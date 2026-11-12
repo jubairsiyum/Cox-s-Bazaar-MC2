@@ -13,9 +13,9 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
-    use HasFactory, Notifiable, HasRoles, SoftDeletes;
+    use HasFactory, HasRoles, Notifiable, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -35,8 +35,9 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'password'          => 'hashed',
-            'status'            => UserStatus::class,
+            'password' => 'hashed',
+            'status' => UserStatus::class,
+            'last_login_at' => 'datetime',
         ];
     }
 
@@ -74,5 +75,10 @@ class User extends Authenticatable
     public function getInitialsAttribute(): string
     {
         return strtoupper(substr($this->name, 0, 2));
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->hasRole('Super Admin');
     }
 }

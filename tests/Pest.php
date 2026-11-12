@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -15,7 +16,7 @@ use Tests\TestCase;
 */
 
 pest()->extend(TestCase::class)
- // ->use(RefreshDatabase::class)
+    ->use(RefreshDatabase::class)
     ->in('Feature');
 
 /*
@@ -47,4 +48,17 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * Create a verified Super Admin, authenticate as them, and return the user.
+ */
+function actingAsSuperAdmin(): User
+{
+    $admin = User::factory()->create(['email_verified_at' => now()]);
+    $admin->assignRole('Super Admin');
+
+    test()->actingAs($admin);
+
+    return $admin;
 }
