@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Policies\RolePolicy;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -28,6 +29,29 @@ class AppServiceProvider extends ServiceProvider
         $this->registerSuperAdminGateBypass();
         $this->registerPasswordDefaults();
         $this->registerPolicies();
+        $this->registerTailAdminComponents();
+    }
+
+    /**
+     * Register Blade component aliases for TailAdmin modules.
+     */
+    private function registerTailAdminComponents(): void
+    {
+        $componentPaths = [
+            'dashboard' => 'views/components/main/dashboard',
+            'ecommerce' => 'views/components/main/dashboard/ecommerce',
+            'form' => 'views/components/main/forms',
+            'profile' => 'views/components/main/profile',
+            'tables' => 'views/components/main/tables',
+            'calendar' => 'views/components/main/calendar',
+        ];
+
+        foreach ($componentPaths as $prefix => $path) {
+            $fullPath = resource_path($path);
+            if (is_dir($fullPath)) {
+                Blade::anonymousComponentPath($fullPath, $prefix);
+            }
+        }
     }
 
     /**

@@ -90,6 +90,26 @@ Route::middleware('auth')->group(function () {
         Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');
         Route::patch('settings', [SettingsController::class, 'update'])->name('settings.update');
     });
+
+    /*
+    |--------------------------------------------------------------------------
+    | TailAdmin Showcase & Demos
+    |--------------------------------------------------------------------------
+    */
+    Route::get('ecommerce', fn () => view('pages.dashboard.ecommerce', ['title' => 'E-commerce Dashboard']))->name('ecommerce');
+    Route::get('calendar', fn () => view('pages.calendar', ['title' => 'Calendar']))->name('calendar');
+    Route::get('form-elements', fn () => view('pages.forms.form-elements', ['title' => 'Form Elements']))->name('form-elements');
+    Route::get('basic-tables', fn () => view('pages.tables.basic-tables', ['title' => 'Basic Tables']))->name('basic-tables');
+    Route::get('blank', fn () => view('pages.pages.blank', ['title' => 'Blank']))->name('blank');
+    Route::get('error-404', fn () => view('pages.errors.error-404', ['title' => 'Error 404']))->name('error-404');
+    Route::get('line-chart', fn () => view('pages.chart.line-chart', ['title' => 'Line Chart']))->name('line-chart');
+    Route::get('bar-chart', fn () => view('pages.chart.bar-chart', ['title' => 'Bar Chart']))->name('bar-chart');
+    Route::get('alerts', fn () => view('pages.ui-elements.alerts', ['title' => 'Alerts']))->name('alerts');
+    Route::get('avatars', fn () => view('pages.ui-elements.avatars', ['title' => 'Avatars']))->name('avatars');
+    Route::get('badge', fn () => view('pages.ui-elements.badge', ['title' => 'Badges']))->name('badge');
+    Route::get('buttons', fn () => view('pages.ui-elements.buttons', ['title' => 'Buttons']))->name('buttons');
+    Route::get('images', fn () => view('pages.ui-elements.images', ['title' => 'Images']))->name('images');
+    Route::get('videos', fn () => view('pages.ui-elements.videos', ['title' => 'Videos']))->name('videos');
 });
 
 /*
