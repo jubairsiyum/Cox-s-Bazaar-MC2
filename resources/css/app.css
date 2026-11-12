@@ -836,3 +836,207 @@ nav[aria-label="Pagination Navigation"] span[aria-current="page"] {
     .main-content { margin-left: 0; }
     .page-content { padding: 0; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   ADMINISTRATION MODULE — Modern UI additions
+═══════════════════════════════════════════════════════════ */
+
+/* Initials avatar */
+.avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--color-primary-subtle);
+    color: var(--color-primary);
+    font-weight: 600;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.avatar-lg { width: 40px; height: 40px; font-size: 0.9rem; }
+.avatar-md { width: 32px; height: 32px; font-size: 0.78rem; }
+.avatar-sm { width: 24px; height: 24px; font-size: 0.7rem; }
+
+/* Stat card with leading icon */
+.stat-card {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.stat-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.stat-icon svg { width: 20px; height: 20px; }
+
+.stat-icon-red    { background: var(--color-danger-subtle);  color: var(--color-danger); }
+.stat-icon-green  { background: var(--color-success-subtle); color: var(--color-success); }
+.stat-icon-blue   { background: var(--color-info-subtle);    color: var(--color-info); }
+.stat-icon-amber  { background: var(--color-warning-subtle); color: var(--color-warning); }
+.stat-icon-slate  { background: var(--color-border);         color: var(--color-text-secondary); }
+
+/* Tabs */
+.tabs {
+    display: flex;
+    gap: 2px;
+    border-bottom: 1px solid var(--color-border);
+    margin-bottom: 20px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+
+.tab {
+    padding: 9px 16px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--color-text-muted);
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: color .15s, border-color .15s;
+}
+.tab:hover { color: var(--color-text); }
+.tab.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+    font-weight: 600;
+}
+
+/* Toggle switch */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 42px;
+    height: 22px;
+    flex-shrink: 0;
+}
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch .slider {
+    position: absolute;
+    inset: 0;
+    background: var(--color-border-strong);
+    border-radius: 20px;
+    transition: background .2s;
+    cursor: pointer;
+}
+.switch .slider::before {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    left: 3px;
+    top: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform .2s;
+    box-shadow: 0 1px 2px rgba(0,0,0,.2);
+}
+.switch input:checked + .slider { background: var(--color-primary); }
+.switch input:checked + .slider::before { transform: translateX(20px); }
+.switch input:focus-visible + .slider { box-shadow: 0 0 0 3px rgba(192,57,43,.25); }
+
+/* Setting row (label + input) */
+.setting-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Cell with avatar + stacked text */
+.cell-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+.cell-user .cell-title {
+    font-weight: 600;
+    color: var(--color-text);
+    line-height: 1.25;
+}
+.cell-user .cell-sub {
+    font-size: 0.76rem;
+    color: var(--color-text-muted);
+    margin-top: 1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Responsive data tables — transform to stacked cards on mobile.
+   Requires `data-label` attributes on every <td>. */
+@media (max-width: 640px) {
+    .table-wrap:has(.table-responsive) {
+        border: none;
+        border-radius: 0;
+        overflow: visible;
+    }
+
+    .table-responsive thead { display: none; }
+
+    .table-responsive, .table-responsive tbody,
+    .table-responsive tr, .table-responsive td {
+        display: block;
+        width: 100%;
+    }
+
+    .table-responsive tr {
+        margin-bottom: 12px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        background: var(--color-surface);
+        box-shadow: var(--shadow-card);
+        overflow: hidden;
+    }
+
+    .table-responsive tr:hover { background: var(--color-surface); }
+
+    .table-responsive td {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 11px 14px;
+        border-bottom: 1px solid var(--color-border);
+        text-align: right;
+    }
+
+    .table-responsive td:last-child { border-bottom: none; }
+
+    .table-responsive td::before {
+        content: attr(data-label);
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: var(--color-text-muted);
+        text-align: left;
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
+
+    .table-responsive td[data-label=""]::before { content: none; }
+    .table-responsive td[data-label=""] { justify-content: flex-end; }
+}

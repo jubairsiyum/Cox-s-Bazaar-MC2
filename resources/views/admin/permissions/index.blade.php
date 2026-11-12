@@ -12,19 +12,21 @@
     <a href="{{ route('roles.index') }}" class="btn btn-secondary">Back to Roles</a>
 </div>
 
-@foreach($groups as $module => $permissions)
-    <div class="card" style="margin-bottom:16px;">
-        <div class="card-header">
-            <span class="card-title">{{ ucwords(str_replace('-', ' ', $module)) }}</span>
-            <span class="badge badge-neutral">{{ $permissions->count() }}</span>
-        </div>
-        <div class="card-body">
-            <div style="display:flex;flex-wrap:wrap;gap:8px;">
-                @foreach($permissions as $permission)
-                    <span class="badge badge-primary">{{ $permission->name }}</span>
-                @endforeach
+<div class="grid-2">
+    @foreach($groups as $module => $permissions)
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">{{ ucwords(str_replace('-', ' ', $module)) }}</span>
+                <span class="badge badge-neutral">{{ $permissions->count() }}</span>
+            </div>
+            <div class="card-body" style="padding:14px 20px;">
+                <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                    @foreach($permissions as $permission)
+                        <span class="badge badge-primary" style="font-weight:500;">{{ $permission->name }}</span>
+                    @endforeach
+                </div>
             </div>
         </div>
-    </div>
-@endforeach
+    @endforeach
+</div>
 @endsection

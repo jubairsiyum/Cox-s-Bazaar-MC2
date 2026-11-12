@@ -10,7 +10,7 @@
         <div class="page-header-sub">Manage roles and their permissions</div>
     </div>
     <div style="display:flex;gap:8px;">
-        <a href="{{ route('permissions.index') }}" class="btn btn-secondary">View Permissions</a>
+        <a href="{{ route('permissions.index') }}" class="btn btn-secondary">Permissions</a>
         @can('create', Spatie\Permission\Models\Role::class)
             <a href="{{ route('roles.create') }}" class="btn btn-primary">+ Add Role</a>
         @endcan
@@ -20,7 +20,7 @@
 <div class="card">
     <div class="card-body" style="padding:0;">
         <div class="table-wrap">
-            <table class="data-table">
+            <table class="data-table table-responsive">
                 <thead>
                     <tr>
                         <th>Role</th>
@@ -32,14 +32,24 @@
                 <tbody>
                     @forelse($roles as $role)
                         <tr>
-                            <td style="font-weight:600;">{{ $role->name }}</td>
-                            <td>
+                            <td data-label="Role">
+                                <div class="cell-user">
+                                    <x-avatar :name="$role->name" size="md" />
+                                    <div>
+                                        <div class="cell-title">{{ $role->name }}</div>
+                                        @if($role->name === 'Super Admin')
+                                            <div class="cell-sub">Full access</div>
+                                        @endif
+                                    </div>
+                                </div>
+                            </td>
+                            <td data-label="Users">
                                 <span class="badge badge-neutral">{{ $role->users_count }} user{{ $role->users_count == 1 ? '' : 's' }}</span>
                             </td>
-                            <td>
+                            <td data-label="Permissions">
                                 <span class="badge badge-primary">{{ $role->permissions_count }} permission{{ $role->permissions_count == 1 ? '' : 's' }}</span>
                             </td>
-                            <td style="text-align:right;white-space:nowrap;">
+                            <td data-label="" style="text-align:right;white-space:nowrap;">
                                 @can('update', $role)
                                     <a href="{{ route('roles.edit', $role) }}" class="btn btn-secondary btn-sm">Edit</a>
                                 @endcan
@@ -52,7 +62,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4"><x-empty-state message="No roles defined." /></td>
+                            <td colspan="4" data-label=""><x-empty-state message="No roles defined." /></td>
                         </tr>
                     @endforelse
                 </tbody>

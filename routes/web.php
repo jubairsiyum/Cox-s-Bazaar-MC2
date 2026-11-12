@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\EmailVerificationController;
@@ -84,6 +85,11 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::get('audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index')->middleware('permission:audit-logs.view');
+
+    Route::middleware(['verified', 'permission:settings.manage'])->group(function () {
+        Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');
+        Route::patch('settings', [SettingsController::class, 'update'])->name('settings.update');
+    });
 });
 
 /*
@@ -119,7 +125,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         'account-transfers.index' => 'Transfers',
         'supplier-payments.index' => 'Supplier Payments',
         'reports.sales' => 'Reports',
-        'settings.index' => 'Settings',
     ];
 
     foreach ($placeholders as $name => $label) {
