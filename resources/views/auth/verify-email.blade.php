@@ -1,30 +1,31 @@
-@extends('layouts.guest')
+@extends('layouts.auth')
 
 @section('title', 'Verify Email')
 
 @section('content')
-<div class="card">
-    <div class="card-body" style="padding:28px;">
-        <h1 style="font-size:1.1rem;font-weight:700;margin:0 0 4px;">Verify Your Email</h1>
-        <p style="font-size:.8rem;color:var(--color-text-muted);margin:0 0 20px;">
-            Thanks for signing up! Before getting started, please verify your email address by clicking the link we just emailed to you.
-        </p>
-
-        @if(session('status'))
-            <div class="alert alert-success" style="margin-bottom:16px;">{{ session('status') }}</div>
-        @endif
-
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
-            <form method="POST" action="{{ route('verification.send') }}">
-                @csrf
-                <button type="submit" class="btn btn-primary">Resend Verification Email</button>
-            </form>
-
-            <form method="POST" action="{{ route('logout') }}">
-                @csrf
-                <button type="submit" class="btn btn-secondary">Log Out</button>
-            </form>
-        </div>
+    <div class="auth-top">
+        <span>Account <b>verification</b></span>
+        <small>Signed in as<br><b>{{ auth()->user()->email }}</b></small>
     </div>
-</div>
+
+    <h2>Verify your email</h2>
+    <p class="auth-desc">
+        We sent a verification link to <b>{{ auth()->user()->email }}</b>. Click the link in the email to activate your account, or request a new one below.
+    </p>
+
+    @if(session('status'))
+        <div class="auth-alert auth-alert-success" role="alert">{{ session('status') }}</div>
+    @endif
+
+    <div class="auth-actions">
+        <form method="POST" action="{{ route('verification.send') }}">
+            @csrf
+            <button type="submit" class="auth-btn">Resend verification email</button>
+        </form>
+
+        <form method="POST" action="{{ route('logout') }}">
+            @csrf
+            <button type="submit" class="auth-btn-secondary">Log out</button>
+        </form>
+    </div>
 @endsection

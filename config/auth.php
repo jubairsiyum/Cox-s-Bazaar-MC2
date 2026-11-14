@@ -114,4 +114,20 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Browser Authentication Gate
+    |--------------------------------------------------------------------------
+    |
+    | Optional HTTP Basic Authentication applied to the login page. The
+    | browser prompts for these credentials before the login form is served.
+    | Leave either value empty to disable the gate.
+    |
+    */
+
+    'browser_gate' => [
+        'username' => env('AUTH_GATE_USERNAME'),
+        'password' => env('AUTH_GATE_PASSWORD'),
+    ],
+
 ];
