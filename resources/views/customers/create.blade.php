@@ -25,6 +25,21 @@
     </div>
 </div>
 
+@php
+    $savedFields = old('custom_fields', []);
+    $initialFields = [];
+    if (is_array($savedFields)) {
+        foreach ($savedFields as $sf) {
+            if (!empty($sf['label'])) {
+                $initialFields[] = [
+                    'label' => trim((string) $sf['label']),
+                    'value' => $sf['value'] ?? '',
+                ];
+            }
+        }
+    }
+@endphp
+
 {{-- Main Form Card --}}
 <div class="card mb-6 border-t-4 border-t-cyan-500 shadow-sm" x-data="customerForm()">
     <div class="card-body">
@@ -165,13 +180,15 @@
 
             {{-- Custom Fields Section --}}
             <div class="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-                <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center justify-between mb-4">
                     <div>
                         <h3 class="text-sm font-bold text-gray-800 dark:text-gray-200">Custom Fields</h3>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Add any additional customer information or attributes (e.g. NID, Tax No, Alternate Contact).</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                            Add any additional customer information or attributes (e.g. NID, Tax No, Alternate Contact). Fields added are saved to the database.
+                        </p>
                     </div>
-                    <button type="button" @click="addCustomField()"
-                            class="px-3 py-1.5 rounded text-xs font-semibold text-white shadow-xs transition hover:opacity-90 cursor-pointer flex items-center gap-1"
+                    <button type="button" @click="openAddFieldModal()"
+                            class="px-3.5 py-1.5 rounded text-xs font-semibold text-white shadow-xs transition hover:opacity-90 cursor-pointer flex items-center gap-1.5"
                             style="background-color: #00c0ef;">
                         <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -180,25 +197,42 @@
                     </button>
                 </div>
 
-                <div class="space-y-2">
+                {{-- Fields List --}}
+                <div class="space-y-3">
                     <template x-for="(field, index) in customFields" :key="index">
-                        <div class="flex items-center gap-2">
-                            <input type="text" :name="`custom_fields[${index}][label]`" x-model="field.label"
-                                   placeholder="Field Name (e.g. NID)"
-                                   class="form-control text-xs w-1/3">
-                            <input type="text" :name="`custom_fields[${index}][value]`" x-model="field.value"
-                                   placeholder="Field Value"
-                                   class="form-control text-xs flex-1">
-                            <button type="button" @click="removeCustomField(index)"
-                                    class="p-1.5 text-red-500 hover:text-red-700 rounded transition"
-                                    title="Remove field">
-                                <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                </svg>
-                            </button>
+                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center p-2.5 rounded-lg bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700">
+                            {{-- Field Label (Col 1-4) --}}
+                            <div class="sm:col-span-4 flex items-center justify-between pr-2">
+                                <label class="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate" x-text="field.label"></label>
+                                <input type="hidden" :name="`custom_fields[${index}][label]`" :value="field.label">
+                            </div>
+
+                            {{-- Field Value Input (Col 5-11) --}}
+                            <div class="sm:col-span-7">
+                                <input type="text"
+                                       :name="`custom_fields[${index}][value]`"
+                                       x-model="field.value"
+                                       :placeholder="`Enter ${field.label}`"
+                                       class="form-control w-full py-1.5 px-3 text-sm rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700">
+                            </div>
+
+                            {{-- Delete / Remove Button (Col 12) --}}
+                            <div class="sm:col-span-1 text-right sm:text-center">
+                                <button type="button"
+                                        @click="removeCustomField(index)"
+                                        class="p-1.5 text-gray-400 hover:text-red-500 rounded transition cursor-pointer"
+                                        title="Delete field">
+                                    <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                     </template>
-                    <p x-show="customFields.length === 0" class="text-xs text-gray-400 italic">No custom fields added yet. Click "+ Add Field" if needed.</p>
+
+                    <p x-show="customFields.length === 0" class="text-xs text-gray-400 italic py-2">
+                        No custom fields added yet. Click "+ Add Field" above to add dynamic custom fields.
+                    </p>
                 </div>
             </div>
 
@@ -220,15 +254,115 @@
             </div>
         </form>
     </div>
+
+    {{-- Add Custom Field Modal --}}
+    <div x-show="showAddFieldModal" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+         @keydown.escape.window="showAddFieldModal = false">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-5 border border-gray-200 dark:border-gray-700"
+             @click.outside="showAddFieldModal = false">
+            <h3 class="text-base font-bold text-gray-900 dark:text-white mb-1.5">Add New Custom Field</h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                Enter the name of the custom field (e.g. NID, Trade License, Alternate Contact). It will be saved dynamically to the database.
+            </p>
+
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Field Name*</label>
+                <input type="text" list="existing-custom-fields" x-model="newFieldName" @keydown.enter.prevent="saveNewField()"
+                       placeholder="e.g. NID, Trade License, Alternate Contact"
+                       class="form-control w-full py-2 px-3 text-sm rounded">
+                <datalist id="existing-custom-fields">
+                    @foreach($customFieldDefinitions as $cf)
+                        <option value="{{ $cf->name }}"></option>
+                    @endforeach
+                </datalist>
+                <p x-show="fieldError" x-text="fieldError" class="text-xs text-red-500 mt-1"></p>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
+                <button type="button" @click="showAddFieldModal = false"
+                        class="px-4 py-2 rounded text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition cursor-pointer">
+                    Cancel
+                </button>
+                <button type="button" @click="saveNewField()"
+                        :disabled="isSubmittingField"
+                        class="px-4 py-2 rounded text-xs font-semibold text-white shadow-xs transition hover:opacity-90 flex items-center gap-1.5 cursor-pointer"
+                        style="background-color: #00a65a;">
+                    <span x-show="!isSubmittingField">Add Field</span>
+                    <span x-show="isSubmittingField">Adding...</span>
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
 function customerForm() {
     return {
-        customFields: @json(old('custom_fields', [])),
-        addCustomField() {
-            this.customFields.push({ label: '', value: '' });
+        customFields: @json($initialFields),
+        showAddFieldModal: false,
+        newFieldName: '',
+        fieldError: '',
+        isSubmittingField: false,
+
+        openAddFieldModal() {
+            this.newFieldName = '';
+            this.fieldError = '';
+            this.showAddFieldModal = true;
         },
+
+        async saveNewField() {
+            const name = this.newFieldName.trim();
+            if (!name) {
+                this.fieldError = 'Field name is required.';
+                return;
+            }
+
+            if (this.customFields.some(f => f.label.toLowerCase() === name.toLowerCase())) {
+                this.fieldError = 'This field already exists.';
+                return;
+            }
+
+            this.isSubmittingField = true;
+            this.fieldError = '';
+
+            try {
+                const response = await fetch('{{ route('customers.custom-fields.store') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ name: name })
+                });
+
+                const data = await response.json();
+                if (data.success && data.custom_field) {
+                    this.customFields.push({
+                        id: data.custom_field.id,
+                        label: data.custom_field.name,
+                        value: ''
+                    });
+                    this.newFieldName = '';
+                    this.showAddFieldModal = false;
+                } else {
+                    this.fieldError = data.message || 'Failed to save field.';
+                }
+            } catch (err) {
+                // Fallback: add locally so user workflow is not blocked
+                this.customFields.push({
+                    id: null,
+                    label: name,
+                    value: ''
+                });
+                this.newFieldName = '';
+                this.showAddFieldModal = false;
+            } finally {
+                this.isSubmittingField = false;
+            }
+        },
+
         removeCustomField(index) {
             this.customFields.splice(index, 1);
         }

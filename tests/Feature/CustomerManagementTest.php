@@ -2,6 +2,7 @@
 
 use App\Helpers\MenuHelper;
 use App\Models\Customer;
+use App\Models\CustomerCustomField;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\SettingsSeeder;
@@ -37,7 +38,7 @@ it('lists customers for an authorized user', function () {
         ->assertSee('CU0001');
 });
 
-it('shows the customer create page', function () {
+it('shows the customer create page with initially blank custom fields', function () {
     actingAsSuperAdmin();
 
     $this->get(route('customers.create'))
@@ -45,6 +46,8 @@ it('shows the customer create page', function () {
         ->assertSee('Customers')
         ->assertSee('Add/Update Customers')
         ->assertSee('Custom Fields')
+        ->assertSee('No custom fields added yet', false)
+        ->assertSee('customFields: []', false)
         ->assertDontSee('Opening Balance Payments');
 });
 
@@ -78,6 +81,13 @@ it('creates a customer and automatically assigns a CU code', function () {
         ->and($customer->note)->toBe('VIP Customer')
         ->and($customer->custom_fields)->toHaveCount(2)
         ->and($customer->custom_fields[0]['label'])->toBe('NID');
+
+    $this->assertDatabaseHas('customer_custom_fields', [
+        'name' => 'NID',
+    ]);
+    $this->assertDatabaseHas('customer_custom_fields', [
+        'name' => 'Reference',
+    ]);
 
     $this->assertDatabaseHas('audit_logs', [
         'event' => 'created',
@@ -272,4 +282,35 @@ it('verifies menu items for customers in MenuHelper', function () {
         ->and($customerNav['subItems'][1]['path'])->toBe('/customers')
         ->and($customerNav['subItems'][2]['name'])->toBe('Import Customers')
         ->and($customerNav['subItems'][2]['path'])->toBe('/customers/import');
+});
+
+it('dynamically adds and deletes custom field definitions in the database', function () {
+    actingAsSuperAdmin();
+
+    $response = $this->postJson(route('customers.custom-fields.store'), [
+        'name' => 'Trade License',
+    ]);
+
+    $response->assertOk()
+        ->assertJson([
+            'success' => true,
+            'custom_field' => [
+                'name' => 'Trade License',
+                'field_key' => 'trade_license',
+            ],
+        ]);
+
+    $this->assertDatabaseHas('customer_custom_fields', [
+        'name' => 'Trade License',
+        'field_key' => 'trade_license',
+    ]);
+
+    $field = CustomerCustomField::where('name', 'Trade License')->first();
+
+    $deleteResponse = $this->deleteJson(route('customers.custom-fields.destroy', $field));
+    $deleteResponse->assertOk()->assertJson(['success' => true]);
+
+    $this->assertDatabaseMissing('customer_custom_fields', [
+        'name' => 'Trade License',
+    ]);
 });

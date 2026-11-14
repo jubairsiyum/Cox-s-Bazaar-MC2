@@ -10,7 +10,9 @@ use App\Http\Requests\Customer\StoreCustomerRequest;
 use App\Http\Requests\Customer\UpdateCustomerRequest;
 use App\Imports\CustomerImport;
 use App\Models\Customer;
+use App\Models\CustomerCustomField;
 use App\Services\AuditService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -63,8 +65,11 @@ class CustomerController extends Controller
             }
         }
 
+        $customFieldDefinitions = CustomerCustomField::orderBy('id')->get();
+
         return view('customers.create', [
             'customer' => new Customer,
+            'customFieldDefinitions' => $customFieldDefinitions,
         ]);
     }
 
@@ -76,11 +81,22 @@ class CustomerController extends Controller
         $validated = $request->validated();
         $validated['created_by'] = $request->user()->id;
 
-        // Filter empty custom field rows
+        // Filter empty custom field rows and sync into customer_custom_fields table
         if (isset($validated['custom_fields']) && is_array($validated['custom_fields'])) {
-            $validated['custom_fields'] = array_values(array_filter($validated['custom_fields'], function ($field) {
-                return ! empty($field['label']) || ! empty($field['value']);
+            $validated['custom_fields'] = array_values(array_filter($validated['custom_fields'], function ($field) use ($request) {
+                $hasLabel = ! empty($field['label']);
+                $hasValue = isset($field['value']) && $field['value'] !== '';
+
+                if ($hasLabel) {
+                    CustomerCustomField::firstOrCreate(
+                        ['name' => trim((string) $field['label'])],
+                        ['created_by' => $request->user()?->id]
+                    );
+                }
+
+                return $hasLabel && $hasValue;
             }));
+
             if (empty($validated['custom_fields'])) {
                 $validated['custom_fields'] = null;
             }
@@ -101,8 +117,11 @@ class CustomerController extends Controller
     {
         $this->authorize('update', $customer);
 
+        $customFieldDefinitions = CustomerCustomField::orderBy('id')->get();
+
         return view('customers.edit', [
             'customer' => $customer,
+            'customFieldDefinitions' => $customFieldDefinitions,
         ]);
     }
 
@@ -114,11 +133,22 @@ class CustomerController extends Controller
         $original = $customer->getOriginal();
         $validated = $request->validated();
 
-        // Filter empty custom field rows
+        // Filter empty custom field rows and sync into customer_custom_fields table
         if (isset($validated['custom_fields']) && is_array($validated['custom_fields'])) {
-            $validated['custom_fields'] = array_values(array_filter($validated['custom_fields'], function ($field) {
-                return ! empty($field['label']) || ! empty($field['value']);
+            $validated['custom_fields'] = array_values(array_filter($validated['custom_fields'], function ($field) use ($request) {
+                $hasLabel = ! empty($field['label']);
+                $hasValue = isset($field['value']) && $field['value'] !== '';
+
+                if ($hasLabel) {
+                    CustomerCustomField::firstOrCreate(
+                        ['name' => trim((string) $field['label'])],
+                        ['created_by' => $request->user()?->id]
+                    );
+                }
+
+                return $hasLabel && $hasValue;
             }));
+
             if (empty($validated['custom_fields'])) {
                 $validated['custom_fields'] = null;
             }
@@ -130,6 +160,52 @@ class CustomerController extends Controller
 
         return redirect()->route('customers.index')
             ->with('success', "Customer '{$customer->name}' updated successfully.");
+    }
+
+    /**
+     * Store a new custom field definition in DB dynamically.
+     */
+    public function storeCustomField(Request $request): JsonResponse|RedirectResponse
+    {
+        $this->authorize('create', Customer::class);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+        ]);
+
+        $name = trim($validated['name']);
+        $field = CustomerCustomField::firstOrCreate(
+            ['name' => $name],
+            ['created_by' => $request->user()?->id]
+        );
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'custom_field' => $field,
+            ]);
+        }
+
+        return back()->with('success', "Custom field '{$field->name}' added successfully.");
+    }
+
+    /**
+     * Delete a custom field definition from DB.
+     */
+    public function destroyCustomField(Request $request, CustomerCustomField $customField): JsonResponse|RedirectResponse
+    {
+        $this->authorize('create', Customer::class);
+
+        $name = $customField->name;
+        $customField->delete();
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+            ]);
+        }
+
+        return back()->with('success', "Custom field '{$name}' deleted successfully.");
     }
 
     /**
