@@ -27,11 +27,18 @@ class MenuHelper
             ],
             [
                 'icon' => 'users',
-                'name' => 'Parties',
+                'name' => 'Suppliers',
+                'canany' => ['suppliers.view', 'suppliers.manage'],
                 'subItems' => [
-                    ['name' => 'Suppliers', 'path' => '/suppliers'],
-                    ['name' => 'Customers', 'path' => '/customers'],
+                    ['name' => 'New Supplier', 'path' => '/suppliers/create', 'can' => 'suppliers.manage'],
+                    ['name' => 'Suppliers List', 'path' => '/suppliers', 'can' => 'suppliers.view'],
+                    ['name' => 'Import Suppliers', 'path' => '/suppliers/import', 'can' => 'suppliers.manage'],
                 ],
+            ],
+            [
+                'icon' => 'users',
+                'name' => 'Customers',
+                'path' => '/customers',
             ],
             [
                 'icon' => 'tables',

@@ -47,6 +47,7 @@ class AuditLog extends Model
         if ($this->auditable_type && $this->auditable_id) {
             return app($this->auditable_type)::find($this->auditable_id);
         }
+
         return null;
     }
 }

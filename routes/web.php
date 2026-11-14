@@ -12,6 +12,7 @@ use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PlaceholderController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SupplierController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => view('welcome'));
@@ -93,6 +94,31 @@ Route::middleware('auth')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
+    | Supplier Management
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['verified', 'permission:suppliers.view'])->group(function () {
+        Route::get('suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
+        Route::get('suppliers/export/{format?}', [SupplierController::class, 'export'])->name('suppliers.export');
+        Route::get('suppliers/import/template', [SupplierController::class, 'downloadTemplate'])->name('suppliers.import-template');
+    });
+
+    Route::middleware(['verified', 'permission:suppliers.manage'])->group(function () {
+        Route::get('suppliers/create', [SupplierController::class, 'create'])->name('suppliers.create');
+        Route::post('suppliers', [SupplierController::class, 'store'])->name('suppliers.store');
+        Route::get('suppliers/import', [SupplierController::class, 'importView'])->name('suppliers.import');
+        Route::post('suppliers/import', [SupplierController::class, 'import'])->name('suppliers.import.store');
+        Route::get('suppliers/{supplier}/edit', [SupplierController::class, 'edit'])->name('suppliers.edit');
+        Route::patch('suppliers/{supplier}', [SupplierController::class, 'update'])->name('suppliers.update');
+        Route::patch('suppliers/{supplier}/toggle-status', [SupplierController::class, 'toggleStatus'])->name('suppliers.toggle-status');
+        Route::delete('suppliers/{supplier}', [SupplierController::class, 'destroy'])->name('suppliers.destroy');
+        Route::post('suppliers/{supplier}/pay-due', [SupplierController::class, 'payDue'])->name('suppliers.pay-due');
+        Route::post('suppliers/{supplier}/pay-return-due', [SupplierController::class, 'payReturnDue'])->name('suppliers.pay-return-due');
+        Route::delete('suppliers/payments/{payment}', [SupplierController::class, 'destroyPayment'])->name('suppliers.payments.destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
     | TailAdmin Showcase & Demos
     |--------------------------------------------------------------------------
     */
@@ -124,7 +150,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         'categories.index' => 'Categories',
         'units.index' => 'Units',
         'products.index' => 'Products',
-        'suppliers.index' => 'Suppliers',
         'customers.index' => 'Customers',
         'warehouses.index' => 'Warehouses',
         'inventory.index' => 'Stock Levels',

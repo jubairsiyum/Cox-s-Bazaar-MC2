@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('phone', 20)->nullable()->after('email');
             $table->string('status', 20)->default('active')->after('phone');  // active|inactive
             $table->foreignId('branch_id')->nullable()->after('status')
-                  ->constrained('branches')->nullOnDelete();
+                ->constrained('branches')->nullOnDelete();
             $table->softDeletes();
         });
     }
