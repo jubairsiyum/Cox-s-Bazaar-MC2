@@ -99,6 +99,8 @@ Route::middleware('auth')->group(function () {
     */
     Route::middleware(['verified', 'permission:suppliers.view'])->group(function () {
         Route::get('suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
+        Route::get('suppliers/pdf-view', [SupplierController::class, 'pdfView'])->name('suppliers.pdf-view');
+        Route::get('suppliers/print-view', [SupplierController::class, 'printView'])->name('suppliers.print-view');
         Route::get('suppliers/export/{format?}', [SupplierController::class, 'export'])->name('suppliers.export');
         Route::get('suppliers/import/template', [SupplierController::class, 'downloadTemplate'])->name('suppliers.import-template');
     });

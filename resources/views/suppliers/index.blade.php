@@ -66,30 +66,53 @@
                 {{-- Middle: Export Buttons --}}
                 <div class="flex items-center gap-1 flex-wrap">
                     <button type="button" @click="copyTable()"
-                            class="px-3 py-1.5 rounded text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
+                            class="px-3 py-1.5 rounded text-xs font-semibold text-white shadow-xs transition hover:opacity-90 cursor-pointer"
                             style="background-color: #26c6da;">
                         Copy
                     </button>
-                    <a href="{{ route('suppliers.export', 'xlsx') . '?' . http_build_query(request()->only(['search', 'status'])) }}"
-                       class="px-3 py-1.5 rounded text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
+                    <a :href="exportUrl('xlsx')"
+                       class="px-3 py-1.5 rounded text-xs font-semibold text-white shadow-xs transition hover:opacity-90 cursor-pointer"
                        style="background-color: #26c6da;">
                         Excel
                     </a>
-                    <button type="button" @click="window.print()"
-                            class="px-3 py-1.5 rounded text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
+                    <button type="button" @click="openPdf()"
+                            class="px-3 py-1.5 rounded text-xs font-semibold text-white shadow-xs transition hover:opacity-90 cursor-pointer"
                             style="background-color: #26c6da;">
                         PDF
                     </button>
-                    <button type="button" @click="window.print()"
-                            class="px-3 py-1.5 rounded text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
+                    <button type="button" @click="printTable()"
+                            class="px-3 py-1.5 rounded text-xs font-semibold text-white shadow-xs transition hover:opacity-90 cursor-pointer"
                             style="background-color: #26c6da;">
                         Print
                     </button>
-                    <a href="{{ route('suppliers.export', 'csv') . '?' . http_build_query(request()->only(['search', 'status'])) }}"
-                       class="px-3 py-1.5 rounded text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
+                    <a :href="exportUrl('csv')"
+                       class="px-3 py-1.5 rounded text-xs font-semibold text-white shadow-xs transition hover:opacity-90 cursor-pointer"
                        style="background-color: #26c6da;">
                         CSV
                     </a>
+
+                    {{-- Columns Visibility Dropdown (matching Image 3) --}}
+                    <div class="relative inline-block text-left">
+                        <button type="button" @click.stop="columnsDropdownOpen = !columnsDropdownOpen"
+                                class="px-3 py-1.5 rounded text-xs font-semibold text-white shadow-xs transition hover:opacity-90 cursor-pointer flex items-center gap-1"
+                                style="background-color: #26c6da;">
+                            Columns
+                        </button>
+
+                        <div x-show="columnsDropdownOpen" x-cloak
+                             @click.outside="columnsDropdownOpen = false"
+                             class="absolute left-0 sm:right-0 sm:left-auto mt-1 w-44 rounded shadow-2xl py-1 z-50 text-left border border-blue-400"
+                             style="background-color: #2580ab;">
+                            <template x-for="col in columnList" :key="col.key">
+                                <button type="button" @click="toggleColumn(col.key)"
+                                        class="w-full flex items-center justify-between px-3.5 py-1.5 text-xs font-medium text-white transition hover:bg-[#1e6b94] text-left cursor-pointer"
+                                        :class="{ 'opacity-50 line-through': !columns[col.key] }">
+                                    <span x-text="col.label"></span>
+                                    <span x-show="columns[col.key]" class="text-[10px] font-bold">✓</span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
                 </div>
 
                 {{-- Right: Search Input --}}
@@ -113,28 +136,28 @@
                                 <input type="checkbox" @click="toggleSelectAll()" :checked="allSelected"
                                        class="rounded border-gray-300 text-cyan-600 focus:ring-0">
                             </th>
-                            <th class="p-2.5 font-bold text-xs tracking-wider cursor-pointer" style="color: #ffffff !important;">
+                            <th x-show="columns.supplier_id" class="p-2.5 font-bold text-xs tracking-wider cursor-pointer" style="color: #ffffff !important;">
                                 SUPPLIER ID <span class="opacity-80">⇅</span>
                             </th>
-                            <th class="p-2.5 font-bold text-xs tracking-wider cursor-pointer" style="color: #ffffff !important;">
+                            <th x-show="columns.name" class="p-2.5 font-bold text-xs tracking-wider cursor-pointer" style="color: #ffffff !important;">
                                 SUPPLIER NAME <span class="opacity-80">⇅</span>
                             </th>
-                            <th class="p-2.5 font-bold text-xs tracking-wider cursor-pointer" style="color: #ffffff !important;">
+                            <th x-show="columns.mobile" class="p-2.5 font-bold text-xs tracking-wider cursor-pointer" style="color: #ffffff !important;">
                                 MOBILE <span class="opacity-80">⇅</span>
                             </th>
-                            <th class="p-2.5 font-bold text-xs tracking-wider cursor-pointer" style="color: #ffffff !important;">
+                            <th x-show="columns.email" class="p-2.5 font-bold text-xs tracking-wider cursor-pointer" style="color: #ffffff !important;">
                                 EMAIL <span class="opacity-80">⇅</span>
                             </th>
-                            <th class="p-2.5 font-bold text-xs tracking-wider cursor-pointer" style="color: #ffffff !important;">
+                            <th x-show="columns.purchase_due" class="p-2.5 font-bold text-xs tracking-wider cursor-pointer" style="color: #ffffff !important;">
                                 PURCHASE DUE <span class="opacity-80">⇅</span>
                             </th>
-                            <th class="p-2.5 font-bold text-xs tracking-wider cursor-pointer" style="color: #ffffff !important;">
+                            <th x-show="columns.purchase_return_due" class="p-2.5 font-bold text-xs tracking-wider cursor-pointer" style="color: #ffffff !important;">
                                 PURCHASE RETURN DUE <span class="opacity-80">⇅</span>
                             </th>
-                            <th class="p-2.5 font-bold text-xs tracking-wider cursor-pointer" style="color: #ffffff !important;">
+                            <th x-show="columns.status" class="p-2.5 font-bold text-xs tracking-wider cursor-pointer" style="color: #ffffff !important;">
                                 STATUS <span class="opacity-80">⇅</span>
                             </th>
-                            <th class="p-2.5 font-bold text-xs tracking-wider text-right" style="color: #ffffff !important;">
+                            <th x-show="columns.action" class="p-2.5 font-bold text-xs tracking-wider text-right" style="color: #ffffff !important;">
                                 ACTION
                             </th>
                         </tr>
@@ -146,25 +169,25 @@
                                     <input type="checkbox" value="{{ $supplier->id }}" x-model="selectedSuppliers"
                                            class="rounded border-gray-300 text-cyan-600 focus:ring-0">
                                 </td>
-                                <td class="p-2.5 text-xs font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
+                                <td x-show="columns.supplier_id" data-col="supplier_id" class="p-2.5 text-xs font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
                                     {{ $supplier->supplier_id }}
                                 </td>
-                                <td class="p-2.5 text-xs text-gray-900 dark:text-gray-100 font-semibold">
+                                <td x-show="columns.name" data-col="name" class="p-2.5 text-xs text-gray-900 dark:text-gray-100 font-semibold">
                                     {{ $supplier->name }}
                                 </td>
-                                <td class="p-2.5 text-xs text-gray-600 dark:text-gray-300">
+                                <td x-show="columns.mobile" data-col="mobile" class="p-2.5 text-xs text-gray-600 dark:text-gray-300">
                                     {{ $supplier->mobile ?: '—' }}
                                 </td>
-                                <td class="p-2.5 text-xs text-gray-600 dark:text-gray-300">
+                                <td x-show="columns.email" data-col="email" class="p-2.5 text-xs text-gray-600 dark:text-gray-300">
                                     {{ $supplier->email ?: '—' }}
                                 </td>
-                                <td class="p-2.5 text-xs font-medium text-gray-900 dark:text-gray-100">
+                                <td x-show="columns.purchase_due" data-col="purchase_due" class="p-2.5 text-xs font-medium text-gray-900 dark:text-gray-100">
                                     {{ number_format((float) $supplier->purchase_due, 2) }}
                                 </td>
-                                <td class="p-2.5 text-xs text-gray-600 dark:text-gray-300">
+                                <td x-show="columns.purchase_return_due" data-col="purchase_return_due" class="p-2.5 text-xs text-gray-600 dark:text-gray-300">
                                     {{ number_format((float) $supplier->purchase_return_due, 2) }}
                                 </td>
-                                <td class="p-2.5 text-xs">
+                                <td x-show="columns.status" data-col="status" class="p-2.5 text-xs">
                                     @can('update', $supplier)
                                         <form method="POST" action="{{ route('suppliers.toggle-status', $supplier) }}" class="inline">
                                             @csrf
@@ -183,7 +206,7 @@
                                         </span>
                                     @endcan
                                 </td>
-                                <td class="p-2.5 text-xs text-right whitespace-nowrap">
+                                <td x-show="columns.action" data-col="action" class="p-2.5 text-xs text-right whitespace-nowrap">
                                     <button @click.stop="toggleActionMenu($event, {{ json_encode([
                                                 'id' => $supplier->id,
                                                 'name' => $supplier->name,
@@ -213,7 +236,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="p-8 text-center text-gray-500 dark:text-gray-400 text-sm font-medium">
+                                <td :colspan="1 + Object.keys(columns).filter(k => columns[k]).length" class="p-8 text-center text-gray-500 dark:text-gray-400 text-sm font-medium">
                                     No suppliers found.
                                 </td>
                             </tr>
@@ -222,10 +245,10 @@
                     {{-- Table Total Footer --}}
                     <tfoot>
                         <tr class="bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-bold text-xs border-t-2 border-gray-300 dark:border-gray-600">
-                            <td colspan="5" class="p-2.5 text-right uppercase tracking-wider">TOTAL</td>
-                            <td class="p-2.5 text-gray-900 dark:text-white font-extrabold">{{ number_format((float) $totalPurchaseDue, 2) }}</td>
-                            <td class="p-2.5 text-gray-900 dark:text-white font-extrabold">{{ number_format((float) $totalPurchaseReturnDue, 2) }}</td>
-                            <td colspan="2" class="p-2.5"></td>
+                            <td :colspan="totalColspan()" class="p-2.5 text-right uppercase tracking-wider">TOTAL</td>
+                            <td x-show="columns.purchase_due" class="p-2.5 text-gray-900 dark:text-white font-extrabold">{{ number_format((float) $totalPurchaseDue, 2) }}</td>
+                            <td x-show="columns.purchase_return_due" class="p-2.5 text-gray-900 dark:text-white font-extrabold">{{ number_format((float) $totalPurchaseReturnDue, 2) }}</td>
+                            <td :colspan="(columns.status ? 1 : 0) + (columns.action ? 1 : 0)" class="p-2.5"></td>
                         </tr>
                     </tfoot>
                 </table>
@@ -481,6 +504,94 @@ function suppliersPage() {
         menuTop: '0px',
         menuLeft: '0px',
 
+        columnsDropdownOpen: false,
+        columns: {
+            supplier_id: true,
+            name: true,
+            mobile: true,
+            email: true,
+            purchase_due: true,
+            purchase_return_due: true,
+            status: true,
+            action: true
+        },
+        columnList: [
+            { key: 'supplier_id', label: 'Supplier ID' },
+            { key: 'name', label: 'Supplier Name' },
+            { key: 'mobile', label: 'Mobile' },
+            { key: 'email', label: 'Email' },
+            { key: 'purchase_due', label: 'Purchase Due' },
+            { key: 'purchase_return_due', label: 'Purchase Return Due' },
+            { key: 'status', label: 'Status' },
+            { key: 'action', label: 'Action' }
+        ],
+
+        toggleColumn(key) {
+            this.columns[key] = !this.columns[key];
+        },
+
+        activeColumnsQuery() {
+            return Object.keys(this.columns)
+                .filter(k => this.columns[k] && k !== 'action')
+                .join(',');
+        },
+
+        exportUrl(format) {
+            const params = new URLSearchParams({
+                columns: this.activeColumnsQuery(),
+                search: '{{ request('search') }}',
+                status: '{{ request('status') }}'
+            });
+            return `/suppliers/export/${format}?${params.toString()}`;
+        },
+
+        openPdf() {
+            const params = new URLSearchParams({
+                columns: this.activeColumnsQuery(),
+                search: '{{ request('search') }}',
+                status: '{{ request('status') }}'
+            });
+            window.open(`/suppliers/pdf-view?${params.toString()}`, '_blank');
+        },
+
+        printTable() {
+            const params = new URLSearchParams({
+                columns: this.activeColumnsQuery(),
+                search: '{{ request('search') }}',
+                status: '{{ request('status') }}'
+            });
+            window.open(`/suppliers/print-view?${params.toString()}`, '_blank');
+        },
+
+        copyTable() {
+            const table = document.getElementById('suppliers-table');
+            const printCols = this.columnList.filter(c => this.columns[c.key] && c.key !== 'action');
+            let text = printCols.map(c => c.label).join('\t') + '\n';
+
+            const rows = table.querySelectorAll('tbody tr');
+            rows.forEach(tr => {
+                if (tr.querySelector('td[colspan]')) return;
+                const rowVals = printCols.map(c => {
+                    const td = tr.querySelector(`td[data-col="${c.key}"]`);
+                    return td ? td.innerText.trim() : '';
+                });
+                text += rowVals.join('\t') + '\n';
+            });
+
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Table data copied to clipboard!');
+            });
+        },
+
+        totalColspan() {
+            let count = 1; // checkbox
+            if (this.columns.supplier_id) count++;
+            if (this.columns.name) count++;
+            if (this.columns.mobile) count++;
+            if (this.columns.email) count++;
+            return count;
+        },
+
         toggleActionMenu(event, supplier) {
             if (this.actionMenuOpen && this.openActionSupplier && this.openActionSupplier.id === supplier.id) {
                 this.actionMenuOpen = false;
@@ -531,23 +642,8 @@ function suppliersPage() {
             } else {
                 checkboxes.forEach(cb => cb.checked = false);
             }
-        },
-
-        copyTable() {
-            const table = document.getElementById('suppliers-table');
-            let text = '';
-            for (let row of table.rows) {
-                let rowData = [];
-                for (let cell of row.cells) {
-                    rowData.push(cell.innerText.trim());
-                }
-                text += rowData.join('\t') + '\n';
-            }
-            navigator.clipboard.writeText(text).then(() => {
-                alert('Table data copied to clipboard!');
-            });
         }
-    }
+    };
 }
 </script>
 @endsection

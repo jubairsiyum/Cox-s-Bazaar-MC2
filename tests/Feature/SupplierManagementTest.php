@@ -268,3 +268,49 @@ it('forbids unauthorized users from toggling supplier status', function () {
 
     expect($supplier->fresh()->status)->toBe('active');
 });
+
+it('renders the pdf preview page with suppliers and headers', function () {
+    actingAsSuperAdmin();
+
+    $supplier = Supplier::factory()->create([
+        'name' => 'John Evans',
+        'supplier_id' => 'SP0009',
+    ]);
+
+    $this->get(route('suppliers.pdf-view', ['columns' => 'supplier_id,name,purchase_due,status']))
+        ->assertOk()
+        ->assertSee('Suppliers List')
+        ->assertSee('John Evans')
+        ->assertSee('SP0009')
+        ->assertSee('Download / Save as PDF');
+});
+
+it('renders the print preview page with suppliers and grid table', function () {
+    actingAsSuperAdmin();
+
+    $supplier = Supplier::factory()->create([
+        'name' => 'John Evans',
+        'supplier_id' => 'SP0009',
+    ]);
+
+    $this->get(route('suppliers.print-view', ['columns' => 'supplier_id,name,purchase_due,status']))
+        ->assertOk()
+        ->assertSee('Suppliers List')
+        ->assertSee('John Evans')
+        ->assertSee('SP0009')
+        ->assertSee('window.print()', false);
+});
+
+it('exports suppliers with selected columns to excel or csv', function () {
+    actingAsSuperAdmin();
+
+    Supplier::factory()->create(['name' => 'Export Supplier']);
+
+    $response = $this->get(route('suppliers.export', [
+        'format' => 'csv',
+        'columns' => 'supplier_id,name,status',
+    ]));
+
+    $response->assertOk();
+    $response->assertHeader('content-disposition');
+});

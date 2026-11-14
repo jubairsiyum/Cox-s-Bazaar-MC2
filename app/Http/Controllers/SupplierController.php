@@ -325,6 +325,106 @@ class SupplierController extends Controller
     }
 
     /**
+     * Show clean PDF preview matching the reference layout.
+     */
+    public function pdfView(Request $request): View
+    {
+        $this->authorize('viewAny', Supplier::class);
+
+        $search = $request->string('search')->toString();
+        $status = $request->string('status')->toString();
+        $columnsParam = $request->string('columns')->toString();
+
+        $defaultColumns = [
+            'supplier_id' => 'Supplier ID',
+            'name' => 'Supplier Name',
+            'mobile' => 'Mobile',
+            'email' => 'Email',
+            'purchase_due' => 'Purchase Due',
+            'purchase_return_due' => 'Purchase Return Due',
+            'status' => 'Status',
+        ];
+
+        if ($columnsParam !== '') {
+            $requested = array_filter(array_map('trim', explode(',', $columnsParam)));
+            $columns = [];
+            foreach ($requested as $col) {
+                if (isset($defaultColumns[$col])) {
+                    $columns[$col] = $defaultColumns[$col];
+                }
+            }
+            if (empty($columns)) {
+                $columns = $defaultColumns;
+            }
+        } else {
+            $columns = $defaultColumns;
+        }
+
+        $suppliers = Supplier::query()
+            ->when($search !== '', fn ($q) => $q->search($search))
+            ->when($status !== '', fn ($q) => $q->where('status', $status))
+            ->latest('id')
+            ->get();
+
+        return view('suppliers.pdf', [
+            'suppliers' => $suppliers,
+            'columns' => $columns,
+            'search' => $search,
+            'status' => $status,
+        ]);
+    }
+
+    /**
+     * Show clean print layout matching the reference image.
+     */
+    public function printView(Request $request): View
+    {
+        $this->authorize('viewAny', Supplier::class);
+
+        $search = $request->string('search')->toString();
+        $status = $request->string('status')->toString();
+        $columnsParam = $request->string('columns')->toString();
+
+        $defaultColumns = [
+            'supplier_id' => 'Supplier ID',
+            'name' => 'Supplier Name',
+            'mobile' => 'Mobile',
+            'email' => 'Email',
+            'purchase_due' => 'Purchase Due',
+            'purchase_return_due' => 'Purchase Return Due',
+            'status' => 'Status',
+        ];
+
+        if ($columnsParam !== '') {
+            $requested = array_filter(array_map('trim', explode(',', $columnsParam)));
+            $columns = [];
+            foreach ($requested as $col) {
+                if (isset($defaultColumns[$col])) {
+                    $columns[$col] = $defaultColumns[$col];
+                }
+            }
+            if (empty($columns)) {
+                $columns = $defaultColumns;
+            }
+        } else {
+            $columns = $defaultColumns;
+        }
+
+        $suppliers = Supplier::query()
+            ->when($search !== '', fn ($q) => $q->search($search))
+            ->when($status !== '', fn ($q) => $q->where('status', $status))
+            ->latest('id')
+            ->get();
+
+        return view('suppliers.print', [
+            'suppliers' => $suppliers,
+            'columns' => $columns,
+            'search' => $search,
+            'status' => $status,
+        ]);
+    }
+
+    /**
      * Export suppliers to Excel or CSV.
      */
     public function export(Request $request, string $format = 'xlsx'): BinaryFileResponse
@@ -333,9 +433,13 @@ class SupplierController extends Controller
 
         $search = $request->string('search')->toString();
         $status = $request->string('status')->toString();
+        $columns = $request->string('columns')->toString();
 
         $filename = 'suppliers_'.now()->format('Y-m-d_His').'.'.($format === 'csv' ? 'csv' : 'xlsx');
 
-        return Excel::download(new SupplierExport($search ?: null, $status ?: null), $filename);
+        return Excel::download(
+            new SupplierExport($search ?: null, $status ?: null, $columns ?: null),
+            $filename
+        );
     }
 }
