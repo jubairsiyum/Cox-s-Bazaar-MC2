@@ -158,29 +158,6 @@
 
             <!-- Main Content Area -->
             <div class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
-                {{-- Flash Messages --}}
-                @if(session('success'))
-                    <div class="alert alert-success" data-flash-dismiss="4000">
-                        <svg class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                        <span>{{ session('success') }}</span>
-                    </div>
-                @endif
-                @if(session('error'))
-                    <div class="alert alert-danger" data-flash-dismiss="6000">
-                        <svg class="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                        <span>{{ session('error') }}</span>
-                    </div>
-                @endif
-                @if(session('warning'))
-                    <div class="alert alert-warning" data-flash-dismiss="5000">
-                        <span>{{ session('warning') }}</span>
-                    </div>
-                @endif
-
                 @yield('content')
             </div>
         </div>
@@ -189,6 +166,78 @@
     {{-- Offline Banner --}}
     <div class="offline-banner" id="offline-banner">
         ⚠ You are offline. Transaction actions require an internet connection.
+    </div>
+
+    {{-- Seed the toast store with server flash messages --}}
+    @php
+        $flashToasts = collect(['success', 'error', 'warning'])
+            ->filter(fn (string $type) => session()->has($type))
+            ->map(fn (string $type) => [
+                'message' => session($type),
+                'type' => $type,
+                'duration' => $type === 'success' ? 4000 : ($type === 'error' ? 6000 : 5000),
+            ])
+            ->values();
+    @endphp
+    <script>
+        window.flashToasts = @json($flashToasts);
+    </script>
+
+    {{-- Toast Notifications --}}
+    <div
+        x-data="toastHost"
+        class="fixed top-4 right-4 z-[99999] flex w-[360px] max-w-[calc(100vw-2rem)] flex-col gap-3"
+        aria-live="polite"
+        aria-label="Notifications"
+    >
+        <template x-for="toast in $store.toast.items" :key="toast.id">
+            <div
+                x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="opacity-0 translate-x-6"
+                x-transition:enter-end="opacity-100 translate-x-0"
+                x-transition:leave="transition ease-in duration-200"
+                x-transition:leave-start="opacity-100 translate-x-0"
+                x-transition:leave-end="opacity-0 translate-x-6"
+                class="pointer-events-auto flex items-start gap-3 rounded-xl border bg-white p-4 shadow-xl dark:bg-gray-800"
+                :class="{
+                    'border-success-200 dark:border-success-500/30': toast.type === 'success',
+                    'border-error-200 dark:border-error-500/30': toast.type === 'error',
+                    'border-warning-200 dark:border-warning-500/30': toast.type === 'warning',
+                }"
+            >
+                <span
+                    class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full"
+                    :class="{
+                        'bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400': toast.type === 'success',
+                        'bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-400': toast.type === 'error',
+                        'bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-400': toast.type === 'warning',
+                    }"
+                >
+                    <svg x-show="toast.type === 'success'" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    <svg x-show="toast.type === 'error'" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                    <svg x-show="toast.type === 'warning'" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/>
+                    </svg>
+                </span>
+
+                <p class="flex-1 text-sm font-medium text-gray-800 dark:text-gray-200" x-text="toast.message"></p>
+
+                <button
+                    type="button"
+                    @click="$store.toast.remove(toast.id)"
+                    class="shrink-0 text-gray-400 transition hover:text-gray-600 dark:hover:text-gray-200"
+                    aria-label="Dismiss"
+                >
+                    <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+        </template>
     </div>
 
     @stack('scripts')
