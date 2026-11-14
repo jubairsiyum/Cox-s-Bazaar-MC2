@@ -9,6 +9,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PlaceholderController;
 use App\Http\Controllers\ProfileController;
@@ -121,6 +122,30 @@ Route::middleware('auth')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
+    | Customer Management
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['verified', 'permission:customers.view'])->group(function () {
+        Route::get('customers', [CustomerController::class, 'index'])->name('customers.index');
+        Route::get('customers/pdf-view', [CustomerController::class, 'pdfView'])->name('customers.pdf-view');
+        Route::get('customers/print-view', [CustomerController::class, 'printView'])->name('customers.print-view');
+        Route::get('customers/export/{format?}', [CustomerController::class, 'export'])->name('customers.export');
+        Route::get('customers/import/template', [CustomerController::class, 'downloadTemplate'])->name('customers.import-template');
+    });
+
+    Route::middleware(['verified', 'permission:customers.manage'])->group(function () {
+        Route::get('customers/create', [CustomerController::class, 'create'])->name('customers.create');
+        Route::post('customers', [CustomerController::class, 'store'])->name('customers.store');
+        Route::get('customers/import', [CustomerController::class, 'importView'])->name('customers.import');
+        Route::post('customers/import', [CustomerController::class, 'import'])->name('customers.import.store');
+        Route::get('customers/{customer}/edit', [CustomerController::class, 'edit'])->name('customers.edit');
+        Route::patch('customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
+        Route::patch('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus'])->name('customers.toggle-status');
+        Route::delete('customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
     | TailAdmin Showcase & Demos
     |--------------------------------------------------------------------------
     */
@@ -152,7 +177,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         'categories.index' => 'Categories',
         'units.index' => 'Units',
         'products.index' => 'Products',
-        'customers.index' => 'Customers',
         'warehouses.index' => 'Warehouses',
         'inventory.index' => 'Stock Levels',
         'stock-adjustments.index' => 'Stock Adjustments',

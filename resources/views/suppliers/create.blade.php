@@ -83,18 +83,6 @@
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                        <label for="gst_number" class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
-                            GST Number
-                        </label>
-                        <div class="sm:col-span-2">
-                            <input type="text" id="gst_number" name="gst_number" value="{{ old('gst_number') }}"
-                                   class="form-control @error('gst_number') is-invalid @enderror"
-                                   placeholder="GST registration number">
-                            @error('gst_number')<div class="form-error">{{ $message }}</div>@enderror
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
                         <label for="tax_number" class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
                             TAX Number
                         </label>

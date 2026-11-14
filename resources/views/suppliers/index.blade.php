@@ -214,7 +214,6 @@
                                                 'mobile' => $supplier->mobile ?: '',
                                                 'phone' => $supplier->phone ?: '',
                                                 'email' => $supplier->email ?: '',
-                                                'gst_number' => $supplier->gst_number ?: '',
                                                 'tax_number' => $supplier->tax_number ?: '',
                                                 'opening_balance' => (float) $supplier->opening_balance,
                                                 'due' => (float) $supplier->purchase_due,
@@ -351,9 +350,6 @@
                         </div>
                         <div class="text-gray-700 dark:text-gray-300">
                             Email: <span x-text="activeSupplier?.email || '—'"></span>
-                        </div>
-                        <div class="text-gray-700 dark:text-gray-300">
-                            GST Number: <span x-text="activeSupplier?.gst_number || '—'"></span>
                         </div>
                         <div class="text-gray-700 dark:text-gray-300">
                             TAX Number: <span x-text="activeSupplier?.tax_number || '—'"></span>

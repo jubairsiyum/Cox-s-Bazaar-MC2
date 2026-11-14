@@ -139,15 +139,6 @@
                     </tr>
                     <tr>
                         <td class="p-3 text-center font-medium">5</td>
-                        <td class="p-3 font-semibold text-gray-900 dark:text-gray-100">GST Number</td>
-                        <td class="p-3 text-center">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold text-gray-700 bg-gray-200 dark:bg-gray-700 dark:text-gray-300">
-                                Optional
-                            </span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="p-3 text-center font-medium">6</td>
                         <td class="p-3 font-semibold text-gray-900 dark:text-gray-100">TAX Number</td>
                         <td class="p-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold text-gray-700 bg-gray-200 dark:bg-gray-700 dark:text-gray-300">
@@ -156,7 +147,7 @@
                         </td>
                     </tr>
                     <tr>
-                        <td class="p-3 text-center font-medium">7</td>
+                        <td class="p-3 text-center font-medium">6</td>
                         <td class="p-3 font-semibold text-gray-900 dark:text-gray-100">Country Name</td>
                         <td class="p-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold text-gray-700 bg-gray-200 dark:bg-gray-700 dark:text-gray-300">
@@ -165,7 +156,7 @@
                         </td>
                     </tr>
                     <tr>
-                        <td class="p-3 text-center font-medium">8</td>
+                        <td class="p-3 text-center font-medium">7</td>
                         <td class="p-3 font-semibold text-gray-900 dark:text-gray-100">State Name</td>
                         <td class="p-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold text-gray-700 bg-gray-200 dark:bg-gray-700 dark:text-gray-300">
@@ -174,7 +165,7 @@
                         </td>
                     </tr>
                     <tr>
-                        <td class="p-3 text-center font-medium">9</td>
+                        <td class="p-3 text-center font-medium">8</td>
                         <td class="p-3 font-semibold text-gray-900 dark:text-gray-100">City</td>
                         <td class="p-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold text-gray-700 bg-gray-200 dark:bg-gray-700 dark:text-gray-300">
@@ -183,7 +174,7 @@
                         </td>
                     </tr>
                     <tr>
-                        <td class="p-3 text-center font-medium">10</td>
+                        <td class="p-3 text-center font-medium">9</td>
                         <td class="p-3 font-semibold text-gray-900 dark:text-gray-100">Postcode</td>
                         <td class="p-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold text-gray-700 bg-gray-200 dark:bg-gray-700 dark:text-gray-300">
@@ -192,7 +183,7 @@
                         </td>
                     </tr>
                     <tr>
-                        <td class="p-3 text-center font-medium">11</td>
+                        <td class="p-3 text-center font-medium">10</td>
                         <td class="p-3 font-semibold text-gray-900 dark:text-gray-100">Address</td>
                         <td class="p-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold text-gray-700 bg-gray-200 dark:bg-gray-700 dark:text-gray-300">
@@ -201,7 +192,7 @@
                         </td>
                     </tr>
                     <tr>
-                        <td class="p-3 text-center font-medium">12</td>
+                        <td class="p-3 text-center font-medium">11</td>
                         <td class="p-3 font-semibold text-gray-900 dark:text-gray-100">Opening Balance</td>
                         <td class="p-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold text-gray-700 bg-gray-200 dark:bg-gray-700 dark:text-gray-300">

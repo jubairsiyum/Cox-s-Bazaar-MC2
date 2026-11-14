@@ -35,7 +35,6 @@ class SupplierImport implements SkipsEmptyRows, ToModel, WithHeadingRow, WithVal
             'mobile' => isset($row['mobile']) ? trim((string) $row['mobile']) : null,
             'email' => isset($row['email']) ? trim((string) $row['email']) : null,
             'phone' => isset($row['phone']) ? trim((string) $row['phone']) : null,
-            'gst_number' => isset($row['gst_number']) ? trim((string) $row['gst_number']) : null,
             'tax_number' => isset($row['tax_number']) ? trim((string) $row['tax_number']) : null,
             'country' => $row['country_name'] ?? $row['country'] ?? 'Bangladesh',
             'state' => $row['state_name'] ?? $row['state'] ?? null,

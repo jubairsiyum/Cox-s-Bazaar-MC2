@@ -77,6 +77,12 @@ function sidebarComponent() {
                 if (target === '/suppliers') return false;
             }
 
+            // Treat customer edit (/customers/*/edit) as the Add/Update Customers ("New Customer") section
+            if (/\/customers\/\d+\/edit$/.test(current)) {
+                if (target === '/customers/create') return true;
+                if (target === '/customers') return false;
+            }
+
             // If current is a deeper path under target (e.g. /suppliers/5/edit under /suppliers)
             if (current.startsWith(target + '/')) {
                 const hasBetterMatch = this.allPaths.some(p => {

@@ -38,7 +38,12 @@ class MenuHelper
             [
                 'icon' => 'users',
                 'name' => 'Customers',
-                'path' => '/customers',
+                'canany' => ['customers.view', 'customers.manage'],
+                'subItems' => [
+                    ['name' => 'New Customer', 'path' => '/customers/create', 'can' => 'customers.manage'],
+                    ['name' => 'Customers List', 'path' => '/customers', 'can' => 'customers.view'],
+                    ['name' => 'Import Customers', 'path' => '/customers/import', 'can' => 'customers.manage'],
+                ],
             ],
             [
                 'icon' => 'tables',
@@ -192,6 +197,15 @@ class MenuHelper
         }
 
         if ($trimmed === 'suppliers' && request()->routeIs('suppliers.edit')) {
+            return false;
+        }
+
+        // Route customer edit page to the "New Customer" (Add/Update Customers) menu item
+        if ($trimmed === 'customers/create' && request()->routeIs('customers.edit')) {
+            return true;
+        }
+
+        if ($trimmed === 'customers' && request()->routeIs('customers.edit')) {
             return false;
         }
 

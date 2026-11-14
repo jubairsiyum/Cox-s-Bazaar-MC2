@@ -22,7 +22,6 @@ class Supplier extends Model
         'mobile',
         'email',
         'phone',
-        'gst_number',
         'tax_number',
         'opening_balance',
         'purchase_due',
@@ -90,7 +89,6 @@ class Supplier extends Model
                 ->orWhere('mobile', 'like', "%{$term}%")
                 ->orWhere('email', 'like', "%{$term}%")
                 ->orWhere('phone', 'like', "%{$term}%")
-                ->orWhere('gst_number', 'like', "%{$term}%")
                 ->orWhere('tax_number', 'like', "%{$term}%");
         });
     }

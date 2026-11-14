@@ -25,7 +25,6 @@ class StoreSupplierRequest extends FormRequest
             'mobile' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
-            'gst_number' => ['nullable', 'string', 'max:100'],
             'tax_number' => ['nullable', 'string', 'max:100'],
             'opening_balance' => ['nullable', 'numeric', 'min:0'],
             'country' => ['nullable', 'string', 'max:100'],

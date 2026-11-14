@@ -22,7 +22,6 @@ class SupplierFactory extends Factory
             'mobile' => fake()->numerify('017########'),
             'email' => fake()->unique()->safeEmail(),
             'phone' => fake()->phoneNumber(),
-            'gst_number' => 'GST'.fake()->numerify('#####'),
             'tax_number' => 'TAX'.fake()->numerify('#####'),
             'opening_balance' => fake()->randomFloat(2, 0, 50000),
             'purchase_due' => fake()->randomFloat(2, 0, 100000),

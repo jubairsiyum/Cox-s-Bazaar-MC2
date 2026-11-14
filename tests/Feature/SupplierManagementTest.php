@@ -54,7 +54,6 @@ it('creates a supplier and automatically assigns an SP code', function () {
         'mobile' => '9844545544',
         'email' => 'krishnapatil@gmail.com',
         'phone' => '02987654',
-        'gst_number' => 'GSTIN789',
         'tax_number' => 'TAX5544',
         'opening_balance' => 5894.00,
         'country' => 'Bangladesh',
@@ -147,8 +146,8 @@ it('downloads the import template CSV', function () {
 it('imports suppliers from a CSV file', function () {
     actingAsSuperAdmin();
 
-    $csvContent = "Supplier Name,Mobile,Email,Phone,GST Number,TAX Number,Country Name,State Name,City,Postcode,Address,Opening Balance\n"
-        ."Imported Company,01712345678,imported@example.com,023344,GST11,TAX22,Bangladesh,Chittagong,Cox's Bazar,4700,Main Street,2500.00\n";
+    $csvContent = "Supplier Name,Mobile,Email,Phone,TAX Number,Country Name,State Name,City,Postcode,Address,Opening Balance\n"
+        ."Imported Company,01712345678,imported@example.com,023344,TAX22,Bangladesh,Chittagong,Cox's Bazar,4700,Main Street,2500.00\n";
 
     $file = UploadedFile::fake()->createWithContent('suppliers.csv', $csvContent);
 
