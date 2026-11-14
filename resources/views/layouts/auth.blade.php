@@ -5,26 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Sign In') — {{ config('app.name') }}</title>
-    <meta name="theme-color" content="#004EFC">
+    <meta name="theme-color" content="#312E81">
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" href="/favicon.ico" sizes="any">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style nonce="{{ Vite::cspNonce() }}">
         :root {
-            --auth-brand: #004EFC;
-            --auth-brand-dark: #0039c9;
-            --auth-brand-light: #2f6bff;
-            --auth-brand-subtle: #eaf0ff;
+            --auth-brand: #4F46E5;
+            --auth-brand-dark: #4338CA;
+            --auth-brand-light: #6366F1;
+            --auth-brand-subtle: #EEF2FF;
+            --auth-navy: #1E2A5A;
+            --auth-indigo: #312E81;
             --auth-page: #f4f6f8;
             --auth-surface: #ffffff;
             --auth-text: #0b0d12;
             --auth-muted: #667085;
             --auth-line: #e2e8f0;
-            --auth-tile: #eaf0ff;
+            --auth-tile: #EEF2FF;
             --auth-card: #ffffff;
             --auth-shadow: 0 24px 60px rgba(11, 13, 18, .16);
-            --auth-ring: rgba(0, 78, 252, .14);
+            --auth-ring: rgba(79, 70, 229, .14);
         }
 
         .auth-body {
@@ -43,48 +45,37 @@
             position: relative;
             width: 100%;
             max-width: 1080px;
-            border-radius: 44px;
+            min-height: 620px;
+            border-radius: 32px;
             overflow: hidden;
             box-shadow: var(--auth-shadow);
-            background: linear-gradient(to bottom, var(--auth-brand) 0 52%, var(--auth-surface) 52% 100%);
             display: grid;
-            grid-template-columns: 1.1fr .9fr;
-            gap: 24px;
-            padding: 56px 52px;
-        }
-
-        .auth-frame::before {
-            content: '';
-            position: absolute;
-            top: -180px;
-            right: -120px;
-            width: 460px;
-            height: 460px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(255, 255, 255, .16), transparent 65%);
-            pointer-events: none;
+            grid-template-columns: 1.05fr .95fr;
+            background: var(--auth-surface);
         }
 
         .auth-left {
+            position: relative;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             gap: 36px;
-            min-width: 0;
-            position: relative;
-            z-index: 1;
+            padding: 52px 48px;
+            color: #fff;
+            background:
+                radial-gradient(circle at 88% 12%, rgba(255, 255, 255, .12), transparent 45%),
+                linear-gradient(165deg, var(--auth-navy) 0%, var(--auth-indigo) 100%);
         }
 
         .auth-hero {
-            color: #fff;
             position: relative;
-            padding-right: 170px;
+            padding-right: 150px;
             animation: authFadeUp .55s cubic-bezier(.22, 1, .36, 1) both;
         }
 
         .auth-logo {
-            width: 68px;
-            height: 68px;
+            width: 62px;
+            height: 62px;
             display: block;
             margin-bottom: 18px;
             object-fit: contain;
@@ -95,34 +86,63 @@
         }
 
         .auth-hero h1 {
-            font-size: 28px;
+            font-size: 26px;
             font-weight: 600;
-            margin: 0 0 12px;
+            margin: 0 0 10px;
             letter-spacing: -.01em;
             line-height: 1.25;
         }
 
         .auth-hero p {
-            font-size: 13px;
-            line-height: 1.7;
-            margin: 0 0 10px;
-            max-width: 410px;
-            opacity: .95;
+            font-size: 15px;
+            line-height: 1.6;
+            margin: 0;
+            max-width: 400px;
+            opacity: .9;
         }
 
         .auth-art {
             position: absolute;
-            right: -8px;
-            top: 70px;
-            width: 200px;
+            right: -6px;
+            top: 68px;
+            width: 172px;
             filter: drop-shadow(0 18px 18px rgba(0, 0, 0, .28));
         }
 
+        .auth-features {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            animation: authFadeUp .55s cubic-bezier(.22, 1, .36, 1) .1s both;
+        }
+
+        .auth-feature {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13.5px;
+            line-height: 1.4;
+            color: rgba(255, 255, 255, .92);
+        }
+
+        .auth-feature svg {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+            stroke: #A5B4FC;
+            fill: none;
+            stroke-width: 2.2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
         .auth-sub {
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 500;
-            margin: 0 0 10px;
-            color: var(--auth-text);
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            margin: 0 0 12px;
+            color: rgba(255, 255, 255, .65);
         }
 
         .auth-mods {
@@ -130,28 +150,29 @@
             grid-template-columns: repeat(5, 1fr);
             gap: 10px;
             max-width: 470px;
-            animation: authFadeUp .55s cubic-bezier(.22, 1, .36, 1) .16s both;
+            animation: authFadeUp .55s cubic-bezier(.22, 1, .36, 1) .18s both;
         }
 
         .auth-mod {
-            background: var(--auth-tile);
+            background: rgba(255, 255, 255, .08);
+            border: 1px solid rgba(255, 255, 255, .12);
             border-radius: 12px;
-            padding: 16px 4px 12px;
+            padding: 14px 4px 11px;
             text-align: center;
             font-size: 11px;
-            color: var(--auth-muted);
-            transition: transform .18s ease, box-shadow .18s ease;
+            color: rgba(255, 255, 255, .85);
+            transition: transform .18s ease, background .18s ease;
         }
 
         .auth-mod:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(11, 13, 18, .08);
+            background: rgba(255, 255, 255, .14);
         }
 
         .auth-mod svg {
             width: 26px;
             height: 26px;
-            stroke: var(--auth-brand);
+            stroke: #C7D2FE;
             fill: none;
             stroke-width: 1.7;
             stroke-linecap: round;
@@ -162,10 +183,11 @@
 
         .auth-card {
             align-self: center;
+            margin: 48px 56px;
             background: var(--auth-card);
-            border-radius: 32px;
-            padding: 34px 34px 30px;
-            box-shadow: var(--auth-shadow);
+            border-radius: 28px;
+            padding: 36px 34px 30px;
+            box-shadow: 0 20px 50px rgba(11, 13, 18, .10);
             animation: authFadeUp .55s cubic-bezier(.22, 1, .36, 1) .08s both;
         }
 
@@ -329,19 +351,19 @@
             border: 0;
             background: linear-gradient(180deg, var(--auth-brand-light), var(--auth-brand));
             color: #fff;
-            box-shadow: 0 8px 18px rgba(0, 78, 252, .35);
+            box-shadow: 0 8px 18px rgba(79, 70, 229, .35);
             transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
         }
 
         .auth-btn:hover {
             filter: brightness(1.05);
             transform: translateY(-1px);
-            box-shadow: 0 12px 24px rgba(0, 78, 252, .4);
+            box-shadow: 0 12px 24px rgba(79, 70, 229, .4);
         }
 
         .auth-btn:active {
             transform: translateY(0);
-            box-shadow: 0 6px 14px rgba(0, 78, 252, .35);
+            box-shadow: 0 6px 14px rgba(79, 70, 229, .35);
         }
 
         .auth-btn-secondary {
@@ -408,6 +430,7 @@
 
         @media (prefers-reduced-motion: reduce) {
             .auth-hero,
+            .auth-features,
             .auth-mods,
             .auth-card {
                 animation: none;
@@ -421,39 +444,33 @@
 
             .auth-frame {
                 grid-template-columns: 1fr;
-                padding: 32px 20px;
-                border-radius: 30px;
-                background: var(--auth-surface);
+                min-height: 0;
+                border-radius: 28px;
             }
 
-            .auth-frame::before {
-                display: none;
+            .auth-left {
+                gap: 0;
+                padding: 30px 24px 26px;
+                background:
+                    radial-gradient(circle at 90% 0%, rgba(255, 255, 255, .12), transparent 50%),
+                    linear-gradient(165deg, var(--auth-navy) 0%, var(--auth-indigo) 100%);
             }
 
             .auth-hero {
-                background: var(--auth-brand);
-                margin: -32px -20px 0;
-                padding: 32px 20px 40px;
-                border-radius: 0 0 30px 30px;
-                padding-right: 20px;
+                padding-right: 0;
             }
 
-            .auth-art {
-                display: none;
-            }
-
+            .auth-art,
+            .auth-features,
             .auth-mods {
                 display: none;
             }
 
             .auth-card {
-                box-shadow: none;
+                margin: 20px 16px;
+                padding: 28px 22px 24px;
                 border: 1px solid var(--auth-line);
-                padding: 26px 22px;
-            }
-
-            .auth-left {
-                gap: 0;
+                box-shadow: none;
             }
         }
     </style>
@@ -464,24 +481,38 @@
         <div class="auth-hero">
             <img class="auth-logo" src="{{ asset('cmc2-logo.jpeg') }}" alt="{{ config('app.name') }} logo">
             <h1>{{ config('app.name') }}</h1>
-            <p>A complete management system for your mobile phone business — sales, stock, purchasing and finance in one workspace.</p>
-            <p>From IMEI-level inventory and POS billing to supplier payments and monthly reports, your mobile center runs on the same live numbers.</p>
+            <p>Sales, stock, purchasing and finance — your entire mobile business in one workspace.</p>
             <svg class="auth-art" viewBox="0 0 200 240" aria-hidden="true">
                 <g transform="rotate(8 100 120)">
-                    <rect x="40" y="26" width="120" height="180" rx="16" fill="#0039c9"/>
-                    <rect x="48" y="34" width="104" height="164" rx="12" fill="#004EFC"/>
-                    <line x1="66" y1="64" x2="134" y2="64" stroke="#dbe7ff" stroke-width="9" stroke-linecap="round"/>
-                    <line x1="66" y1="90" x2="118" y2="90" stroke="#dbe7ff" stroke-width="9" stroke-linecap="round" opacity=".7"/>
-                    <line x1="66" y1="116" x2="126" y2="116" stroke="#dbe7ff" stroke-width="9" stroke-linecap="round" opacity=".7"/>
-                    <line x1="66" y1="142" x2="104" y2="142" stroke="#dbe7ff" stroke-width="9" stroke-linecap="round" opacity=".5"/>
+                    <rect x="40" y="26" width="120" height="180" rx="16" fill="#312E81"/>
+                    <rect x="48" y="34" width="104" height="164" rx="12" fill="#4F46E5"/>
+                    <line x1="66" y1="64" x2="134" y2="64" stroke="#C7D2FE" stroke-width="9" stroke-linecap="round"/>
+                    <line x1="66" y1="90" x2="118" y2="90" stroke="#C7D2FE" stroke-width="9" stroke-linecap="round" opacity=".7"/>
+                    <line x1="66" y1="116" x2="126" y2="116" stroke="#C7D2FE" stroke-width="9" stroke-linecap="round" opacity=".7"/>
+                    <line x1="66" y1="142" x2="104" y2="142" stroke="#C7D2FE" stroke-width="9" stroke-linecap="round" opacity=".5"/>
                 </g>
                 <g transform="rotate(-6 60 80)">
                     <rect x="24" y="50" width="88" height="88" rx="14" fill="#0b0d12"/>
                     <path d="M24 66h88M68 50v88" stroke="#1a2130" stroke-width="6"/>
                 </g>
                 <circle cx="152" cy="192" r="26" fill="#ffffff"/>
-                <path d="M140 192l8 8 16-16" stroke="#004EFC" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M140 192l8 8 16-16" stroke="#4F46E5" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
+        </div>
+
+        <div class="auth-features">
+            <div class="auth-feature">
+                <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+                IMEI-level inventory tracking
+            </div>
+            <div class="auth-feature">
+                <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+                POS billing &amp; customer dues
+            </div>
+            <div class="auth-feature">
+                <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+                Real-time sales &amp; finance reports
+            </div>
         </div>
 
         <div>
