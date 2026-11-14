@@ -63,9 +63,7 @@
     <!-- Logo Section -->
     <div class="py-6 flex items-center gap-2 border-b border-gray-100 dark:border-gray-800" :class="(!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen) ? 'justify-center' : 'justify-between'">
         <a href="{{ route('dashboard') }}" class="flex items-center gap-3">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-500 font-bold text-white shadow-theme-xs">
-                📱
-            </div>
+            <img src="{{ asset('cmc2-logo.jpeg') }}" alt="{{ config('app.name') }}" class="h-10 w-10 shrink-0 rounded-xl object-contain bg-white p-0.5 shadow-theme-xs">
             <div class="hidden [.sidebar-expanded_&]:block">
                 <span class="block text-base font-bold text-gray-900 dark:text-white leading-tight">
                     {{ config('app.name', 'Cox\'s Bazaar') }}

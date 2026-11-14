@@ -14,9 +14,10 @@
     {{-- Title & Meta --}}
     <title>@yield('title', 'Dashboard') — {{ config('app.name', 'ERP') }}</title>
     <meta name="description" content="@yield('meta_description', 'Cox\'s Bazaar Mobile Distribution ERP')">
-    <meta name="theme-color" content="#465fff">
+    <meta name="theme-color" content="#004EFC">
     <link rel="manifest" href="/manifest.json">
-    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 
     @include('layouts.head-meta')
 

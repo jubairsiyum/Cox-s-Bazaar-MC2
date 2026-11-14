@@ -26,9 +26,7 @@
 
             <!-- Logo (mobile only) -->
             <a href="{{ route('dashboard') }}" class="xl:hidden flex items-center gap-2">
-                <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-500 font-bold text-white text-sm">
-                    📱
-                </span>
+                <img src="{{ asset('cmc2-logo.jpeg') }}" alt="{{ config('app.name') }}" class="h-9 w-9 rounded-lg object-contain bg-white p-0.5">
                 <span class="font-bold text-gray-900 dark:text-white text-sm">
                     {{ config('app.name', 'ERP') }}
                 </span>
