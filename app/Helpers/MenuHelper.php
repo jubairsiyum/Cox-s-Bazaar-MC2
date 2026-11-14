@@ -27,10 +27,22 @@ class MenuHelper
             ],
             [
                 'icon' => 'users',
-                'name' => 'Parties',
+                'name' => 'Suppliers',
+                'canany' => ['suppliers.view', 'suppliers.manage'],
                 'subItems' => [
-                    ['name' => 'Suppliers', 'path' => '/suppliers'],
-                    ['name' => 'Customers', 'path' => '/customers'],
+                    ['name' => 'New Supplier', 'path' => '/suppliers/create', 'can' => 'suppliers.manage'],
+                    ['name' => 'Suppliers List', 'path' => '/suppliers', 'can' => 'suppliers.view'],
+                    ['name' => 'Import Suppliers', 'path' => '/suppliers/import', 'can' => 'suppliers.manage'],
+                ],
+            ],
+            [
+                'icon' => 'users',
+                'name' => 'Customers',
+                'canany' => ['customers.view', 'customers.manage'],
+                'subItems' => [
+                    ['name' => 'New Customer', 'path' => '/customers/create', 'can' => 'customers.manage'],
+                    ['name' => 'Customers List', 'path' => '/customers', 'can' => 'customers.view'],
+                    ['name' => 'Import Customers', 'path' => '/customers/import', 'can' => 'customers.manage'],
                 ],
             ],
             [
@@ -178,6 +190,24 @@ class MenuHelper
     public static function isActive(string $path): bool
     {
         $trimmed = ltrim($path, '/');
+
+        // Route supplier edit page to the "New Supplier" (Add/Update Suppliers) menu item
+        if ($trimmed === 'suppliers/create' && request()->routeIs('suppliers.edit')) {
+            return true;
+        }
+
+        if ($trimmed === 'suppliers' && request()->routeIs('suppliers.edit')) {
+            return false;
+        }
+
+        // Route customer edit page to the "New Customer" (Add/Update Customers) menu item
+        if ($trimmed === 'customers/create' && request()->routeIs('customers.edit')) {
+            return true;
+        }
+
+        if ($trimmed === 'customers' && request()->routeIs('customers.edit')) {
+            return false;
+        }
 
         return request()->is($trimmed) || request()->is($trimmed.'/*');
     }

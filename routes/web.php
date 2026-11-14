@@ -9,9 +9,11 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PlaceholderController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SupplierController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
@@ -99,6 +101,57 @@ Route::middleware('auth')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
+    | Supplier Management
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['verified', 'permission:suppliers.view'])->group(function () {
+        Route::get('suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
+        Route::get('suppliers/pdf-view', [SupplierController::class, 'pdfView'])->name('suppliers.pdf-view');
+        Route::get('suppliers/print-view', [SupplierController::class, 'printView'])->name('suppliers.print-view');
+        Route::get('suppliers/export/{format?}', [SupplierController::class, 'export'])->name('suppliers.export');
+        Route::get('suppliers/import/template', [SupplierController::class, 'downloadTemplate'])->name('suppliers.import-template');
+    });
+
+    Route::middleware(['verified', 'permission:suppliers.manage'])->group(function () {
+        Route::get('suppliers/create', [SupplierController::class, 'create'])->name('suppliers.create');
+        Route::post('suppliers', [SupplierController::class, 'store'])->name('suppliers.store');
+        Route::get('suppliers/import', [SupplierController::class, 'importView'])->name('suppliers.import');
+        Route::post('suppliers/import', [SupplierController::class, 'import'])->name('suppliers.import.store');
+        Route::get('suppliers/{supplier}/edit', [SupplierController::class, 'edit'])->name('suppliers.edit');
+        Route::patch('suppliers/{supplier}', [SupplierController::class, 'update'])->name('suppliers.update');
+        Route::patch('suppliers/{supplier}/toggle-status', [SupplierController::class, 'toggleStatus'])->name('suppliers.toggle-status');
+        Route::delete('suppliers/{supplier}', [SupplierController::class, 'destroy'])->name('suppliers.destroy');
+        Route::post('suppliers/{supplier}/pay-due', [SupplierController::class, 'payDue'])->name('suppliers.pay-due');
+        Route::post('suppliers/{supplier}/pay-return-due', [SupplierController::class, 'payReturnDue'])->name('suppliers.pay-return-due');
+        Route::delete('suppliers/payments/{payment}', [SupplierController::class, 'destroyPayment'])->name('suppliers.payments.destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Customer Management
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['verified', 'permission:customers.view'])->group(function () {
+        Route::get('customers', [CustomerController::class, 'index'])->name('customers.index');
+        Route::get('customers/pdf-view', [CustomerController::class, 'pdfView'])->name('customers.pdf-view');
+        Route::get('customers/print-view', [CustomerController::class, 'printView'])->name('customers.print-view');
+        Route::get('customers/export/{format?}', [CustomerController::class, 'export'])->name('customers.export');
+        Route::get('customers/import/template', [CustomerController::class, 'downloadTemplate'])->name('customers.import-template');
+    });
+
+    Route::middleware(['verified', 'permission:customers.manage'])->group(function () {
+        Route::get('customers/create', [CustomerController::class, 'create'])->name('customers.create');
+        Route::post('customers', [CustomerController::class, 'store'])->name('customers.store');
+        Route::get('customers/import', [CustomerController::class, 'importView'])->name('customers.import');
+        Route::post('customers/import', [CustomerController::class, 'import'])->name('customers.import.store');
+        Route::get('customers/{customer}/edit', [CustomerController::class, 'edit'])->name('customers.edit');
+        Route::patch('customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
+        Route::patch('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus'])->name('customers.toggle-status');
+        Route::delete('customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
     | TailAdmin Showcase & Demos
     |--------------------------------------------------------------------------
     */
@@ -130,8 +183,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         'categories.index' => 'Categories',
         'units.index' => 'Units',
         'products.index' => 'Products',
-        'suppliers.index' => 'Suppliers',
-        'customers.index' => 'Customers',
         'warehouses.index' => 'Warehouses',
         'inventory.index' => 'Stock Levels',
         'stock-adjustments.index' => 'Stock Adjustments',

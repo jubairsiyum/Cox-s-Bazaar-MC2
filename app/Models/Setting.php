@@ -29,7 +29,7 @@ class Setting extends Model
     public static function set(string $key, mixed $value, ?int $updatedBy = null): void
     {
         static::updateOrCreate(
-            ['key'  => $key],
+            ['key' => $key],
             ['value' => $value, 'updated_by' => $updatedBy]
         );
     }
