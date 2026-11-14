@@ -53,11 +53,22 @@ class SupplierController extends Controller
     }
 
     /**
-     * Show the form for creating a new supplier.
+     * Show the form for creating a new supplier (or redirect to edit if supplier ID is provided).
      */
-    public function create(): View
+    public function create(Request $request): View|RedirectResponse
     {
         $this->authorize('create', Supplier::class);
+
+        if ($request->filled('supplier_id') || $request->filled('id')) {
+            $identifier = $request->input('supplier_id') ?: $request->input('id');
+            $supplier = Supplier::where('id', $identifier)
+                ->orWhere('supplier_id', $identifier)
+                ->first();
+
+            if ($supplier) {
+                return redirect()->route('suppliers.edit', $supplier);
+            }
+        }
 
         return view('suppliers.create', [
             'supplier' => new Supplier,

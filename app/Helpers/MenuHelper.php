@@ -186,6 +186,15 @@ class MenuHelper
     {
         $trimmed = ltrim($path, '/');
 
+        // Route supplier edit page to the "New Supplier" (Add/Update Suppliers) menu item
+        if ($trimmed === 'suppliers/create' && request()->routeIs('suppliers.edit')) {
+            return true;
+        }
+
+        if ($trimmed === 'suppliers' && request()->routeIs('suppliers.edit')) {
+            return false;
+        }
+
         return request()->is($trimmed) || request()->is($trimmed.'/*');
     }
 

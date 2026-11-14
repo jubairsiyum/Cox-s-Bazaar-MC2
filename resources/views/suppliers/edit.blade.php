@@ -21,7 +21,7 @@
         <span>&rsaquo;</span>
         <a href="{{ route('suppliers.index') }}" class="hover:text-brand-500">Suppliers List</a>
         <span>&rsaquo;</span>
-        <span class="text-gray-700 dark:text-gray-300 font-medium">Edit: {{ $supplier->supplier_id }}</span>
+        <span class="text-gray-700 dark:text-gray-300 font-medium">Suppliers</span>
     </div>
 </div>
 
@@ -185,19 +185,6 @@
                                       class="form-control @error('address') is-invalid @enderror"
                                       placeholder="Supplier full street address">{{ old('address', $supplier->address) }}</textarea>
                             @error('address')<div class="form-error">{{ $message }}</div>@enderror
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                        <label for="status" class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
-                            Status
-                        </label>
-                        <div class="sm:col-span-2">
-                            <select id="status" name="status" class="form-select @error('status') is-invalid @enderror">
-                                <option value="active" @selected(old('status', $supplier->status) === 'active')>Active</option>
-                                <option value="inactive" @selected(old('status', $supplier->status) === 'inactive')>Inactive</option>
-                            </select>
-                            @error('status')<div class="form-error">{{ $message }}</div>@enderror
                         </div>
                     </div>
                 </div>

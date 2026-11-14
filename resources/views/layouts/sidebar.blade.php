@@ -22,11 +22,11 @@
     }
 @endphp
 
-<aside id="sidebar"
-    class="fixed flex flex-col mt-0 top-0 px-5 start-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out max-xl:duration-200 max-xl:w-[290px] z-50 max-xl:z-101 ltr:border-r rtl:border-l border-gray-200 w-[90px] [.sidebar-expanded_&]:min-w-[290px]"
-    x-data="{
+<script>
+function sidebarComponent() {
+    return {
         openSubmenus: {},
-        allPaths: {{ json_encode($allMenuPaths) }},
+        allPaths: @json($allMenuPaths),
         init() {
             this.initializeActiveMenus();
         },
@@ -51,7 +51,6 @@
             const key = groupIndex + '-' + itemIndex;
             const newState = !this.openSubmenus[key];
 
-            // Close all other submenus when opening a new one
             if (newState) {
                 this.openSubmenus = {};
             }
@@ -72,9 +71,14 @@
                 return true;
             }
 
+            // Treat supplier edit (/suppliers/*/edit) as the Add/Update Suppliers ("New Supplier") section
+            if (/\/suppliers\/\d+\/edit$/.test(current)) {
+                if (target === '/suppliers/create') return true;
+                if (target === '/suppliers') return false;
+            }
+
             // If current is a deeper path under target (e.g. /suppliers/5/edit under /suppliers)
             if (current.startsWith(target + '/')) {
-                // If another menu item matches current exactly or is a closer prefix, do not highlight this one
                 const hasBetterMatch = this.allPaths.some(p => {
                     const other = p.replace(/\/+$/, '') || '/';
                     return other !== target && (current === other || (current.startsWith(other + '/') && other.length > target.length));
@@ -84,14 +88,20 @@
 
             return false;
         }
-    }"
+    };
+}
+</script>
+
+<aside id="sidebar"
+    class="fixed flex flex-col mt-0 top-0 px-5 start-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out max-xl:duration-200 max-xl:w-[290px] z-50 max-xl:z-101 ltr:border-r rtl:border-l border-gray-200 w-[90px] [.sidebar-expanded_&]:min-w-[290px]"
+    x-data="sidebarComponent()"
     :class="{
         'translate-x-0': $store.sidebar.isMobileOpen,
         'max-xl:-translate-x-full max-xl:rtl:translate-x-full': !$store.sidebar.isMobileOpen
     }"
     @mouseenter="if (!$store.sidebar.isExpanded) $store.sidebar.setHovered(true)"
     @mouseleave="$store.sidebar.setHovered(false)">
-    
+
     <!-- Logo Section -->
     <div class="py-6 flex items-center gap-2 border-b border-gray-100 dark:border-gray-800" :class="(!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen) ? 'justify-center' : 'justify-between'">
         <a href="{{ route('dashboard') }}" class="flex items-center gap-3">
