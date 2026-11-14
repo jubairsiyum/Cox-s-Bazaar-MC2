@@ -15,6 +15,13 @@ class StoreSupplierRequest extends FormRequest
         return $this->user()?->can('create', Supplier::class) ?? false;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('phone') && ! $this->has('tel_no')) {
+            $this->merge(['tel_no' => $this->input('phone')]);
+        }
+    }
+
     /**
      * @return array<string, ValidationRule|array<mixed>|string>
      */
@@ -22,8 +29,9 @@ class StoreSupplierRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'mobile' => ['nullable', 'string', 'max:50'],
+            'mobile' => ['required', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255'],
+            'tel_no' => ['nullable', 'string', 'max:50'],
             'phone' => ['nullable', 'string', 'max:50'],
             'tax_number' => ['nullable', 'string', 'max:100'],
             'opening_balance' => ['nullable', 'numeric', 'min:0'],
@@ -33,6 +41,19 @@ class StoreSupplierRequest extends FormRequest
             'postcode' => ['nullable', 'string', 'max:20'],
             'address' => ['nullable', 'string', 'max:1000'],
             'status' => ['nullable', 'in:active,inactive'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return [
+            'name' => 'Supplier Name',
+            'mobile' => 'Mobile No.',
+            'tel_no' => 'Tel No.',
+            'phone' => 'Tel No.',
         ];
     }
 }

@@ -27,13 +27,16 @@ class CustomerImport implements SkipsEmptyRows, ToModel, WithHeadingRow, WithVal
             return null;
         }
 
+        $mobile = $row['mobile_no'] ?? $row['mobile'] ?? $row['mobile_number'] ?? null;
+        $phone = $row['tel_no'] ?? $row['tel'] ?? $row['phone'] ?? $row['contact_no'] ?? null;
+
         $this->importedCount++;
 
         return new Customer([
             'customer_id' => NumberingService::nextSequential('customer_prefix', 'CU', 4),
             'name' => trim((string) $name),
-            'mobile' => isset($row['mobile']) ? trim((string) $row['mobile']) : (isset($row['mobile_number']) ? trim((string) $row['mobile_number']) : null),
-            'phone' => isset($row['phone']) ? trim((string) $row['phone']) : (isset($row['contact_no']) ? trim((string) $row['contact_no']) : null),
+            'mobile' => $mobile !== null ? trim((string) $mobile) : null,
+            'tel_no' => $phone !== null ? trim((string) $phone) : null,
             'email' => isset($row['email']) ? trim((string) $row['email']) : null,
             'country' => $row['country_name'] ?? $row['country'] ?? 'Bangladesh',
             'state' => $row['state_name'] ?? $row['state'] ?? null,
@@ -51,6 +54,8 @@ class CustomerImport implements SkipsEmptyRows, ToModel, WithHeadingRow, WithVal
         return [
             '*.customer_name' => ['required_without:*.name'],
             '*.name' => ['required_without:*.customer_name'],
+            '*.mobile_no' => ['required_without_all:*.mobile,*.mobile_number'],
+            '*.mobile' => ['required_without_all:*.mobile_no,*.mobile_number'],
             '*.email' => ['nullable', 'email'],
         ];
     }

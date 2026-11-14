@@ -82,8 +82,8 @@
                                 {{ $customer->name }}
                             @elseif($key === 'mobile')
                                 {{ $customer->mobile ?: '—' }}
-                            @elseif($key === 'phone')
-                                {{ $customer->phone ?: '—' }}
+                            @elseif($key === 'tel_no' || $key === 'phone')
+                                {{ $customer->tel_no ?: '—' }}
                             @elseif($key === 'email')
                                 {{ $customer->email ?: '—' }}
                             @elseif($key === 'city')

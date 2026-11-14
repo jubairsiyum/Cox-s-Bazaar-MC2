@@ -53,7 +53,7 @@ it('creates a supplier and automatically assigns an SP code', function () {
         'name' => 'Krishna Patil',
         'mobile' => '9844545544',
         'email' => 'krishnapatil@gmail.com',
-        'phone' => '02987654',
+        'tel_no' => '02987654',
         'tax_number' => 'TAX5544',
         'opening_balance' => 5894.00,
         'country' => 'Bangladesh',
@@ -67,6 +67,7 @@ it('creates a supplier and automatically assigns an SP code', function () {
 
     expect($supplier)->not->toBeNull()
         ->and($supplier->supplier_id)->toStartWith('SP')
+        ->and($supplier->tel_no)->toBe('02987654')
         ->and((float) $supplier->opening_balance)->toBe(5894.00)
         ->and((float) $supplier->purchase_due)->toBe(5894.00);
 
@@ -84,6 +85,15 @@ it('fails validation when supplier name is missing', function () {
         'name' => '',
         'mobile' => '01700000000',
     ])->assertSessionHasErrors('name');
+});
+
+it('fails validation when supplier mobile is missing', function () {
+    actingAsSuperAdmin();
+
+    $this->post(route('suppliers.store'), [
+        'name' => 'Valid Supplier Name',
+        'mobile' => '',
+    ])->assertSessionHasErrors('mobile');
 });
 
 it('updates an existing supplier', function () {
@@ -312,4 +322,39 @@ it('exports suppliers with selected columns to excel or csv', function () {
 
     $response->assertOk();
     $response->assertHeader('content-disposition');
+});
+
+it('downloads the supplier import CSV template', function () {
+    actingAsSuperAdmin();
+
+    $response = $this->get(route('suppliers.import-template'));
+
+    $response->assertOk()
+        ->assertHeader('Content-Disposition', 'attachment; filename="supplier_import_template.csv"')
+        ->assertSee('Supplier Name')
+        ->assertSee('Mobile No')
+        ->assertSee('Tel No')
+        ->assertSee('Subhramaniam');
+});
+
+it('imports suppliers from a valid CSV file with Mobile No and Tel No', function () {
+    actingAsSuperAdmin();
+
+    $csvContent = implode("\n", [
+        'Supplier Name,Mobile No,Email,Tel No,TAX Number,Country Name,State Name,City,Postcode,Address,Opening Balance',
+        'Imported Supplier 1,01811223344,imp_supp1@distributor.com,029876543,TAX-101,Bangladesh,Chittagong,Cox\'s Bazar,4700,"Main Road",15000.00',
+        'Imported Supplier 2,01711998877,imp_supp2@distributor.com,034164101,TAX-202,Bangladesh,Chittagong,Cox\'s Bazar,4700,"Ocean City",0.00',
+    ]);
+
+    $file = UploadedFile::fake()->createWithContent('suppliers.csv', $csvContent);
+
+    $response = $this->post(route('suppliers.import.store'), [
+        'file' => $file,
+    ]);
+
+    $response->assertRedirect(route('suppliers.index'));
+    $response->assertSessionHas('success', 'Successfully imported 2 supplier(s).');
+
+    expect(Supplier::where('name', 'Imported Supplier 1')->exists())->toBeTrue()
+        ->and(Supplier::where('name', 'Imported Supplier 2')->exists())->toBeTrue();
 });

@@ -139,8 +139,8 @@
                             </th>
                             <th x-show="columns.customer_id" class="p-2.5 whitespace-nowrap">Customer ID</th>
                             <th x-show="columns.name" class="p-2.5 whitespace-nowrap">Customer Name</th>
-                            <th x-show="columns.mobile" class="p-2.5 whitespace-nowrap">Mobile</th>
-                            <th x-show="columns.phone" class="p-2.5 whitespace-nowrap">Contact No</th>
+                            <th x-show="columns.mobile" class="p-2.5 whitespace-nowrap">Mobile No.</th>
+                            <th x-show="columns.tel_no" class="p-2.5 whitespace-nowrap">Tel No.</th>
                             <th x-show="columns.email" class="p-2.5 whitespace-nowrap">Email</th>
                             <th x-show="columns.city" class="p-2.5 whitespace-nowrap">City</th>
                             <th x-show="columns.status" class="p-2.5 text-center whitespace-nowrap">Status</th>
@@ -163,8 +163,8 @@
                                 <td x-show="columns.mobile" data-col="mobile" class="p-2.5 text-gray-600 dark:text-gray-300 whitespace-nowrap">
                                     {{ $customer->mobile ?: '—' }}
                                 </td>
-                                <td x-show="columns.phone" data-col="phone" class="p-2.5 text-gray-600 dark:text-gray-300 whitespace-nowrap">
-                                    {{ $customer->phone ?: '—' }}
+                                <td x-show="columns.tel_no" data-col="tel_no" class="p-2.5 text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                                    {{ $customer->tel_no ?: '—' }}
                                 </td>
                                 <td x-show="columns.email" data-col="email" class="p-2.5 text-gray-600 dark:text-gray-300 whitespace-nowrap">
                                     {{ $customer->email ?: '—' }}
@@ -278,7 +278,7 @@ function customersPage() {
             customer_id: true,
             name: true,
             mobile: true,
-            phone: true,
+            tel_no: true,
             email: true,
             city: true,
             status: true,
@@ -287,8 +287,8 @@ function customersPage() {
         columnList: [
             { key: 'customer_id', label: 'Customer ID' },
             { key: 'name', label: 'Customer Name' },
-            { key: 'mobile', label: 'Mobile' },
-            { key: 'phone', label: 'Contact No' },
+            { key: 'mobile', label: 'Mobile No.' },
+            { key: 'tel_no', label: 'Tel No.' },
             { key: 'email', label: 'Email' },
             { key: 'city', label: 'City' },
             { key: 'status', label: 'Status' },
@@ -357,7 +357,7 @@ function customersPage() {
             if (this.columns.customer_id) count++;
             if (this.columns.name) count++;
             if (this.columns.mobile) count++;
-            if (this.columns.phone) count++;
+            if (this.columns.tel_no) count++;
             if (this.columns.email) count++;
             if (this.columns.city) count++;
             if (this.columns.status) count++;

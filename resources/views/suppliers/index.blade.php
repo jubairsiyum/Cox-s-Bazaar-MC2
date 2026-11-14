@@ -143,7 +143,7 @@
                                 SUPPLIER NAME <span class="opacity-80">⇅</span>
                             </th>
                             <th x-show="columns.mobile" class="p-2.5 font-bold text-xs tracking-wider cursor-pointer" style="color: #ffffff !important;">
-                                MOBILE <span class="opacity-80">⇅</span>
+                                MOBILE NO. <span class="opacity-80">⇅</span>
                             </th>
                             <th x-show="columns.email" class="p-2.5 font-bold text-xs tracking-wider cursor-pointer" style="color: #ffffff !important;">
                                 EMAIL <span class="opacity-80">⇅</span>
@@ -212,7 +212,7 @@
                                                 'name' => $supplier->name,
                                                 'supplier_id' => $supplier->supplier_id,
                                                 'mobile' => $supplier->mobile ?: '',
-                                                'phone' => $supplier->phone ?: '',
+                                                'tel_no' => $supplier->tel_no ?: '',
                                                 'email' => $supplier->email ?: '',
                                                 'tax_number' => $supplier->tax_number ?: '',
                                                 'opening_balance' => (float) $supplier->opening_balance,
@@ -346,7 +346,7 @@
                             Mobile: <span x-text="activeSupplier?.mobile || '—'"></span>
                         </div>
                         <div class="text-gray-700 dark:text-gray-300">
-                            Phone: <span x-text="activeSupplier?.phone || '—'"></span>
+                            Tel No: <span x-text="activeSupplier?.tel_no || '—'"></span>
                         </div>
                         <div class="text-gray-700 dark:text-gray-300">
                             Email: <span x-text="activeSupplier?.email || '—'"></span>
@@ -514,7 +514,7 @@ function suppliersPage() {
         columnList: [
             { key: 'supplier_id', label: 'Supplier ID' },
             { key: 'name', label: 'Supplier Name' },
-            { key: 'mobile', label: 'Mobile' },
+            { key: 'mobile', label: 'Mobile No.' },
             { key: 'email', label: 'Email' },
             { key: 'purchase_due', label: 'Purchase Due' },
             { key: 'purchase_return_due', label: 'Purchase Return Due' },

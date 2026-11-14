@@ -48,10 +48,10 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
                         <label for="mobile" class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
-                            Mobile
+                            Mobile No.<span class="text-red-500 font-bold">*</span>
                         </label>
                         <div class="sm:col-span-2">
-                            <input type="text" id="mobile" name="mobile" value="{{ old('mobile') }}"
+                            <input type="text" id="mobile" name="mobile" value="{{ old('mobile') }}" required
                                    class="form-control @error('mobile') is-invalid @enderror"
                                    placeholder="e.g. 01700000000">
                             @error('mobile')<div class="form-error">{{ $message }}</div>@enderror
@@ -71,14 +71,14 @@
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                        <label for="phone" class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
-                            Phone
+                        <label for="tel_no" class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
+                            Tel No.
                         </label>
                         <div class="sm:col-span-2">
-                            <input type="text" id="phone" name="phone" value="{{ old('phone') }}"
-                                   class="form-control @error('phone') is-invalid @enderror"
-                                   placeholder="Landline / Alternate phone">
-                            @error('phone')<div class="form-error">{{ $message }}</div>@enderror
+                            <input type="text" id="tel_no" name="tel_no" value="{{ old('tel_no', old('phone')) }}"
+                                   class="form-control @error('tel_no') is-invalid @enderror"
+                                   placeholder="e.g. 034164200 / Landline">
+                            @error('tel_no')<div class="form-error">{{ $message }}</div>@enderror
                         </div>
                     </div>
 

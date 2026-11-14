@@ -19,7 +19,7 @@ class Customer extends Model
         'customer_id',
         'name',
         'mobile',
-        'phone',
+        'tel_no',
         'email',
         'country',
         'state',
@@ -63,6 +63,16 @@ class Customer extends Model
         return $this->status === 'active';
     }
 
+    public function getPhoneAttribute(): ?string
+    {
+        return $this->tel_no;
+    }
+
+    public function setPhoneAttribute(?string $value): void
+    {
+        $this->attributes['tel_no'] = $value;
+    }
+
     // ── Scopes ─────────────────────────────────────────────
 
     public function scopeActive(Builder $query): Builder
@@ -81,7 +91,7 @@ class Customer extends Model
                 ->orWhere('customer_id', 'like', "%{$term}%")
                 ->orWhere('mobile', 'like', "%{$term}%")
                 ->orWhere('email', 'like', "%{$term}%")
-                ->orWhere('phone', 'like', "%{$term}%")
+                ->orWhere('tel_no', 'like', "%{$term}%")
                 ->orWhere('city', 'like', "%{$term}%");
         });
     }

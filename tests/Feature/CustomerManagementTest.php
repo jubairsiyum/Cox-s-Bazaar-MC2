@@ -57,7 +57,7 @@ it('creates a customer and automatically assigns a CU code', function () {
     $response = $this->post(route('customers.store'), [
         'name' => 'Akbar Ali',
         'mobile' => '01711223344',
-        'phone' => '034164200',
+        'tel_no' => '034164200',
         'email' => 'akbar@example.com',
         'country' => 'Bangladesh',
         'state' => 'Chittagong',
@@ -78,6 +78,7 @@ it('creates a customer and automatically assigns a CU code', function () {
     expect($customer)->not->toBeNull()
         ->and($customer->customer_id)->toStartWith('CU')
         ->and($customer->mobile)->toBe('01711223344')
+        ->and($customer->tel_no)->toBe('034164200')
         ->and($customer->note)->toBe('VIP Customer')
         ->and($customer->custom_fields)->toHaveCount(2)
         ->and($customer->custom_fields[0]['label'])->toBe('NID');
@@ -103,6 +104,15 @@ it('fails validation when customer name is missing', function () {
         'name' => '',
         'mobile' => '01700000000',
     ])->assertSessionHasErrors('name');
+});
+
+it('fails validation when customer mobile is missing', function () {
+    actingAsSuperAdmin();
+
+    $this->post(route('customers.store'), [
+        'name' => 'Valid Customer Name',
+        'mobile' => '',
+    ])->assertSessionHasErrors('mobile');
 });
 
 it('shows the customer edit page', function () {
@@ -244,6 +254,8 @@ it('downloads the customer import CSV template', function () {
     $response->assertOk()
         ->assertHeader('Content-Disposition', 'attachment; filename="customer_import_template.csv"')
         ->assertSee('Customer Name')
+        ->assertSee('Mobile No')
+        ->assertSee('Tel No')
         ->assertSee('Rahim Uddin');
 });
 
@@ -251,7 +263,7 @@ it('imports customers from a valid CSV file', function () {
     actingAsSuperAdmin();
 
     $csvContent = implode("\n", [
-        'Customer Name,Mobile,Phone,Email,Country Name,State Name,City,Postcode,Address,Note',
+        'Customer Name,Mobile No,Tel No,Email,Country Name,State Name,City,Postcode,Address,Note',
         'Imported Customer 1,01700000001,034100001,imp1@example.com,Bangladesh,Chittagong,Cox\'s Bazar,4700,Hotel Motel Zone,First imported note',
         'Imported Customer 2,01700000002,034100002,imp2@example.com,Bangladesh,Chittagong,Cox\'s Bazar,4700,Main Road,Second imported note',
     ]);

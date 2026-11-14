@@ -281,8 +281,8 @@ class CustomerController extends Controller
 
         $headers = [
             'Customer Name',
-            'Mobile',
-            'Phone',
+            'Mobile No',
+            'Tel No',
             'Email',
             'Country Name',
             'State Name',
@@ -332,15 +332,19 @@ class CustomerController extends Controller
         $defaultColumns = [
             'customer_id' => 'Customer ID',
             'name' => 'Customer Name',
-            'mobile' => 'Mobile',
-            'phone' => 'Phone',
+            'mobile' => 'Mobile No.',
+            'tel_no' => 'Tel No.',
             'email' => 'Email',
             'city' => 'City',
             'status' => 'Status',
         ];
 
         if ($columnsParam !== '') {
-            $requested = array_filter(array_map('trim', explode(',', $columnsParam)));
+            $requested = array_filter(array_map(function ($c) {
+                $c = trim($c);
+
+                return $c === 'phone' ? 'tel_no' : $c;
+            }, explode(',', $columnsParam)));
             $columns = [];
             foreach ($requested as $col) {
                 if (isset($defaultColumns[$col])) {
@@ -382,15 +386,19 @@ class CustomerController extends Controller
         $defaultColumns = [
             'customer_id' => 'Customer ID',
             'name' => 'Customer Name',
-            'mobile' => 'Mobile',
-            'phone' => 'Phone',
+            'mobile' => 'Mobile No.',
+            'tel_no' => 'Tel No.',
             'email' => 'Email',
             'city' => 'City',
             'status' => 'Status',
         ];
 
         if ($columnsParam !== '') {
-            $requested = array_filter(array_map('trim', explode(',', $columnsParam)));
+            $requested = array_filter(array_map(function ($c) {
+                $c = trim($c);
+
+                return $c === 'phone' ? 'tel_no' : $c;
+            }, explode(',', $columnsParam)));
             $columns = [];
             foreach ($requested as $col) {
                 if (isset($defaultColumns[$col])) {
