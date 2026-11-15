@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Requests\Customer;
 
 use App\Models\Customer;
+use App\Services\DuplicateCheckService;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreCustomerRequest extends FormRequest
@@ -43,6 +45,29 @@ class StoreCustomerRequest extends FormRequest
             'custom_fields' => ['nullable', 'array'],
             'custom_fields.*.label' => ['nullable', 'string', 'max:100'],
             'custom_fields.*.value' => ['nullable', 'string', 'max:255'],
+        ];
+    }
+
+    /**
+     * Reject details that already belong to another customer.
+     *
+     * @return array<callable(Validator): void>
+     */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator): void {
+                if ($validator->errors()->isNotEmpty()) {
+                    return;
+                }
+
+                foreach (array_keys(DuplicateCheckService::liveConflicts(Customer::class, $this->validated())) as $column) {
+                    $validator->errors()->add(
+                        $column,
+                        __('validation.unique', ['attribute' => $validator->getDisplayableAttribute($column)])
+                    );
+                }
+            },
         ];
     }
 

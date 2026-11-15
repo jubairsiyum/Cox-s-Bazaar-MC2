@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Imports;
 
 use App\Models\Customer;
+use App\Services\DuplicateCheckService;
 use App\Services\NumberingService;
 use Illuminate\Support\Facades\Auth;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
@@ -15,6 +16,8 @@ use Maatwebsite\Excel\Concerns\WithValidation;
 class CustomerImport implements SkipsEmptyRows, ToModel, WithHeadingRow, WithValidation
 {
     private int $importedCount = 0;
+
+    private int $skippedCount = 0;
 
     /**
      * @param  array<string, mixed>  $row
@@ -30,10 +33,7 @@ class CustomerImport implements SkipsEmptyRows, ToModel, WithHeadingRow, WithVal
         $mobile = $row['mobile_no'] ?? $row['mobile'] ?? $row['mobile_number'] ?? null;
         $phone = $row['tel_no'] ?? $row['tel'] ?? $row['phone'] ?? $row['contact_no'] ?? null;
 
-        $this->importedCount++;
-
-        return new Customer([
-            'customer_id' => NumberingService::nextSequential('customer_prefix', 'CU', 4),
+        $attributes = [
             'name' => trim((string) $name),
             'mobile' => $mobile !== null ? trim((string) $mobile) : null,
             'tel_no' => $phone !== null ? trim((string) $phone) : null,
@@ -46,6 +46,31 @@ class CustomerImport implements SkipsEmptyRows, ToModel, WithHeadingRow, WithVal
             'note' => isset($row['note']) ? trim((string) $row['note']) : null,
             'status' => 'active',
             'created_by' => Auth::id(),
+        ];
+
+        if (DuplicateCheckService::liveConflicts(Customer::class, $attributes) !== []) {
+            $this->skippedCount++;
+
+            return null;
+        }
+
+        $reusable = DuplicateCheckService::reusableRecord(Customer::class, $attributes);
+
+        if ($reusable instanceof Customer) {
+            DuplicateCheckService::purgeTrashConflicts(Customer::class, $attributes, $reusable->id);
+
+            $reusable->fill($attributes);
+            $reusable->deleted_at = null;
+
+            $this->importedCount++;
+
+            return $reusable;
+        }
+
+        $this->importedCount++;
+
+        return new Customer($attributes + [
+            'customer_id' => NumberingService::nextSequential('customer_prefix', 'CU', 4),
         ]);
     }
 
@@ -63,5 +88,10 @@ class CustomerImport implements SkipsEmptyRows, ToModel, WithHeadingRow, WithVal
     public function getImportedCount(): int
     {
         return $this->importedCount;
+    }
+
+    public function getSkippedCount(): int
+    {
+        return $this->skippedCount;
     }
 }

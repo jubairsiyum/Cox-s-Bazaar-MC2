@@ -18,11 +18,11 @@ class SupplierFactory extends Factory
     {
         return [
             'supplier_id' => 'SP'.str_pad((string) fake()->unique()->numberBetween(1, 9999), 4, '0', STR_PAD_LEFT),
-            'name' => fake()->company(),
-            'mobile' => fake()->numerify('017########'),
+            'name' => fake()->unique()->company(),
+            'mobile' => fake()->unique()->numerify('017########'),
             'email' => fake()->unique()->safeEmail(),
-            'tel_no' => fake()->phoneNumber(),
-            'tax_number' => 'TAX'.fake()->numerify('#####'),
+            'tel_no' => fake()->unique()->phoneNumber(),
+            'tax_number' => 'TAX'.fake()->unique()->numerify('#####'),
             'opening_balance' => fake()->randomFloat(2, 0, 50000),
             'purchase_due' => fake()->randomFloat(2, 0, 100000),
             'purchase_return_due' => 0.00,

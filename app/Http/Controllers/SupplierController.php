@@ -12,6 +12,7 @@ use App\Imports\SupplierImport;
 use App\Models\Supplier;
 use App\Models\SupplierOpeningPayment;
 use App\Services\AuditService;
+use App\Services\DuplicateCheckService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -89,6 +90,20 @@ class SupplierController extends Controller
             $validated['purchase_due'] = $validated['opening_balance'];
         }
 
+        $reusable = DuplicateCheckService::reusableRecord(Supplier::class, $validated);
+
+        if ($reusable instanceof Supplier) {
+            DuplicateCheckService::purgeTrashConflicts(Supplier::class, $validated, $reusable->id);
+
+            $reusable->fill($validated);
+            $reusable->restore();
+
+            AuditService::created($reusable, "Supplier '{$reusable->name}' ({$reusable->supplier_id}) restored and updated.");
+
+            return redirect()->route('suppliers.index')
+                ->with('success', "Supplier '{$reusable->name}' restored and updated successfully.");
+        }
+
         $supplier = Supplier::create($validated);
 
         AuditService::created($supplier, "Supplier '{$supplier->name}' ({$supplier->supplier_id}) created.");
@@ -119,6 +134,12 @@ class SupplierController extends Controller
     {
         $original = $supplier->getOriginal();
         $validated = $request->validated();
+
+        $purged = DuplicateCheckService::purgeTrashConflicts(Supplier::class, $validated, $supplier->id);
+
+        foreach ($purged as $record) {
+            AuditService::deleted($record, "Deleted supplier '{$record->name}' ({$record->supplier_id}) permanently removed while updating supplier '{$supplier->supplier_id}'.");
+        }
 
         $supplier->update($validated);
 
@@ -267,11 +288,17 @@ class SupplierController extends Controller
         Excel::import($import, $request->file('file'));
 
         $count = $import->getImportedCount();
+        $skipped = $import->getSkippedCount();
 
         AuditService::log('imported', null, [], ['count' => $count], "Imported {$count} suppliers from file.");
 
+        $message = "Successfully imported {$count} supplier(s).";
+        if ($skipped > 0) {
+            $message .= " Skipped {$skipped} duplicate row(s).";
+        }
+
         return redirect()->route('suppliers.index')
-            ->with('success', "Successfully imported {$count} supplier(s).");
+            ->with('success', $message);
     }
 
     /**

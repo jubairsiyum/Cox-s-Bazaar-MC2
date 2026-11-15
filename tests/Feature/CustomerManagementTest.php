@@ -364,3 +364,164 @@ it('dynamically adds and deletes custom field definitions in the database', func
         'name' => 'Trade License',
     ]);
 });
+
+it('rejects creating a customer whose name matches an existing customer', function () {
+    actingAsSuperAdmin();
+
+    Customer::factory()->create(['name' => 'Akbar Ali']);
+
+    $this->post(route('customers.store'), [
+        'name' => '  akbar   ali ',
+        'mobile' => '01711223344',
+    ])->assertSessionHasErrors('name');
+
+    expect(Customer::count())->toBe(1);
+});
+
+it('rejects creating a customer whose contact details match an existing customer', function () {
+    actingAsSuperAdmin();
+
+    Customer::factory()->create([
+        'mobile' => '01711223344',
+        'tel_no' => '034164200',
+        'email' => 'akbar@example.com',
+    ]);
+
+    $this->post(route('customers.store'), [
+        'name' => 'Different Person',
+        'mobile' => '01711223344',
+    ])->assertSessionHasErrors('mobile');
+
+    $this->post(route('customers.store'), [
+        'name' => 'Another Person',
+        'mobile' => '01700000000',
+        'tel_no' => '034164200',
+    ])->assertSessionHasErrors('tel_no');
+
+    $this->post(route('customers.store'), [
+        'name' => 'Third Person',
+        'mobile' => '01700000001',
+        'email' => 'AKBAR@Example.com',
+    ])->assertSessionHasErrors('email');
+
+    expect(Customer::count())->toBe(1);
+});
+
+it('allows updating a customer with its own details', function () {
+    actingAsSuperAdmin();
+
+    $customer = Customer::factory()->create([
+        'name' => 'Stable Customer',
+        'mobile' => '01711223344',
+        'email' => 'stable@example.com',
+    ]);
+
+    $this->patch(route('customers.update', $customer), [
+        'name' => 'Stable Customer',
+        'mobile' => '01711223344',
+        'email' => 'stable@example.com',
+    ])->assertRedirect(route('customers.index'));
+
+    $customer->refresh();
+    expect($customer->name)->toBe('Stable Customer');
+});
+
+it('rejects updating a customer to details that belong to another customer', function () {
+    actingAsSuperAdmin();
+
+    $other = Customer::factory()->create([
+        'name' => 'Other Customer',
+        'email' => 'other@example.com',
+    ]);
+    $customer = Customer::factory()->create(['name' => 'Editable Customer']);
+
+    $this->patch(route('customers.update', $customer), [
+        'name' => 'Other Customer',
+        'mobile' => '01711223344',
+    ])->assertSessionHasErrors('name');
+
+    $this->patch(route('customers.update', $customer), [
+        'name' => 'Editable Customer',
+        'mobile' => '01711223344',
+        'email' => 'other@example.com',
+    ])->assertSessionHasErrors('email');
+
+    $customer->refresh();
+    expect($customer->name)->toBe('Editable Customer')
+        ->and($other->refresh()->email)->toBe('other@example.com');
+});
+
+it('restores a soft-deleted customer when the same details are submitted again', function () {
+    actingAsSuperAdmin();
+
+    $this->post(route('customers.store'), [
+        'name' => 'Akbar Ali',
+        'mobile' => '01711223344',
+        'email' => 'akbar@example.com',
+    ])->assertRedirect(route('customers.index'));
+
+    $customer = Customer::where('name', 'Akbar Ali')->firstOrFail();
+    $originalCode = $customer->customer_id;
+
+    $this->delete(route('customers.destroy', $customer))->assertRedirect(route('customers.index'));
+
+    $this->post(route('customers.store'), [
+        'name' => 'Akbar Ali',
+        'mobile' => '01711223344',
+        'email' => 'akbar@example.com',
+        'note' => 'Re-added after accidental delete',
+    ])->assertRedirect(route('customers.index'));
+
+    expect(Customer::withTrashed()->count())->toBe(1);
+
+    $restored = Customer::withTrashed()->firstOrFail();
+    expect($restored->deleted_at)->toBeNull()
+        ->and($restored->customer_id)->toBe($originalCode)
+        ->and($restored->note)->toBe('Re-added after accidental delete');
+});
+
+it('permanently removes a conflicting deleted customer when another customer is updated', function () {
+    actingAsSuperAdmin();
+
+    $kept = Customer::factory()->create(['name' => 'Kept Customer']);
+    $removed = Customer::factory()->create(['name' => 'Removed Customer']);
+
+    $this->delete(route('customers.destroy', $removed))->assertRedirect(route('customers.index'));
+
+    $this->patch(route('customers.update', $kept), [
+        'name' => 'Removed Customer',
+        'mobile' => '01711223344',
+    ])->assertRedirect(route('customers.index'));
+
+    $kept->refresh();
+    expect($kept->name)->toBe('Removed Customer')
+        ->and(Customer::withTrashed()->count())->toBe(1);
+
+    $this->assertDatabaseMissing('customers', ['id' => $removed->id]);
+});
+
+it('skips duplicate rows when importing customers', function () {
+    actingAsSuperAdmin();
+
+    Customer::factory()->create([
+        'name' => 'Existing Customer',
+        'mobile' => '01700000001',
+    ]);
+
+    $csvContent = implode("\n", [
+        'Customer Name,Mobile No,Tel No,Email,Country Name,State Name,City,Postcode,Address,Note',
+        'Existing Customer,01700000001,,,,,,,,',
+        'Fresh Customer,01700000002,034100002,fresh@example.com,Bangladesh,Chittagong,Cox\'s Bazar,4700,Main Road,First note',
+        'Fresh Customer,01700000002,034100002,fresh@example.com,Bangladesh,Chittagong,Cox\'s Bazar,4700,Main Road,First note',
+    ]);
+
+    $file = UploadedFile::fake()->createWithContent('customers.csv', $csvContent);
+
+    $this->post(route('customers.import.store'), [
+        'file' => $file,
+    ])->assertRedirect(route('customers.index'))
+        ->assertSessionHas('success', 'Successfully imported 1 customer(s). Skipped 2 duplicate row(s).');
+
+    expect(Customer::count())->toBe(2)
+        ->and(Customer::where('name', 'Fresh Customer')->count())->toBe(1);
+});

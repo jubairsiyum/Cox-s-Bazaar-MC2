@@ -12,6 +12,7 @@ use App\Imports\CustomerImport;
 use App\Models\Customer;
 use App\Models\CustomerCustomField;
 use App\Services\AuditService;
+use App\Services\DuplicateCheckService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -102,6 +103,20 @@ class CustomerController extends Controller
             }
         }
 
+        $reusable = DuplicateCheckService::reusableRecord(Customer::class, $validated);
+
+        if ($reusable instanceof Customer) {
+            DuplicateCheckService::purgeTrashConflicts(Customer::class, $validated, $reusable->id);
+
+            $reusable->fill($validated);
+            $reusable->restore();
+
+            AuditService::created($reusable, "Customer '{$reusable->name}' ({$reusable->customer_id}) restored and updated.");
+
+            return redirect()->route('customers.index')
+                ->with('success', "Customer '{$reusable->name}' restored and updated successfully.");
+        }
+
         $customer = Customer::create($validated);
 
         AuditService::created($customer, "Customer '{$customer->name}' ({$customer->customer_id}) created.");
@@ -152,6 +167,12 @@ class CustomerController extends Controller
             if (empty($validated['custom_fields'])) {
                 $validated['custom_fields'] = null;
             }
+        }
+
+        $purged = DuplicateCheckService::purgeTrashConflicts(Customer::class, $validated, $customer->id);
+
+        foreach ($purged as $record) {
+            AuditService::deleted($record, "Deleted customer '{$record->name}' ({$record->customer_id}) permanently removed while updating customer '{$customer->customer_id}'.");
         }
 
         $customer->update($validated);
@@ -265,11 +286,17 @@ class CustomerController extends Controller
         Excel::import($import, $request->file('file'));
 
         $count = $import->getImportedCount();
+        $skipped = $import->getSkippedCount();
 
         AuditService::log('imported', null, [], ['count' => $count], "Imported {$count} customers from file.");
 
+        $message = "Successfully imported {$count} customer(s).";
+        if ($skipped > 0) {
+            $message .= " Skipped {$skipped} duplicate row(s).";
+        }
+
         return redirect()->route('customers.index')
-            ->with('success', "Successfully imported {$count} customer(s).");
+            ->with('success', $message);
     }
 
     /**
