@@ -136,9 +136,6 @@
                                 <input type="checkbox" @click="toggleSelectAll()" :checked="allSelected"
                                        class="rounded border-gray-300 text-cyan-600 focus:ring-0">
                             </th>
-                            <th x-show="columns.category_id" class="p-2.5 font-bold text-xs tracking-wider cursor-pointer" style="color: #ffffff !important;">
-                                CATEGORY CODE <span class="opacity-80">⇅</span>
-                            </th>
                             <th x-show="columns.name" class="p-2.5 font-bold text-xs tracking-wider cursor-pointer" style="color: #ffffff !important;">
                                 CATEGORY NAME <span class="opacity-80">⇅</span>
                             </th>
@@ -160,16 +157,13 @@
                                     <input type="checkbox" value="{{ $category->id }}" x-model="selectedCategories"
                                            class="rounded border-gray-300 text-cyan-600 focus:ring-0">
                                 </td>
-                                <td x-show="columns.category_id" data-col="category_id" class="p-2.5 text-xs font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
-                                    {{ $category->category_id }}
-                                </td>
-                                <td x-show="columns.name" data-col="name" class="p-2.5 text-xs text-gray-900 dark:text-gray-100 font-semibold">
+                                <td x-show="columns.name" data-col="name" class="p-2.5 text-gray-900 dark:text-gray-100 font-semibold">
                                     {{ $category->name }}
                                 </td>
-                                <td x-show="columns.description" data-col="description" class="p-2.5 text-xs text-gray-600 dark:text-gray-300">
+                                <td x-show="columns.description" data-col="description" class="p-2.5 text-gray-600 dark:text-gray-300">
                                     {{ $category->description ?: '—' }}
                                 </td>
-                                <td x-show="columns.status" data-col="status" class="p-2.5 text-xs">
+                                <td x-show="columns.status" data-col="status" class="p-2.5">
                                     @can('update', $category)
                                         <form method="POST" action="{{ route('categories.toggle-status', $category) }}" class="inline">
                                             @csrf
@@ -188,11 +182,10 @@
                                         </span>
                                     @endcan
                                 </td>
-                                <td x-show="columns.action" data-col="action" class="p-2.5 text-xs text-right whitespace-nowrap">
+                                <td x-show="columns.action" data-col="action" class="p-2.5 text-right whitespace-nowrap">
                                     <button @click.stop="toggleActionMenu($event, {{ json_encode([
                                                 'id' => $category->id,
-                                                'name' => $category->name,
-                                                'category_id' => $category->category_id
+                                                'name' => $category->name
                                             ]) }})"
                                             type="button"
                                             class="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold text-white rounded shadow-xs hover:opacity-90"
@@ -208,7 +201,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td :colspan="1 + Object.keys(columns).filter(k => columns[k]).length" class="p-8 text-center text-gray-500 dark:text-gray-400 text-sm font-medium">
+                                <td :colspan="1 + Object.keys(columns).filter(k => columns[k]).length" class="p-8 text-center text-gray-500 dark:text-gray-400 font-medium">
                                     No categories found.
                                 </td>
                             </tr>
@@ -273,14 +266,12 @@ function categoriesPage() {
 
         columnsDropdownOpen: false,
         columns: {
-            category_id: true,
             name: true,
             description: true,
             status: true,
             action: true
         },
         columnList: [
-            { key: 'category_id', label: 'Category Code' },
             { key: 'name', label: 'Category Name' },
             { key: 'description', label: 'Description' },
             { key: 'status', label: 'Status' },

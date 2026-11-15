@@ -9,6 +9,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
+use App\Http\Controllers\BrandController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
@@ -98,6 +99,24 @@ Route::middleware('auth')->group(function () {
     Route::middleware(['verified', 'permission:settings.manage'])->group(function () {
         Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');
         Route::patch('settings', [SettingsController::class, 'update'])->name('settings.update');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Brand Management (Master Data)
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['verified', 'permission:brands.view'])->group(function () {
+        Route::get('brands', [BrandController::class, 'index'])->name('brands.index');
+        Route::get('brands/pdf-view', [BrandController::class, 'pdfView'])->name('brands.pdf-view');
+        Route::get('brands/print-view', [BrandController::class, 'printView'])->name('brands.print-view');
+        Route::get('brands/export/{format?}', [BrandController::class, 'export'])->name('brands.export');
+    });
+
+    Route::middleware(['verified', 'permission:brands.manage'])->group(function () {
+        Route::post('brands', [BrandController::class, 'store'])->name('brands.store');
+        Route::patch('brands/{brand}', [BrandController::class, 'update'])->name('brands.update');
+        Route::delete('brands/{brand}', [BrandController::class, 'destroy'])->name('brands.destroy');
     });
 
     /*
@@ -203,7 +222,6 @@ Route::middleware('auth')->group(function () {
 */
 Route::middleware(['auth', 'verified'])->group(function () {
     $placeholders = [
-        'brands.index' => 'Brands',
         'units.index' => 'Units',
         'products.index' => 'Products',
         'warehouses.index' => 'Warehouses',

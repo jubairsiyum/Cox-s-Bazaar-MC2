@@ -32,7 +32,7 @@ it('lists categories for a Super Admin', function () {
         ->assertOk()
         ->assertSee('Categories List')
         ->assertSee('Smartphones')
-        ->assertSee('CT0021');
+        ->assertDontSee('CT0021');
 });
 
 it('shows the category create page', function () {
@@ -88,7 +88,7 @@ it('fails validation when category name is duplicated', function () {
     ])->assertSessionHasErrors('name');
 });
 
-it('shows the category edit page with the generated category code', function () {
+it('hides the category code on the category edit page', function () {
     actingAsSuperAdmin();
 
     $category = Category::factory()->create([
@@ -99,8 +99,8 @@ it('shows the category edit page with the generated category code', function () 
     $this->get(route('categories.edit', $category))
         ->assertOk()
         ->assertSee('Add/Update Category')
-        ->assertSee('CT0015')
-        ->assertSee('Smart Watches');
+        ->assertSee('Smart Watches')
+        ->assertDontSee('CT0015');
 });
 
 it('updates an existing category', function () {
@@ -191,7 +191,7 @@ it('renders the pdf preview page with categories and headers', function () {
         ->assertOk()
         ->assertSee('Categories List')
         ->assertSee('Bluetooth Speakers')
-        ->assertSee('CT0019')
+        ->assertDontSee('CT0019')
         ->assertSee('Download / Save as PDF');
 });
 
@@ -207,7 +207,7 @@ it('renders the print preview page with categories and grid table', function () 
         ->assertOk()
         ->assertSee('Categories List')
         ->assertSee('Bluetooth Speakers')
-        ->assertSee('CT0019')
+        ->assertDontSee('CT0019')
         ->assertSee('window.print()', false);
 });
 

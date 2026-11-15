@@ -171,9 +171,7 @@
                     <tr>
                         @foreach($columns as $key => $label)
                             <td>
-                                @if($key === 'category_id')
-                                    {{ $category->category_id }}
-                                @elseif($key === 'name')
+                                @if($key === 'name')
                                     {{ $category->name }}
                                 @elseif($key === 'description')
                                     {{ $category->description ?: '—' }}

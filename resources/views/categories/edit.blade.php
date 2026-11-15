@@ -41,17 +41,6 @@
 
                 <div class="max-w-3xl space-y-4">
                     <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                        <label for="category_code"
-                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
-                            Category Code
-                        </label>
-                        <div class="sm:col-span-2">
-                            <input type="text" id="category_code" value="{{ $category->category_id }}" disabled
-                                class="form-control bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed">
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
                         <label for="name"
                             class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
                             Category Name<span class="text-red-500 font-bold">*</span>

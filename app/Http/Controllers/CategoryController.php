@@ -198,7 +198,6 @@ class CategoryController extends Controller
         $columnsParam = $request->string('columns')->toString();
 
         $availableColumns = [
-            'category_id' => 'Category Code',
             'name' => 'Category Name',
             'description' => 'Description',
             'status' => 'Status',

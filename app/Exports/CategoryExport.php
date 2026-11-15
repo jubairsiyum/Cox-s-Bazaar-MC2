@@ -16,7 +16,6 @@ class CategoryExport implements FromCollection, WithHeadings, WithMapping
      * @var array<string, string>
      */
     protected const COLUMN_DEFINITIONS = [
-        'category_id' => 'Category Code',
         'name' => 'Category Name',
         'description' => 'Description',
         'status' => 'Status',
@@ -64,7 +63,6 @@ class CategoryExport implements FromCollection, WithHeadings, WithMapping
         $mapped = [];
         foreach ($this->activeColumns as $col) {
             $mapped[] = match ($col) {
-                'category_id' => $category->category_id,
                 'name' => $category->name,
                 'description' => $category->description ?: '—',
                 'status' => ucfirst($category->status),
