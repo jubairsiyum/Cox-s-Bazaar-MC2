@@ -16,6 +16,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PlaceholderController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\UnitController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
@@ -99,6 +100,27 @@ Route::middleware('auth')->group(function () {
     Route::middleware(['verified', 'permission:settings.manage'])->group(function () {
         Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');
         Route::patch('settings', [SettingsController::class, 'update'])->name('settings.update');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Unit / Quantity Management (Master Data)
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['verified', 'permission:units.view'])->group(function () {
+        Route::get('units', [UnitController::class, 'index'])->name('units.index');
+        Route::get('units/pdf-view', [UnitController::class, 'pdfView'])->name('units.pdf-view');
+        Route::get('units/print-view', [UnitController::class, 'printView'])->name('units.print-view');
+        Route::get('units/export/{format?}', [UnitController::class, 'export'])->name('units.export');
+        Route::get('units/import/template', [UnitController::class, 'downloadTemplate'])->name('units.import-template');
+    });
+
+    Route::middleware(['verified', 'permission:units.manage'])->group(function () {
+        Route::post('units', [UnitController::class, 'store'])->name('units.store');
+        Route::get('units/import', [UnitController::class, 'importView'])->name('units.import');
+        Route::post('units/import', [UnitController::class, 'import'])->name('units.import.store');
+        Route::patch('units/{unit}', [UnitController::class, 'update'])->name('units.update');
+        Route::delete('units/{unit}', [UnitController::class, 'destroy'])->name('units.destroy');
     });
 
     /*
@@ -222,7 +244,6 @@ Route::middleware('auth')->group(function () {
 */
 Route::middleware(['auth', 'verified'])->group(function () {
     $placeholders = [
-        'units.index' => 'Units',
         'products.index' => 'Products',
         'warehouses.index' => 'Warehouses',
         'inventory.index' => 'Stock Levels',
