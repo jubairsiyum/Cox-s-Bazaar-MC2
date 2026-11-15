@@ -20,6 +20,29 @@ it('forbids users without permission from viewing categories', function () {
     $this->actingAs($user)->get(route('categories.index'))->assertForbidden();
 });
 
+it('hides the categories action column for users without manage permission', function () {
+    $salesStaff = User::factory()->create(['email_verified_at' => now()]);
+    $salesStaff->assignRole('Sales Staff');
+
+    Category::factory()->create(['name' => 'Smartphones']);
+
+    $this->actingAs($salesStaff)->get(route('categories.index'))
+        ->assertOk()
+        ->assertSee('Smartphones')
+        ->assertDontSee('ACTION')
+        ->assertDontSee('data-col="action"', false);
+});
+
+it('shows the categories action column for users with manage permission', function () {
+    actingAsSuperAdmin();
+
+    Category::factory()->create(['name' => 'Smartphones']);
+
+    $this->get(route('categories.index'))
+        ->assertSee('ACTION')
+        ->assertSee('data-col="action"', false);
+});
+
 it('lists categories for a Super Admin', function () {
     actingAsSuperAdmin();
 

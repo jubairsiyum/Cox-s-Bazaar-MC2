@@ -23,6 +23,30 @@ it('forbids users without permission from viewing customers', function () {
     $this->actingAs($user)->get(route('customers.index'))->assertForbidden();
 });
 
+it('allows the demo sales staff to view the customers list', function () {
+    $salesStaff = User::factory()->create(['email_verified_at' => now()]);
+    $salesStaff->assignRole('Sales Staff');
+
+    Customer::factory()->create(['name' => 'Walk-in Customer']);
+
+    $this->actingAs($salesStaff)->get(route('customers.index'))
+        ->assertOk()
+        ->assertSee('Customers List')
+        ->assertSee('Walk-in Customer')
+        ->assertDontSee('delete this customer')
+        ->assertDontSee('>Action</th>', false);
+});
+
+it('shows the customer actions for users with manage permission', function () {
+    actingAsSuperAdmin();
+
+    Customer::factory()->create();
+
+    $this->get(route('customers.index'))
+        ->assertSee('delete this customer')
+        ->assertSee('>Action</th>', false);
+});
+
 it('lists customers for an authorized user', function () {
     actingAsSuperAdmin();
 

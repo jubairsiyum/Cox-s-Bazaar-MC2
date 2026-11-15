@@ -114,11 +114,102 @@ Alpine.data("toastHost", () => ({
     },
 }));
 
+// Barcode field: receives scans from hardware scanners and fills the input.
+Alpine.data("barcodeField", () => ({
+    lastScan: "",
+    scanning: false,
+
+    init() {
+        // Focus the input so a USB/Bluetooth keyboard-wedge scanner types into it.
+        this.$nextTick(() => this.focus());
+    },
+
+    startScan() {
+        this.scanning = true;
+        this.focus();
+    },
+
+    applyScan(code) {
+        if (!code) {
+            return;
+        }
+        if (this.$refs.input) {
+            this.$refs.input.value = code;
+        }
+        this.lastScan = code;
+        this.scanning = false;
+        Alpine.store("toast")?.show("Barcode scanned: " + code, "success", 2500);
+    },
+
+    focus() {
+        this.$nextTick(() => this.$refs.input && this.$refs.input.focus());
+    },
+}));
+
 // Start Alpine
 Alpine.start();
 
+// Global keyboard-wedge barcode scanner capture. USB and Bluetooth scanners
+// used in Bangladesh behave like a keyboard: they type the code in a fast burst
+// and end with Enter. This listener detects that burst and routes it to the
+// product barcode field regardless of focus.
+function initBarcodeScanner() {
+    let buffer = "";
+    let lastKeyTime = 0;
+    let flushTimer = null;
+
+    const flush = () => {
+        const code = buffer;
+        buffer = "";
+        if (code.length >= 4) {
+            window.dispatchEvent(new CustomEvent("barcode-scanned", { detail: { code } }));
+        }
+    };
+
+    document.addEventListener("keydown", (event) => {
+        const isBarcodeInput = event.target && event.target.id === "barcode";
+
+        if (event.key === "Enter") {
+            if (buffer.length >= 4) {
+                event.preventDefault();
+                event.stopPropagation();
+                flush();
+            }
+            return;
+        }
+
+        // Only printable characters without modifier keys.
+        if (event.key.length !== 1 || event.ctrlKey || event.altKey || event.metaKey) {
+            buffer = "";
+            return;
+        }
+
+        const now = Date.now();
+        const rapid = now - lastKeyTime <= 40;
+
+        if (!rapid) {
+            buffer = "";
+        }
+
+        buffer += event.key;
+        lastKeyTime = now;
+
+        // Keep a detected scan from leaking into a non-barcode field. When the
+        // barcode input itself is focused, let the keys flow through naturally.
+        if (buffer.length >= 2 && !isBarcodeInput) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
+        clearTimeout(flushTimer);
+        flushTimer = setTimeout(flush, 100);
+    }, true);
+}
+
 // Initialize components on DOM ready
 document.addEventListener("DOMContentLoaded", () => {
+    initBarcodeScanner();
+
     // ── Offline / Online detection ──────────────────────────
     const offlineBanner = document.getElementById('offline-banner');
     if (offlineBanner) {

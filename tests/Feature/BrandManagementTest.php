@@ -20,6 +20,27 @@ it('forbids users without permission from viewing brands', function () {
     $this->actingAs($user)->get(route('brands.index'))->assertForbidden();
 });
 
+it('hides the brands action column for users without manage permission', function () {
+    $salesStaff = User::factory()->create(['email_verified_at' => now()]);
+    $salesStaff->assignRole('Sales Staff');
+
+    Brand::factory()->create(['name' => 'Samsung']);
+
+    $this->actingAs($salesStaff)->get(route('brands.index'))
+        ->assertOk()
+        ->assertSee('Samsung')
+        ->assertDontSee('>Action</th>', false);
+});
+
+it('shows the brands action column for users with manage permission', function () {
+    actingAsSuperAdmin();
+
+    Brand::factory()->create(['name' => 'Samsung']);
+
+    $this->get(route('brands.index'))
+        ->assertSee('>Action</th>', false);
+});
+
 it('lists brands for a Super Admin', function () {
     actingAsSuperAdmin();
 

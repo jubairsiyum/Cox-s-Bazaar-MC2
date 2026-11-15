@@ -145,9 +145,11 @@
                             <th x-show="columns.status" class="p-2.5 font-bold text-xs tracking-wider cursor-pointer" style="color: #ffffff !important;">
                                 STATUS <span class="opacity-80">⇅</span>
                             </th>
-                            <th x-show="columns.action" class="p-2.5 font-bold text-xs tracking-wider text-right" style="color: #ffffff !important;">
-                                ACTION
-                            </th>
+                            @can('categories.manage')
+                                <th x-show="columns.action" class="p-2.5 font-bold text-xs tracking-wider text-right" style="color: #ffffff !important;">
+                                    ACTION
+                                </th>
+                            @endcan
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
@@ -182,22 +184,24 @@
                                         </span>
                                     @endcan
                                 </td>
-                                <td x-show="columns.action" data-col="action" class="p-2.5 text-right whitespace-nowrap">
-                                    <button @click.stop="toggleActionMenu($event, {{ json_encode([
-                                                'id' => $category->id,
-                                                'name' => $category->name
-                                            ]) }})"
-                                            type="button"
-                                            class="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold text-white rounded shadow-xs hover:opacity-90"
-                                            style="background-color: #1e3a5f;">
-                                        Action
-                                        <svg class="size-3 transition-transform"
-                                             :class="{ 'rotate-180': actionMenuOpen && openActionCategory && openActionCategory.id === {{ $category->id }} }"
-                                             fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                        </svg>
-                                    </button>
-                                </td>
+                                @can('categories.manage')
+                                    <td x-show="columns.action" data-col="action" class="p-2.5 text-right whitespace-nowrap">
+                                        <button @click.stop="toggleActionMenu($event, {{ json_encode([
+                                                    'id' => $category->id,
+                                                    'name' => $category->name
+                                                ]) }})"
+                                                type="button"
+                                                class="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold text-white rounded shadow-xs hover:opacity-90"
+                                                style="background-color: #1e3a5f;">
+                                            Action
+                                            <svg class="size-3 transition-transform"
+                                                 :class="{ 'rotate-180': actionMenuOpen && openActionCategory && openActionCategory.id === {{ $category->id }} }"
+                                                 fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                            </svg>
+                                        </button>
+                                    </td>
+                                @endcan
                             </tr>
                         @empty
                             <tr>
@@ -218,6 +222,7 @@
     </div>
 
     {{-- Floating Action Dropdown Menu (Outside table to prevent any clipping or scrollbar) --}}
+    @can('categories.manage')
     <div x-show="actionMenuOpen" x-cloak
          @click.outside="actionMenuOpen = false"
          @scroll.window="actionMenuOpen = false"
@@ -251,6 +256,7 @@
             </div>
         </template>
     </div>
+    @endcan
 </div>
 
 <script>
@@ -275,7 +281,7 @@ function categoriesPage() {
             { key: 'name', label: 'Category Name' },
             { key: 'description', label: 'Description' },
             { key: 'status', label: 'Status' },
-            { key: 'action', label: 'Action' }
+            @can('categories.manage') { key: 'action', label: 'Action' } @endcan
         ],
 
         toggleColumn(key) {

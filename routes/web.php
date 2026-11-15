@@ -14,6 +14,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PlaceholderController;
+use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\UnitController;
@@ -164,6 +165,24 @@ Route::middleware('auth')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
+    | Product Management (Master Data)
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['verified', 'permission:products.view'])->group(function () {
+        Route::get('products', [ProductController::class, 'index'])->name('products.index');
+    });
+
+    Route::middleware(['verified', 'permission:products.manage'])->group(function () {
+        Route::get('products/create', [ProductController::class, 'create'])->name('products.create');
+        Route::post('products', [ProductController::class, 'store'])->name('products.store');
+        Route::get('products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
+        Route::patch('products/{product}', [ProductController::class, 'update'])->name('products.update');
+        Route::patch('products/{product}/toggle-status', [ProductController::class, 'toggleStatus'])->name('products.toggle-status');
+        Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
     | Supplier Management
     |--------------------------------------------------------------------------
     */
@@ -244,7 +263,6 @@ Route::middleware('auth')->group(function () {
 */
 Route::middleware(['auth', 'verified'])->group(function () {
     $placeholders = [
-        'products.index' => 'Products',
         'warehouses.index' => 'Warehouses',
         'inventory.index' => 'Stock Levels',
         'stock-adjustments.index' => 'Stock Adjustments',
