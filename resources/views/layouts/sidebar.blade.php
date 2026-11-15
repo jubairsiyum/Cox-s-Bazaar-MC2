@@ -16,6 +16,13 @@
                     if (!empty($sub['path'])) {
                         $allMenuPaths[] = $sub['path'];
                     }
+                    if (!empty($sub['subItems'])) {
+                        foreach ($sub['subItems'] as $childSub) {
+                            if (!empty($childSub['path'])) {
+                                $allMenuPaths[] = $childSub['path'];
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -26,6 +33,7 @@
 function sidebarComponent() {
     return {
         openSubmenus: {},
+        openChildSubmenus: {},
         allPaths: @json($allMenuPaths),
         init() {
             this.initializeActiveMenus();
@@ -36,18 +44,32 @@ function sidebarComponent() {
             @foreach ($menuGroups as $groupIndex => $menuGroup)
                 @foreach ($menuGroup['items'] as $itemIndex => $item)
                     @if (isset($item['subItems']))
-                        @foreach ($item['subItems'] as $subItem)
-                            if (currentPath === '{{ ltrim($subItem['path'], '/') }}' ||
-                                window.location.pathname === '{{ $subItem['path'] }}' ||
-                                (window.location.pathname.startsWith('{{ $subItem['path'] }}/'))) {
-                                this.openSubmenus['{{ $groupIndex }}-{{ $itemIndex }}'] = true;
-                            }
+                        @foreach ($item['subItems'] as $subIndex => $subItem)
+                            @if (isset($subItem['subItems']))
+                                @foreach ($subItem['subItems'] as $childSub)
+                                    if (currentPath === '{{ ltrim($childSub['path'], '/') }}' ||
+                                        window.location.pathname === '{{ $childSub['path'] }}' ||
+                                        (window.location.pathname.startsWith('{{ $childSub['path'] }}/'))) {
+                                        this.openSubmenus['{{ $groupIndex }}-{{ $itemIndex }}'] = true;
+                                        this.openChildSubmenus['{{ $groupIndex }}-{{ $itemIndex }}-{{ $subIndex }}'] = true;
+                                    }
+                                @endforeach
+                            @else
+                                if (currentPath === '{{ ltrim($subItem['path'], '/') }}' ||
+                                    window.location.pathname === '{{ $subItem['path'] }}' ||
+                                    (window.location.pathname.startsWith('{{ $subItem['path'] }}/'))) {
+                                    this.openSubmenus['{{ $groupIndex }}-{{ $itemIndex }}'] = true;
+                                }
+                            @endif
                         @endforeach
                     @endif
                 @endforeach
             @endforeach
         },
         toggleSubmenu(groupIndex, itemIndex) {
+            if (!Alpine.store('sidebar').isExpanded) {
+                Alpine.store('sidebar').setExpanded(true);
+            }
             const key = groupIndex + '-' + itemIndex;
             const newState = !this.openSubmenus[key];
 
@@ -60,6 +82,14 @@ function sidebarComponent() {
         isSubmenuOpen(groupIndex, itemIndex) {
             const key = groupIndex + '-' + itemIndex;
             return this.openSubmenus[key] || false;
+        },
+        toggleChildSubmenu(groupIndex, itemIndex, subIndex) {
+            const key = groupIndex + '-' + itemIndex + '-' + subIndex;
+            this.openChildSubmenus[key] = !this.openChildSubmenus[key];
+        },
+        isChildSubmenuOpen(groupIndex, itemIndex, subIndex) {
+            const key = groupIndex + '-' + itemIndex + '-' + subIndex;
+            return !!this.openChildSubmenus[key];
         },
         isActive(path) {
             if (!path) return false;
@@ -99,9 +129,11 @@ function sidebarComponent() {
 </script>
 
 <aside id="sidebar"
-    class="fixed flex flex-col mt-0 top-0 px-5 start-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out max-xl:duration-200 max-xl:w-[290px] z-50 max-xl:z-101 ltr:border-r rtl:border-l border-gray-200 w-[90px] [.sidebar-expanded_&]:min-w-[290px]"
+    class="fixed flex flex-col mt-0 top-0 px-5 ltr:left-0 rtl:right-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out max-xl:duration-200 max-xl:w-[290px] z-50 max-xl:z-101 ltr:border-r rtl:border-l border-gray-200 w-[90px] [.sidebar-expanded_&]:w-[290px] [.sidebar-expanded_&]:min-w-[290px]"
     x-data="sidebarComponent()"
     :class="{
+        'w-[290px]': $store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen,
+        'w-[90px]': !$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen,
         'translate-x-0': $store.sidebar.isMobileOpen,
         'max-xl:-translate-x-full max-xl:rtl:translate-x-full': !$store.sidebar.isMobileOpen
     }"
@@ -110,9 +142,10 @@ function sidebarComponent() {
 
     <!-- Logo Section -->
     <div class="py-6 flex items-center gap-2 border-b border-gray-100 dark:border-gray-800" :class="(!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen) ? 'justify-center' : 'justify-between'">
-        <a href="{{ route('dashboard') }}" class="flex items-center gap-3">
+        <a href="{{ route('dashboard') }}" class="flex items-center gap-3 overflow-hidden">
             <img src="{{ asset('cmc2-logo.jpeg') }}" alt="{{ config('app.name') }}" class="h-10 w-10 shrink-0 rounded-xl object-contain bg-white p-0.5 shadow-theme-xs">
-            <div class="hidden [.sidebar-expanded_&]:block">
+            <div x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen"
+                class="hidden [.sidebar-expanded_&]:block whitespace-nowrap overflow-hidden">
                 <span class="block text-base font-bold text-gray-900 dark:text-white leading-tight">
                     {{ config('app.name', 'Cox\'s Bazaar') }}
                 </span>
@@ -122,7 +155,7 @@ function sidebarComponent() {
     </div>
 
     <!-- Navigation Menu -->
-    <div class="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar pt-4">
+    <div class="flex flex-col overflow-y-auto overflow-x-hidden duration-300 ease-linear no-scrollbar pt-4">
         <nav class="mb-6">
             <div class="flex flex-col gap-4">
                 @foreach ($menuGroups as $groupIndex => $menuGroup)
@@ -197,32 +230,86 @@ function sidebarComponent() {
                                         </button>
 
                                         <!-- Submenu -->
-                                        <div x-show="isSubmenuOpen({{ $groupIndex }}, {{ $itemIndex }}) && ($store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen)" x-collapse>
+                                        <div x-show="isSubmenuOpen({{ $groupIndex }}, {{ $itemIndex }}) && ($store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen)">
                                             <ul class="mt-2 space-y-1 ltr:ml-9 rtl:mr-9">
-                                                @foreach ($item['subItems'] as $subItem)
+                                                @foreach ($item['subItems'] as $subIndex => $subItem)
                                                     @php
                                                         if (!empty($subItem['can']) && !auth()->user()?->can($subItem['can'])) {
                                                             continue;
                                                         }
+                                                        if (!empty($subItem['canany']) && !auth()->user()?->hasRole('Super Admin')) {
+                                                            $hasAnySub = false;
+                                                            foreach ((array) $subItem['canany'] as $perm) {
+                                                                if (auth()->user()?->can($perm)) { $hasAnySub = true; break; }
+                                                            }
+                                                            if (!$hasAnySub) continue;
+                                                        }
                                                     @endphp
-                                                    <li>
-                                                        <a href="{{ $subItem['path'] }}" class="menu-dropdown-item"
-                                                            :class="isActive('{{ $subItem['path'] }}') ?
-                                                                'menu-dropdown-item-active' :
-                                                                'menu-dropdown-item-inactive'">
-                                                            {{ __($subItem['name']) }}
-                                                            <span class="flex items-center gap-1 ltr:ml-auto rtl:mr-auto">
-                                                                @if (!empty($subItem['new']))
-                                                                    <span
-                                                                        :class="isActive('{{ $subItem['path'] }}') ?
-                                                                            'menu-dropdown-badge menu-dropdown-badge-active' :
-                                                                            'menu-dropdown-badge menu-dropdown-badge-inactive'">
-                                                                        {{ __('new') }}
-                                                                    </span>
-                                                                @endif
-                                                            </span>
-                                                        </a>
-                                                    </li>
+                                                    @if (isset($subItem['subItems']))
+                                                        @php
+                                                            $isSubActive = false;
+                                                            foreach ($subItem['subItems'] as $childSubCheck) {
+                                                                $cleanPath = ltrim($childSubCheck['path'] ?? '', '/');
+                                                                if (request()->is($cleanPath) || request()->is($cleanPath . '/*')) {
+                                                                    $isSubActive = true;
+                                                                    break;
+                                                                }
+                                                            }
+                                                        @endphp
+                                                        <!-- Nested 2nd-level submenu (Customers, Suppliers under Parties) -->
+                                                        <li>
+                                                            <button type="button"
+                                                                @click.stop="toggleChildSubmenu({{ $groupIndex }}, {{ $itemIndex }}, {{ $subIndex }})"
+                                                                class="menu-dropdown-item group w-full justify-between cursor-pointer"
+                                                                :class="(isChildSubmenuOpen({{ $groupIndex }}, {{ $itemIndex }}, {{ $subIndex }}) || {{ $isSubActive ? 'true' : 'false' }}) ?
+                                                                    'menu-dropdown-item-active' :
+                                                                    'menu-dropdown-item-inactive'">
+                                                                <span>{{ __($subItem['name']) }}</span>
+                                                                <x-svg.chevron-down
+                                                                    class="h-4 w-4 transition-transform duration-200"
+                                                                    x-bind:class="{ 'rotate-180 text-brand-500': isChildSubmenuOpen({{ $groupIndex }}, {{ $itemIndex }}, {{ $subIndex }}) }" />
+                                                            </button>
+                                                            <div x-show="isChildSubmenuOpen({{ $groupIndex }}, {{ $itemIndex }}, {{ $subIndex }})">
+                                                                <ul class="mt-1 space-y-1 ltr:ml-4 rtl:mr-4">
+                                                                    @foreach ($subItem['subItems'] as $childSub)
+                                                                        @php
+                                                                            if (!empty($childSub['can']) && !auth()->user()?->can($childSub['can'])) {
+                                                                                continue;
+                                                                            }
+                                                                        @endphp
+                                                                        <li>
+                                                                            <a href="{{ $childSub['path'] }}" class="menu-dropdown-item"
+                                                                                :class="isActive('{{ $childSub['path'] }}') ?
+                                                                                    'menu-dropdown-item-active' :
+                                                                                    'menu-dropdown-item-inactive'">
+                                                                                {{ __($childSub['name']) }}
+                                                                            </a>
+                                                                        </li>
+                                                                    @endforeach
+                                                                </ul>
+                                                            </div>
+                                                        </li>
+                                                    @else
+                                                        <!-- Normal 1st-level submenu item -->
+                                                        <li>
+                                                            <a href="{{ $subItem['path'] }}" class="menu-dropdown-item"
+                                                                :class="isActive('{{ $subItem['path'] }}') ?
+                                                                    'menu-dropdown-item-active' :
+                                                                    'menu-dropdown-item-inactive'">
+                                                                {{ __($subItem['name']) }}
+                                                                <span class="flex items-center gap-1 ltr:ml-auto rtl:mr-auto">
+                                                                    @if (!empty($subItem['new']))
+                                                                        <span
+                                                                            :class="isActive('{{ $subItem['path'] }}') ?
+                                                                                'menu-dropdown-badge menu-dropdown-badge-active' :
+                                                                                'menu-dropdown-badge menu-dropdown-badge-inactive'">
+                                                                            {{ __('new') }}
+                                                                        </span>
+                                                                    @endif
+                                                                </span>
+                                                            </a>
+                                                        </li>
+                                                    @endif
                                                 @endforeach
                                             </ul>
                                         </div>

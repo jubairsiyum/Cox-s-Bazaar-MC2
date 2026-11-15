@@ -112,10 +112,11 @@
                     </tr>
                     <tr>
                         <td class="p-3 text-center font-medium">2</td>
-                        <td class="p-3 font-semibold text-gray-900 dark:text-gray-100">Mobile</td>
+                        <td class="p-3 font-semibold text-gray-900 dark:text-gray-100">Mobile No.</td>
                         <td class="p-3 text-center">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold text-gray-700 bg-gray-200 dark:bg-gray-700 dark:text-gray-300">
-                                Optional
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-white"
+                                  style="background-color: #00a65a;">
+                                Required
                             </span>
                         </td>
                     </tr>
@@ -130,7 +131,7 @@
                     </tr>
                     <tr>
                         <td class="p-3 text-center font-medium">4</td>
-                        <td class="p-3 font-semibold text-gray-900 dark:text-gray-100">Phone</td>
+                        <td class="p-3 font-semibold text-gray-900 dark:text-gray-100">Tel No.</td>
                         <td class="p-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold text-gray-700 bg-gray-200 dark:bg-gray-700 dark:text-gray-300">
                                 Optional

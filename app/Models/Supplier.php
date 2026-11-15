@@ -21,7 +21,7 @@ class Supplier extends Model
         'name',
         'mobile',
         'email',
-        'phone',
+        'tel_no',
         'tax_number',
         'opening_balance',
         'purchase_due',
@@ -70,6 +70,16 @@ class Supplier extends Model
         return $this->status === 'active';
     }
 
+    public function getPhoneAttribute(): ?string
+    {
+        return $this->tel_no;
+    }
+
+    public function setPhoneAttribute(?string $value): void
+    {
+        $this->attributes['tel_no'] = $value;
+    }
+
     // ── Scopes ─────────────────────────────────────────────
 
     public function scopeActive(Builder $query): Builder
@@ -88,7 +98,7 @@ class Supplier extends Model
                 ->orWhere('supplier_id', 'like', "%{$term}%")
                 ->orWhere('mobile', 'like', "%{$term}%")
                 ->orWhere('email', 'like', "%{$term}%")
-                ->orWhere('phone', 'like', "%{$term}%")
+                ->orWhere('tel_no', 'like', "%{$term}%")
                 ->orWhere('tax_number', 'like', "%{$term}%");
         });
     }

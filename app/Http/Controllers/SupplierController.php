@@ -283,9 +283,9 @@ class SupplierController extends Controller
 
         $headers = [
             'Supplier Name',
-            'Mobile',
+            'Mobile No',
             'Email',
-            'Phone',
+            'Tel No',
             'TAX Number',
             'Country Name',
             'State Name',
@@ -336,19 +336,28 @@ class SupplierController extends Controller
         $defaultColumns = [
             'supplier_id' => 'Supplier ID',
             'name' => 'Supplier Name',
-            'mobile' => 'Mobile',
+            'mobile' => 'Mobile No.',
             'email' => 'Email',
             'purchase_due' => 'Purchase Due',
             'purchase_return_due' => 'Purchase Return Due',
             'status' => 'Status',
         ];
 
+        $availableColumns = array_merge($defaultColumns, [
+            'tel_no' => 'Tel No.',
+            'tax_number' => 'TAX Number',
+        ]);
+
         if ($columnsParam !== '') {
-            $requested = array_filter(array_map('trim', explode(',', $columnsParam)));
+            $requested = array_filter(array_map(function ($c) {
+                $c = trim($c);
+
+                return $c === 'phone' ? 'tel_no' : $c;
+            }, explode(',', $columnsParam)));
             $columns = [];
             foreach ($requested as $col) {
-                if (isset($defaultColumns[$col])) {
-                    $columns[$col] = $defaultColumns[$col];
+                if (isset($availableColumns[$col])) {
+                    $columns[$col] = $availableColumns[$col];
                 }
             }
             if (empty($columns)) {
@@ -386,19 +395,28 @@ class SupplierController extends Controller
         $defaultColumns = [
             'supplier_id' => 'Supplier ID',
             'name' => 'Supplier Name',
-            'mobile' => 'Mobile',
+            'mobile' => 'Mobile No.',
             'email' => 'Email',
             'purchase_due' => 'Purchase Due',
             'purchase_return_due' => 'Purchase Return Due',
             'status' => 'Status',
         ];
 
+        $availableColumns = array_merge($defaultColumns, [
+            'tel_no' => 'Tel No.',
+            'tax_number' => 'TAX Number',
+        ]);
+
         if ($columnsParam !== '') {
-            $requested = array_filter(array_map('trim', explode(',', $columnsParam)));
+            $requested = array_filter(array_map(function ($c) {
+                $c = trim($c);
+
+                return $c === 'phone' ? 'tel_no' : $c;
+            }, explode(',', $columnsParam)));
             $columns = [];
             foreach ($requested as $col) {
-                if (isset($defaultColumns[$col])) {
-                    $columns[$col] = $defaultColumns[$col];
+                if (isset($availableColumns[$col])) {
+                    $columns[$col] = $availableColumns[$col];
                 }
             }
             if (empty($columns)) {

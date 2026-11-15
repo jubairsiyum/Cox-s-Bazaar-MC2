@@ -107,12 +107,12 @@
                     </tr>
                     <tr>
                         <td class="p-3 text-center text-gray-500">2</td>
-                        <td class="p-3 font-semibold text-gray-900 dark:text-gray-100">Mobile</td>
-                        <td class="p-3 text-center text-green-600 font-medium">Optional</td>
+                        <td class="p-3 font-semibold text-gray-900 dark:text-gray-100">Mobile No.</td>
+                        <td class="p-3 text-center text-red-500 font-bold">Required</td>
                     </tr>
                     <tr>
                         <td class="p-3 text-center text-gray-500">3</td>
-                        <td class="p-3 font-semibold text-gray-900 dark:text-gray-100">Phone (Contact No)</td>
+                        <td class="p-3 font-semibold text-gray-900 dark:text-gray-100">Tel No.</td>
                         <td class="p-3 text-center text-green-600 font-medium">Optional</td>
                     </tr>
                     <tr>

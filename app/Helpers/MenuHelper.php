@@ -27,22 +27,27 @@ class MenuHelper
             ],
             [
                 'icon' => 'users',
-                'name' => 'Suppliers',
-                'canany' => ['suppliers.view', 'suppliers.manage'],
+                'name' => 'Parties',
+                'canany' => ['customers.view', 'customers.manage', 'suppliers.view', 'suppliers.manage'],
                 'subItems' => [
-                    ['name' => 'New Supplier', 'path' => '/suppliers/create', 'can' => 'suppliers.manage'],
-                    ['name' => 'Suppliers List', 'path' => '/suppliers', 'can' => 'suppliers.view'],
-                    ['name' => 'Import Suppliers', 'path' => '/suppliers/import', 'can' => 'suppliers.manage'],
-                ],
-            ],
-            [
-                'icon' => 'users',
-                'name' => 'Customers',
-                'canany' => ['customers.view', 'customers.manage'],
-                'subItems' => [
-                    ['name' => 'New Customer', 'path' => '/customers/create', 'can' => 'customers.manage'],
-                    ['name' => 'Customers List', 'path' => '/customers', 'can' => 'customers.view'],
-                    ['name' => 'Import Customers', 'path' => '/customers/import', 'can' => 'customers.manage'],
+                    [
+                        'name' => 'Customers',
+                        'canany' => ['customers.view', 'customers.manage'],
+                        'subItems' => [
+                            ['name' => 'New Customer', 'path' => '/customers/create', 'can' => 'customers.manage'],
+                            ['name' => 'Customers List', 'path' => '/customers', 'can' => 'customers.view'],
+                            ['name' => 'Import Customers', 'path' => '/customers/import', 'can' => 'customers.manage'],
+                        ],
+                    ],
+                    [
+                        'name' => 'Suppliers',
+                        'canany' => ['suppliers.view', 'suppliers.manage'],
+                        'subItems' => [
+                            ['name' => 'New Supplier', 'path' => '/suppliers/create', 'can' => 'suppliers.manage'],
+                            ['name' => 'Suppliers List', 'path' => '/suppliers', 'can' => 'suppliers.view'],
+                            ['name' => 'Import Suppliers', 'path' => '/suppliers/import', 'can' => 'suppliers.manage'],
+                        ],
+                    ],
                 ],
             ],
             [

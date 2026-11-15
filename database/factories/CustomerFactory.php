@@ -20,7 +20,7 @@ class CustomerFactory extends Factory
         return [
             'name' => fake()->name(),
             'mobile' => fake()->phoneNumber(),
-            'phone' => fake()->optional()->phoneNumber(),
+            'tel_no' => fake()->optional()->phoneNumber(),
             'email' => fake()->unique()->safeEmail(),
             'country' => 'Bangladesh',
             'state' => 'Chittagong',
