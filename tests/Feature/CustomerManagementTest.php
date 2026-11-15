@@ -281,19 +281,33 @@ it('imports customers from a valid CSV file', function () {
         ->and(Customer::where('name', 'Imported Customer 2')->exists())->toBeTrue();
 });
 
-it('verifies menu items for customers in MenuHelper', function () {
+it('verifies menu items for parties (customers and suppliers) in MenuHelper', function () {
     $mainNav = MenuHelper::getMainNavItems();
 
-    $customerNav = collect($mainNav)->firstWhere('name', 'Customers');
+    $partiesNav = collect($mainNav)->firstWhere('name', 'Parties');
 
-    expect($customerNav)->not->toBeNull()
-        ->and($customerNav['subItems'])->toHaveCount(3)
-        ->and($customerNav['subItems'][0]['name'])->toBe('New Customer')
-        ->and($customerNav['subItems'][0]['path'])->toBe('/customers/create')
-        ->and($customerNav['subItems'][1]['name'])->toBe('Customers List')
-        ->and($customerNav['subItems'][1]['path'])->toBe('/customers')
-        ->and($customerNav['subItems'][2]['name'])->toBe('Import Customers')
-        ->and($customerNav['subItems'][2]['path'])->toBe('/customers/import');
+    expect($partiesNav)->not->toBeNull()
+        ->and($partiesNav['subItems'])->toHaveCount(2)
+        ->and($partiesNav['subItems'][0]['name'])->toBe('Customers')
+        ->and($partiesNav['subItems'][1]['name'])->toBe('Suppliers');
+
+    $customerSub = $partiesNav['subItems'][0];
+    expect($customerSub['subItems'])->toHaveCount(3)
+        ->and($customerSub['subItems'][0]['name'])->toBe('New Customer')
+        ->and($customerSub['subItems'][0]['path'])->toBe('/customers/create')
+        ->and($customerSub['subItems'][1]['name'])->toBe('Customers List')
+        ->and($customerSub['subItems'][1]['path'])->toBe('/customers')
+        ->and($customerSub['subItems'][2]['name'])->toBe('Import Customers')
+        ->and($customerSub['subItems'][2]['path'])->toBe('/customers/import');
+
+    $supplierSub = $partiesNav['subItems'][1];
+    expect($supplierSub['subItems'])->toHaveCount(3)
+        ->and($supplierSub['subItems'][0]['name'])->toBe('New Supplier')
+        ->and($supplierSub['subItems'][0]['path'])->toBe('/suppliers/create')
+        ->and($supplierSub['subItems'][1]['name'])->toBe('Suppliers List')
+        ->and($supplierSub['subItems'][1]['path'])->toBe('/suppliers')
+        ->and($supplierSub['subItems'][2]['name'])->toBe('Import Suppliers')
+        ->and($supplierSub['subItems'][2]['path'])->toBe('/suppliers/import');
 });
 
 it('dynamically adds and deletes custom field definitions in the database', function () {

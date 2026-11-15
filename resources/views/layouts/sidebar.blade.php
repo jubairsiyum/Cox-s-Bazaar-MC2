@@ -16,6 +16,13 @@
                     if (!empty($sub['path'])) {
                         $allMenuPaths[] = $sub['path'];
                     }
+                    if (!empty($sub['subItems'])) {
+                        foreach ($sub['subItems'] as $childSub) {
+                            if (!empty($childSub['path'])) {
+                                $allMenuPaths[] = $childSub['path'];
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -26,6 +33,7 @@
 function sidebarComponent() {
     return {
         openSubmenus: {},
+        openChildSubmenus: {},
         allPaths: @json($allMenuPaths),
         init() {
             this.initializeActiveMenus();
@@ -36,12 +44,23 @@ function sidebarComponent() {
             @foreach ($menuGroups as $groupIndex => $menuGroup)
                 @foreach ($menuGroup['items'] as $itemIndex => $item)
                     @if (isset($item['subItems']))
-                        @foreach ($item['subItems'] as $subItem)
-                            if (currentPath === '{{ ltrim($subItem['path'], '/') }}' ||
-                                window.location.pathname === '{{ $subItem['path'] }}' ||
-                                (window.location.pathname.startsWith('{{ $subItem['path'] }}/'))) {
-                                this.openSubmenus['{{ $groupIndex }}-{{ $itemIndex }}'] = true;
-                            }
+                        @foreach ($item['subItems'] as $subIndex => $subItem)
+                            @if (isset($subItem['subItems']))
+                                @foreach ($subItem['subItems'] as $childSub)
+                                    if (currentPath === '{{ ltrim($childSub['path'], '/') }}' ||
+                                        window.location.pathname === '{{ $childSub['path'] }}' ||
+                                        (window.location.pathname.startsWith('{{ $childSub['path'] }}/'))) {
+                                        this.openSubmenus['{{ $groupIndex }}-{{ $itemIndex }}'] = true;
+                                        this.openChildSubmenus['{{ $groupIndex }}-{{ $itemIndex }}-{{ $subIndex }}'] = true;
+                                    }
+                                @endforeach
+                            @else
+                                if (currentPath === '{{ ltrim($subItem['path'], '/') }}' ||
+                                    window.location.pathname === '{{ $subItem['path'] }}' ||
+                                    (window.location.pathname.startsWith('{{ $subItem['path'] }}/'))) {
+                                    this.openSubmenus['{{ $groupIndex }}-{{ $itemIndex }}'] = true;
+                                }
+                            @endif
                         @endforeach
                     @endif
                 @endforeach
@@ -53,6 +72,13 @@ function sidebarComponent() {
 
             if (newState) {
                 this.openSubmenus = {};
+                // If opening this menu and none of its child submenus is open, default first child (Customers) to open
+                const hasChildOpen = Object.keys(this.openChildSubmenus).some(
+                    k => k.startsWith(key + '-') && this.openChildSubmenus[k]
+                );
+                if (!hasChildOpen) {
+                    this.openChildSubmenus[key + '-0'] = true;
+                }
             }
 
             this.openSubmenus[key] = newState;
@@ -60,6 +86,23 @@ function sidebarComponent() {
         isSubmenuOpen(groupIndex, itemIndex) {
             const key = groupIndex + '-' + itemIndex;
             return this.openSubmenus[key] || false;
+        },
+        toggleChildSubmenu(groupIndex, itemIndex, subIndex) {
+            const key = groupIndex + '-' + itemIndex + '-' + subIndex;
+            const isCurrentlyOpen = this.isChildSubmenuOpen(groupIndex, itemIndex, subIndex);
+
+            // Close sibling child submenus under this parent item (accordion)
+            Object.keys(this.openChildSubmenus).forEach(k => {
+                if (k.startsWith(groupIndex + '-' + itemIndex + '-')) {
+                    this.openChildSubmenus[k] = false;
+                }
+            });
+
+            this.openChildSubmenus[key] = !isCurrentlyOpen;
+        },
+        isChildSubmenuOpen(groupIndex, itemIndex, subIndex) {
+            const key = groupIndex + '-' + itemIndex + '-' + subIndex;
+            return !!this.openChildSubmenus[key];
         },
         isActive(path) {
             if (!path) return false;
@@ -198,31 +241,75 @@ function sidebarComponent() {
 
                                         <!-- Submenu -->
                                         <div x-show="isSubmenuOpen({{ $groupIndex }}, {{ $itemIndex }}) && ($store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen)" x-collapse>
-                                            <ul class="mt-2 space-y-1 ltr:ml-9 rtl:mr-9">
-                                                @foreach ($item['subItems'] as $subItem)
+                                            <ul class="mt-2 space-y-1.5 ltr:ml-9 rtl:mr-9">
+                                                @foreach ($item['subItems'] as $subIndex => $subItem)
                                                     @php
                                                         if (!empty($subItem['can']) && !auth()->user()?->can($subItem['can'])) {
                                                             continue;
                                                         }
+                                                        if (!empty($subItem['canany']) && !auth()->user()?->hasRole('Super Admin')) {
+                                                            $hasAnySub = false;
+                                                            foreach ((array) $subItem['canany'] as $perm) {
+                                                                if (auth()->user()?->can($perm)) { $hasAnySub = true; break; }
+                                                            }
+                                                            if (!$hasAnySub) continue;
+                                                        }
                                                     @endphp
-                                                    <li>
-                                                        <a href="{{ $subItem['path'] }}" class="menu-dropdown-item"
-                                                            :class="isActive('{{ $subItem['path'] }}') ?
-                                                                'menu-dropdown-item-active' :
-                                                                'menu-dropdown-item-inactive'">
-                                                            {{ __($subItem['name']) }}
-                                                            <span class="flex items-center gap-1 ltr:ml-auto rtl:mr-auto">
-                                                                @if (!empty($subItem['new']))
-                                                                    <span
-                                                                        :class="isActive('{{ $subItem['path'] }}') ?
-                                                                            'menu-dropdown-badge menu-dropdown-badge-active' :
-                                                                            'menu-dropdown-badge menu-dropdown-badge-inactive'">
-                                                                        {{ __('new') }}
-                                                                    </span>
-                                                                @endif
-                                                            </span>
-                                                        </a>
-                                                    </li>
+                                                    @if (isset($subItem['subItems']))
+                                                        <!-- Nested 2nd-level submenu (e.g. Customers, Suppliers under Parties) -->
+                                                        <li>
+                                                            <button type="button"
+                                                                @click.stop="toggleChildSubmenu({{ $groupIndex }}, {{ $itemIndex }}, {{ $subIndex }})"
+                                                                class="menu-dropdown-item group w-full justify-between cursor-pointer"
+                                                                :class="isChildSubmenuOpen({{ $groupIndex }}, {{ $itemIndex }}, {{ $subIndex }}) ?
+                                                                    'text-brand-500 font-semibold bg-gray-50 dark:bg-gray-800/40' :
+                                                                    'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5'">
+                                                                <span>{{ __($subItem['name']) }}</span>
+                                                                <x-svg.chevron-down
+                                                                    class="h-4 w-4 transition-transform duration-200 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200"
+                                                                    x-bind:class="{ 'rotate-180 text-brand-500': isChildSubmenuOpen({{ $groupIndex }}, {{ $itemIndex }}, {{ $subIndex }}) }" />
+                                                            </button>
+                                                            <div x-show="isChildSubmenuOpen({{ $groupIndex }}, {{ $itemIndex }}, {{ $subIndex }})" x-collapse>
+                                                                <ul class="mt-1 space-y-1 ltr:ml-3 rtl:mr-3 border-l-2 border-brand-100 dark:border-brand-900/40 ltr:pl-2 rtl:pr-2">
+                                                                    @foreach ($subItem['subItems'] as $childSub)
+                                                                        @php
+                                                                            if (!empty($childSub['can']) && !auth()->user()?->can($childSub['can'])) {
+                                                                                continue;
+                                                                            }
+                                                                        @endphp
+                                                                        <li>
+                                                                            <a href="{{ $childSub['path'] }}" class="menu-dropdown-item"
+                                                                                :class="isActive('{{ $childSub['path'] }}') ?
+                                                                                    'menu-dropdown-item-active' :
+                                                                                    'menu-dropdown-item-inactive'">
+                                                                                {{ __($childSub['name']) }}
+                                                                            </a>
+                                                                        </li>
+                                                                    @endforeach
+                                                                </ul>
+                                                            </div>
+                                                        </li>
+                                                    @else
+                                                        <!-- Normal 1st-level submenu item -->
+                                                        <li>
+                                                            <a href="{{ $subItem['path'] }}" class="menu-dropdown-item"
+                                                                :class="isActive('{{ $subItem['path'] }}') ?
+                                                                    'menu-dropdown-item-active' :
+                                                                    'menu-dropdown-item-inactive'">
+                                                                {{ __($subItem['name']) }}
+                                                                <span class="flex items-center gap-1 ltr:ml-auto rtl:mr-auto">
+                                                                    @if (!empty($subItem['new']))
+                                                                        <span
+                                                                            :class="isActive('{{ $subItem['path'] }}') ?
+                                                                                'menu-dropdown-badge menu-dropdown-badge-active' :
+                                                                                'menu-dropdown-badge menu-dropdown-badge-inactive'">
+                                                                            {{ __('new') }}
+                                                                        </span>
+                                                                    @endif
+                                                                </span>
+                                                            </a>
+                                                        </li>
+                                                    @endif
                                                 @endforeach
                                             </ul>
                                         </div>
