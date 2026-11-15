@@ -144,7 +144,9 @@
                             <th x-show="columns.email" class="p-2.5 whitespace-nowrap">Email</th>
                             <th x-show="columns.city" class="p-2.5 whitespace-nowrap">City</th>
                             <th x-show="columns.status" class="p-2.5 text-center whitespace-nowrap">Status</th>
-                            <th x-show="columns.action" class="p-2.5 text-center whitespace-nowrap">Action</th>
+                            @can('customers.manage')
+                                <th x-show="columns.action" class="p-2.5 text-center whitespace-nowrap">Action</th>
+                            @endcan
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-gray-900">
@@ -191,19 +193,21 @@
                                         </span>
                                     @endcan
                                 </td>
-                                <td x-show="columns.action" data-col="action" class="p-2.5 text-center whitespace-nowrap">
-                                    <div class="relative inline-block text-left">
-                                        <button type="button"
-                                                @click.stop="toggleActionMenu($event, {{ json_encode(['id' => $customer->id, 'name' => $customer->name]) }})"
-                                                class="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold text-white rounded shadow-xs hover:opacity-90 transition cursor-pointer"
-                                                style="background-color: #00c0ef;">
-                                            Action
-                                            <svg class="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </td>
+                                @can('customers.manage')
+                                    <td x-show="columns.action" data-col="action" class="p-2.5 text-center whitespace-nowrap">
+                                        <div class="relative inline-block text-left">
+                                            <button type="button"
+                                                    @click.stop="toggleActionMenu($event, {{ json_encode(['id' => $customer->id, 'name' => $customer->name]) }})"
+                                                    class="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold text-white rounded shadow-xs hover:opacity-90 transition cursor-pointer"
+                                                    style="background-color: #00c0ef;">
+                                                Action
+                                                <svg class="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </td>
+                                @endcan
                             </tr>
                         @empty
                             <tr>
@@ -223,7 +227,7 @@
                      @click.outside="actionMenuOpen = false"
                      class="fixed z-9999 w-44 rounded-md bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700 py-1 text-xs text-gray-700 dark:text-gray-200"
                      :style="`top: ${menuTop}; left: ${menuLeft};`">
-                    @can('update', App\Models\Customer::class)
+                    @can('customers.manage')
                         <a :href="`/customers/${openActionCustomer?.id}/edit`"
                            class="flex items-center gap-2 px-3 py-1.5 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 font-medium transition">
                             <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -233,7 +237,7 @@
                         </a>
                     @endcan
 
-                    @can('delete', App\Models\Customer::class)
+                    @can('customers.manage')
                         <form :action="`/customers/${openActionCustomer?.id}`" method="POST"
                               onsubmit="return confirm('Are you sure you want to delete this customer?');">
                             @csrf
@@ -287,7 +291,7 @@ function customersPage() {
             { key: 'email', label: 'Email' },
             { key: 'city', label: 'City' },
             { key: 'status', label: 'Status' },
-            { key: 'action', label: 'Action' }
+            @can('customers.manage') { key: 'action', label: 'Action' } @endcan
         ],
 
         toggleColumn(key) {

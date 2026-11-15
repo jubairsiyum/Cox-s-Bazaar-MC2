@@ -153,7 +153,9 @@
                                     <span class="text-xs opacity-70">{{ $sort === 'note' ? ($direction === 'asc' ? '↑' : '↓') : '⇅' }}</span>
                                 </a>
                             </th>
-                            <th class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">Action</th>
+                            @can('brands.manage')
+                                <th class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">Action</th>
+                            @endcan
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-gray-900">
@@ -165,34 +167,36 @@
                                 <td x-show="columns.note" data-col="note" class="p-3 text-sm text-gray-600 dark:text-gray-300">
                                     {{ $brand->note ?: '—' }}
                                 </td>
-                                <td class="p-3 text-xs whitespace-nowrap">
-                                    <div class="flex items-center gap-2">
-                                        @can('update', $brand)
-                                            <button type="button"
-                                                    @click="openEdit(@js(['id' => $brand->id, 'name' => $brand->name, 'note' => $brand->note]))"
-                                                    class="inline-flex items-center gap-1 rounded-full border border-indigo-500/60 px-3 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 transition hover:bg-indigo-50 dark:hover:bg-indigo-500/10 cursor-pointer">
-                                                <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                                </svg>
-                                                Edit
-                                            </button>
-                                        @endcan
-                                        @can('delete', $brand)
-                                            <form method="POST" action="{{ route('brands.destroy', $brand) }}"
-                                                  onsubmit="return confirm('Are you sure you want to delete this brand?');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit"
-                                                        class="inline-flex items-center gap-1 rounded-full border border-red-400/70 px-3 py-1 text-xs font-medium text-red-500 dark:text-red-400 transition hover:bg-red-50 dark:hover:bg-red-500/10 cursor-pointer">
+                                @can('brands.manage')
+                                    <td class="p-3 text-xs whitespace-nowrap">
+                                        <div class="flex items-center gap-2">
+                                            @can('update', $brand)
+                                                <button type="button"
+                                                        @click="openEdit(@js(['id' => $brand->id, 'name' => $brand->name, 'note' => $brand->note]))"
+                                                        class="inline-flex items-center gap-1 rounded-full border border-indigo-500/60 px-3 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 transition hover:bg-indigo-50 dark:hover:bg-indigo-500/10 cursor-pointer">
                                                     <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                                     </svg>
-                                                    Delete
+                                                    Edit
                                                 </button>
-                                            </form>
-                                        @endcan
-                                    </div>
-                                </td>
+                                            @endcan
+                                            @can('delete', $brand)
+                                                <form method="POST" action="{{ route('brands.destroy', $brand) }}"
+                                                      onsubmit="return confirm('Are you sure you want to delete this brand?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit"
+                                                            class="inline-flex items-center gap-1 rounded-full border border-red-400/70 px-3 py-1 text-xs font-medium text-red-500 dark:text-red-400 transition hover:bg-red-50 dark:hover:bg-red-500/10 cursor-pointer">
+                                                        <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                                        </svg>
+                                                        Delete
+                                                    </button>
+                                                </form>
+                                            @endcan
+                                        </div>
+                                    </td>
+                                @endcan
                             </tr>
                         @empty
                             <tr>
