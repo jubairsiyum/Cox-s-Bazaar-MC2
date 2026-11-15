@@ -89,22 +89,36 @@ Alpine.store("direction", {
     },
 });
 
+// Toast notification store
+Alpine.store("toast", {
+    items: [],
+    show(message, type = "success", duration = 4000) {
+        const id = Date.now() + Math.random();
+        this.items.push({ id, message, type });
+
+        if (duration) {
+            setTimeout(() => this.remove(id), duration);
+        }
+    },
+    remove(id) {
+        this.items = this.items.filter((toast) => toast.id !== id);
+    },
+});
+
+// Toast host component: seeds the store from server flash data.
+Alpine.data("toastHost", () => ({
+    init() {
+        (window.flashToasts || []).forEach((toast) => {
+            Alpine.store("toast").show(toast.message, toast.type, toast.duration);
+        });
+    },
+}));
+
 // Start Alpine
 Alpine.start();
 
 // Initialize components on DOM ready
 document.addEventListener("DOMContentLoaded", () => {
-    // ── Flash message auto-dismiss ──────────────────────────
-    const flashes = document.querySelectorAll('[data-flash-dismiss]');
-    flashes.forEach(el => {
-        const delay = parseInt(el.dataset.flashDismiss) || 4000;
-        setTimeout(() => {
-            el.style.transition = 'opacity .4s';
-            el.style.opacity = '0';
-            setTimeout(() => el.remove(), 400);
-        }, delay);
-    });
-
     // ── Offline / Online detection ──────────────────────────
     const offlineBanner = document.getElementById('offline-banner');
     if (offlineBanner) {
