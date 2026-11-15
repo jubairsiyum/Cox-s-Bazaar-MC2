@@ -1782,36 +1782,6 @@ table.data-table tfoot td {
     flex-wrap: wrap;
     gap: 8px;
 }
-nav[aria-label="Pagination Navigation"] {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-nav[aria-label="Pagination Navigation"] a,
-nav[aria-label="Pagination Navigation"] span {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 32px;
-    height: 32px;
-    padding: 0 8px;
-    font-size: 0.8rem;
-    border-radius: 6px;
-    border: 1px solid #e5e7eb;
-    color: #4b5563;
-    text-decoration: none;
-    transition: all .15s;
-}
-nav[aria-label="Pagination Navigation"] a:hover {
-    background: #f9fafb;
-    border-color: #d1d5db;
-}
-nav[aria-label="Pagination Navigation"] span[aria-current="page"] {
-    background: #465fff;
-    border-color: #465fff;
-    color: #fff;
-    font-weight: 600;
-}
 
 /* Misc ERP classes */
 .text-bdt::before { content: '৳'; }
@@ -2054,14 +2024,6 @@ nav[aria-label="Pagination Navigation"] span[aria-current="page"] {
 .dark .pagination-wrap {
     border-color: #1f2a37;
     color: #9ca3af;
-}
-.dark nav[aria-label="Pagination Navigation"] a,
-.dark nav[aria-label="Pagination Navigation"] span {
-    border-color: #374151;
-    color: #d1d5db;
-}
-.dark nav[aria-label="Pagination Navigation"] a:hover {
-    background: #1f2937;
 }
 .dark .badge-neutral {
     background: #374151;

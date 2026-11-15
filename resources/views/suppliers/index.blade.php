@@ -254,13 +254,8 @@
             </div>
 
             {{-- Pagination & Entry Info --}}
-            <div class="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-600 dark:text-gray-400">
-                <div>
-                    Showing {{ $suppliers->firstItem() ?? 0 }} to {{ $suppliers->lastItem() ?? 0 }} of {{ $suppliers->total() }} entries
-                </div>
-                <div>
-                    {{ $suppliers->links() }}
-                </div>
+            <div class="mt-4">
+                {{ $suppliers->links() }}
             </div>
         </div>
     </div>

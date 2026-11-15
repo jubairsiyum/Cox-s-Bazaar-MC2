@@ -251,13 +251,8 @@
             </template>
 
             {{-- Footer: Pagination & Counter --}}
-            <div class="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                <div>
-                    Showing {{ $customers->firstItem() ?? 0 }} to {{ $customers->lastItem() ?? 0 }} of {{ $customers->total() }} entries
-                </div>
-                <div>
-                    {{ $customers->links() }}
-                </div>
+            <div class="mt-4">
+                {{ $customers->links() }}
             </div>
         </div>
     </div>
