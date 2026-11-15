@@ -142,7 +142,7 @@ function sidebarComponent() {
 </script>
 
 <aside id="sidebar"
-    class="fixed flex flex-col mt-0 top-0 px-5 start-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out max-xl:duration-200 max-xl:w-[290px] z-50 max-xl:z-101 ltr:border-r rtl:border-l border-gray-200 w-[90px] [.sidebar-expanded_&]:min-w-[290px]"
+    class="fixed flex flex-col mt-0 top-0 px-5 inset-s-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out max-xl:duration-200 max-xl:w-72.5 z-50 max-xl:z-101 ltr:border-r rtl:border-l border-gray-200 w-22.5 in-[.sidebar-expanded_&]:min-w-72.5"
     x-data="sidebarComponent()"
     :class="{
         'translate-x-0': $store.sidebar.isMobileOpen,
@@ -155,7 +155,7 @@ function sidebarComponent() {
     <div class="py-6 flex items-center gap-2 border-b border-gray-100 dark:border-gray-800" :class="(!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen) ? 'justify-center' : 'justify-between'">
         <a href="{{ route('dashboard') }}" class="flex items-center gap-3">
             <img src="{{ asset('cmc2-logo.jpeg') }}" alt="{{ config('app.name') }}" class="h-10 w-10 shrink-0 rounded-xl object-contain bg-white p-0.5 shadow-theme-xs">
-            <div class="hidden [.sidebar-expanded_&]:block">
+            <div class="hidden in-[.sidebar-expanded_&]:block">
                 <span class="block text-base font-bold text-gray-900 dark:text-white leading-tight">
                     {{ config('app.name', 'Cox\'s Bazaar') }}
                 </span>
