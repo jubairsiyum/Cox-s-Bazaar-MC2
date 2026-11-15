@@ -117,10 +117,16 @@ Alpine.data("toastHost", () => ({
 // Barcode field: receives scans from hardware scanners and fills the input.
 Alpine.data("barcodeField", () => ({
     lastScan: "",
+    scanning: false,
 
     init() {
         // Focus the input so a USB/Bluetooth keyboard-wedge scanner types into it.
-        this.$nextTick(() => this.$refs.input && this.$refs.input.focus());
+        this.$nextTick(() => this.focus());
+    },
+
+    startScan() {
+        this.scanning = true;
+        this.focus();
     },
 
     applyScan(code) {
@@ -131,11 +137,12 @@ Alpine.data("barcodeField", () => ({
             this.$refs.input.value = code;
         }
         this.lastScan = code;
+        this.scanning = false;
         Alpine.store("toast")?.show("Barcode scanned: " + code, "success", 2500);
     },
 
     focus() {
-        this.$refs.input && this.$refs.input.focus();
+        this.$nextTick(() => this.$refs.input && this.$refs.input.focus());
     },
 }));
 
@@ -155,7 +162,7 @@ function initBarcodeScanner() {
         const code = buffer;
         buffer = "";
         if (code.length >= 4) {
-            document.dispatchEvent(new CustomEvent("barcode-scanned", { detail: { code } }));
+            window.dispatchEvent(new CustomEvent("barcode-scanned", { detail: { code } }));
         }
     };
 

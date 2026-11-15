@@ -119,15 +119,18 @@
                                     placeholder="Scan barcode or type IMEI / EAN"
                                     @keydown.enter.prevent
                                     class="form-control @error('barcode') is-invalid @enderror font-mono">
-                                <button type="button" @click="focus()"
+                                <button type="button" @click="startScan()"
                                         class="px-3 py-2.5 rounded-md text-white text-sm font-medium flex items-center gap-1.5 shrink-0 shadow-sm transition hover:opacity-90"
-                                        style="background-color: #00c0ef;">
+                                        :style="scanning ? 'background-color: #f39c12;' : 'background-color: #00c0ef;'">
                                     <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                                         <path d="M4 5v14M8 5v14M12 5v14M16 5v14M20 5v14"/>
                                     </svg>
-                                    Scan
+                                    <span x-text="scanning ? 'Scanning…' : 'Scan'"></span>
                                 </button>
                             </div>
+                            <p x-show="scanning &amp;&amp; !lastScan" x-cloak class="mt-1.5 text-xs text-cyan-600 dark:text-cyan-400">
+                                Listening for barcode — scan with your USB/Bluetooth scanner…
+                            </p>
                             <p x-show="lastScan" x-cloak class="mt-1.5 text-xs text-green-600 dark:text-green-400">
                                 Last scanned: <span x-text="lastScan" class="font-mono font-semibold"></span>
                             </p>
