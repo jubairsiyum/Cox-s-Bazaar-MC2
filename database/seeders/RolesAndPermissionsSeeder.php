@@ -23,7 +23,7 @@ class RolesAndPermissionsSeeder extends Seeder
             // Roles
             'roles.view', 'roles.manage',
             // Products
-            'brands.manage', 'categories.manage', 'units.manage', 'products.manage',
+            'brands.manage', 'categories.manage', 'categories.view', 'units.manage', 'products.manage',
             'products.view',
             // Suppliers
             'suppliers.manage', 'suppliers.view',
@@ -71,7 +71,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'dashboard.view',
             'users.view', 'users.create', 'users.update',
             'manage-users',
-            'brands.manage', 'categories.manage', 'units.manage', 'products.manage',
+            'brands.manage', 'categories.manage', 'categories.view', 'units.manage', 'products.manage',
             'suppliers.manage', 'suppliers.view',
             'customers.manage', 'customers.view',
             'warehouses.manage', 'inventory.view',
@@ -92,7 +92,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $accountant = Role::firstOrCreate(['name' => 'Accountant', 'guard_name' => 'web']);
         $accountant->syncPermissions([
             'dashboard.view',
-            'products.view', 'suppliers.view', 'customers.view',
+            'products.view', 'categories.view', 'suppliers.view', 'customers.view',
             'inventory.view',
             'purchase-invoices.view', 'sales-invoices.view',
             'supplier-payments.view',
@@ -108,7 +108,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $salesStaff = Role::firstOrCreate(['name' => 'Sales Staff', 'guard_name' => 'web']);
         $salesStaff->syncPermissions([
             'dashboard.view',
-            'products.view', 'customers.view', 'inventory.view',
+            'products.view', 'categories.view', 'customers.view', 'inventory.view',
             'sales-orders.manage', 'sales-invoices.manage',
             'sales-invoices.post', 'sales-invoices.view',
             'customer-collections.manage',
@@ -121,7 +121,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $storekeeper->syncPermissions([
             'dashboard.view',
             'products.manage', 'products.view',
-            'brands.manage', 'categories.manage', 'units.manage',
+            'brands.manage', 'categories.manage', 'categories.view', 'units.manage',
             'warehouses.manage', 'inventory.view',
             'stock-adjustments.manage', 'stock-transfers.manage',
             'purchase-invoices.view', 'purchase-invoices.post',

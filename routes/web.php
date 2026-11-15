@@ -9,6 +9,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
+use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PlaceholderController;
@@ -101,6 +102,27 @@ Route::middleware('auth')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
+    | Category Management (Master Data)
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['verified', 'permission:categories.view'])->group(function () {
+        Route::get('categories', [CategoryController::class, 'index'])->name('categories.index');
+        Route::get('categories/pdf-view', [CategoryController::class, 'pdfView'])->name('categories.pdf-view');
+        Route::get('categories/print-view', [CategoryController::class, 'printView'])->name('categories.print-view');
+        Route::get('categories/export/{format?}', [CategoryController::class, 'export'])->name('categories.export');
+    });
+
+    Route::middleware(['verified', 'permission:categories.manage'])->group(function () {
+        Route::get('categories/create', [CategoryController::class, 'create'])->name('categories.create');
+        Route::post('categories', [CategoryController::class, 'store'])->name('categories.store');
+        Route::get('categories/{category}/edit', [CategoryController::class, 'edit'])->name('categories.edit');
+        Route::patch('categories/{category}', [CategoryController::class, 'update'])->name('categories.update');
+        Route::patch('categories/{category}/toggle-status', [CategoryController::class, 'toggleStatus'])->name('categories.toggle-status');
+        Route::delete('categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
     | Supplier Management
     |--------------------------------------------------------------------------
     */
@@ -182,7 +204,6 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'verified'])->group(function () {
     $placeholders = [
         'brands.index' => 'Brands',
-        'categories.index' => 'Categories',
         'units.index' => 'Units',
         'products.index' => 'Products',
         'warehouses.index' => 'Warehouses',

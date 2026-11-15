@@ -31,6 +31,7 @@ class SettingsSeeder extends Seeder
             ['key' => 'adjustment_prefix',      'value' => 'ADJ', 'group' => 'numbering', 'label' => 'Stock Adjustment Prefix'],
             ['key' => 'transfer_prefix',        'value' => 'TRF', 'group' => 'numbering', 'label' => 'Stock Transfer Prefix'],
             ['key' => 'supplier_prefix',        'value' => 'SP',  'group' => 'numbering', 'label' => 'Supplier Prefix'],
+            ['key' => 'category_prefix',        'value' => 'CT',  'group' => 'numbering', 'label' => 'Category Prefix'],
             ['key' => 'expense_prefix',         'value' => 'EXP', 'group' => 'numbering', 'label' => 'Expense Prefix'],
             ['key' => 'income_prefix',          'value' => 'INC', 'group' => 'numbering', 'label' => 'Income Prefix'],
 
