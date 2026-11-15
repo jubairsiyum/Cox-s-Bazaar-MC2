@@ -132,38 +132,6 @@
             }
         }());
     </script>
-
-    {{-- Alpine theme store --}}
-    <script>
-        document.addEventListener('alpine:init', function () {
-            Alpine.store('theme', {
-                init: function () {
-                    var saved = localStorage.getItem('theme');
-                    this.theme = (saved === 'dark') ? 'dark' : 'light';
-                    this.updateTheme();
-                },
-                theme: 'light',
-                resolvedTheme: 'light',
-                set: function (value) {
-                    value = (value === 'dark') ? 'dark' : 'light';
-                    this.theme = value;
-                    localStorage.setItem('theme', value);
-                    this.updateTheme();
-                    window.dispatchEvent(new CustomEvent('theme-changed', { detail: value }));
-                },
-                toggle: function () {
-                    this.set(this.resolvedTheme === 'dark' ? 'light' : 'dark');
-                },
-                updateTheme: function () {
-                    var html = document.documentElement;
-                    var isDark = this.theme === 'dark';
-                    if (isDark) { html.classList.add('dark'); } else { html.classList.remove('dark'); }
-                    this.resolvedTheme = isDark ? 'dark' : 'light';
-                    html.setAttribute('data-color-scheme', this.resolvedTheme);
-                }
-            });
-        });
-    </script>
 </head>
 
 {{--
@@ -200,16 +168,6 @@
             </div>
         </a>
 
-        {{-- Mobile theme toggle --}}
-        <button
-            type="button"
-            @click="$store.theme.toggle()"
-            aria-label="Toggle theme"
-            class="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white/80 text-gray-500 backdrop-blur transition hover:bg-gray-100 hover:text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
-        >
-            <x-svg.sun x-show="$store.theme.resolvedTheme === 'dark'" class="size-[15px]" />
-            <x-svg.moon x-show="$store.theme.resolvedTheme !== 'dark'" class="size-[15px]" />
-        </button>
     </header>
 
 
@@ -383,19 +341,6 @@
          RIGHT PANEL — Authentication form
     ════════════════════════════════════════════════════════════ --}}
     <main class="relative flex flex-1 flex-col bg-white dark:bg-gray-950 lg:overflow-y-auto">
-
-        {{-- Desktop-only: dark mode toggle + corner decoration --}}
-        <div class="absolute top-5 right-5 z-20 hidden lg:block">
-            <button
-                type="button"
-                @click="$store.theme.toggle()"
-                aria-label="Toggle dark/light theme"
-                class="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 shadow-xs transition hover:bg-gray-50 hover:text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
-            >
-                <x-svg.sun x-show="$store.theme.resolvedTheme === 'dark'" class="size-[15px]" />
-                <x-svg.moon x-show="$store.theme.resolvedTheme !== 'dark'" class="size-[15px]" />
-            </button>
-        </div>
 
         {{-- Vertical divider line on desktop (decorative) --}}
         <div class="absolute inset-y-0 left-0 hidden w-px lg:block bg-gradient-to-b from-transparent via-gray-200/60 to-transparent dark:via-gray-800/60"></div>
