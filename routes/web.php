@@ -9,11 +9,14 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
+use App\Http\Controllers\BrandController;
+use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PlaceholderController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\UnitController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
@@ -101,6 +104,66 @@ Route::middleware('auth')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
+    | Unit / Quantity Management (Master Data)
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['verified', 'permission:units.view'])->group(function () {
+        Route::get('units', [UnitController::class, 'index'])->name('units.index');
+        Route::get('units/pdf-view', [UnitController::class, 'pdfView'])->name('units.pdf-view');
+        Route::get('units/print-view', [UnitController::class, 'printView'])->name('units.print-view');
+        Route::get('units/export/{format?}', [UnitController::class, 'export'])->name('units.export');
+        Route::get('units/import/template', [UnitController::class, 'downloadTemplate'])->name('units.import-template');
+    });
+
+    Route::middleware(['verified', 'permission:units.manage'])->group(function () {
+        Route::post('units', [UnitController::class, 'store'])->name('units.store');
+        Route::get('units/import', [UnitController::class, 'importView'])->name('units.import');
+        Route::post('units/import', [UnitController::class, 'import'])->name('units.import.store');
+        Route::patch('units/{unit}', [UnitController::class, 'update'])->name('units.update');
+        Route::delete('units/{unit}', [UnitController::class, 'destroy'])->name('units.destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Brand Management (Master Data)
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['verified', 'permission:brands.view'])->group(function () {
+        Route::get('brands', [BrandController::class, 'index'])->name('brands.index');
+        Route::get('brands/pdf-view', [BrandController::class, 'pdfView'])->name('brands.pdf-view');
+        Route::get('brands/print-view', [BrandController::class, 'printView'])->name('brands.print-view');
+        Route::get('brands/export/{format?}', [BrandController::class, 'export'])->name('brands.export');
+    });
+
+    Route::middleware(['verified', 'permission:brands.manage'])->group(function () {
+        Route::post('brands', [BrandController::class, 'store'])->name('brands.store');
+        Route::patch('brands/{brand}', [BrandController::class, 'update'])->name('brands.update');
+        Route::delete('brands/{brand}', [BrandController::class, 'destroy'])->name('brands.destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Category Management (Master Data)
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['verified', 'permission:categories.view'])->group(function () {
+        Route::get('categories', [CategoryController::class, 'index'])->name('categories.index');
+        Route::get('categories/pdf-view', [CategoryController::class, 'pdfView'])->name('categories.pdf-view');
+        Route::get('categories/print-view', [CategoryController::class, 'printView'])->name('categories.print-view');
+        Route::get('categories/export/{format?}', [CategoryController::class, 'export'])->name('categories.export');
+    });
+
+    Route::middleware(['verified', 'permission:categories.manage'])->group(function () {
+        Route::get('categories/create', [CategoryController::class, 'create'])->name('categories.create');
+        Route::post('categories', [CategoryController::class, 'store'])->name('categories.store');
+        Route::get('categories/{category}/edit', [CategoryController::class, 'edit'])->name('categories.edit');
+        Route::patch('categories/{category}', [CategoryController::class, 'update'])->name('categories.update');
+        Route::patch('categories/{category}/toggle-status', [CategoryController::class, 'toggleStatus'])->name('categories.toggle-status');
+        Route::delete('categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
     | Supplier Management
     |--------------------------------------------------------------------------
     */
@@ -148,6 +211,8 @@ Route::middleware('auth')->group(function () {
         Route::patch('customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
         Route::patch('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus'])->name('customers.toggle-status');
         Route::delete('customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
+        Route::post('customers/custom-fields', [CustomerController::class, 'storeCustomField'])->name('customers.custom-fields.store');
+        Route::delete('customers/custom-fields/{customField}', [CustomerController::class, 'destroyCustomField'])->name('customers.custom-fields.destroy');
     });
 
     /*
@@ -179,9 +244,6 @@ Route::middleware('auth')->group(function () {
 */
 Route::middleware(['auth', 'verified'])->group(function () {
     $placeholders = [
-        'brands.index' => 'Brands',
-        'categories.index' => 'Categories',
-        'units.index' => 'Units',
         'products.index' => 'Products',
         'warehouses.index' => 'Warehouses',
         'inventory.index' => 'Stock Levels',

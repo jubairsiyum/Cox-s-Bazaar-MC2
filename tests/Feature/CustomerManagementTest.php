@@ -2,6 +2,7 @@
 
 use App\Helpers\MenuHelper;
 use App\Models\Customer;
+use App\Models\CustomerCustomField;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\SettingsSeeder;
@@ -37,7 +38,7 @@ it('lists customers for an authorized user', function () {
         ->assertSee('CU0001');
 });
 
-it('shows the customer create page', function () {
+it('shows the customer create page with initially blank custom fields', function () {
     actingAsSuperAdmin();
 
     $this->get(route('customers.create'))
@@ -45,6 +46,8 @@ it('shows the customer create page', function () {
         ->assertSee('Customers')
         ->assertSee('Add/Update Customers')
         ->assertSee('Custom Fields')
+        ->assertSee('No custom fields added yet', false)
+        ->assertSee('customFields: []', false)
         ->assertDontSee('Opening Balance Payments');
 });
 
@@ -54,7 +57,7 @@ it('creates a customer and automatically assigns a CU code', function () {
     $response = $this->post(route('customers.store'), [
         'name' => 'Akbar Ali',
         'mobile' => '01711223344',
-        'phone' => '034164200',
+        'tel_no' => '034164200',
         'email' => 'akbar@example.com',
         'country' => 'Bangladesh',
         'state' => 'Chittagong',
@@ -75,9 +78,17 @@ it('creates a customer and automatically assigns a CU code', function () {
     expect($customer)->not->toBeNull()
         ->and($customer->customer_id)->toStartWith('CU')
         ->and($customer->mobile)->toBe('01711223344')
+        ->and($customer->tel_no)->toBe('034164200')
         ->and($customer->note)->toBe('VIP Customer')
         ->and($customer->custom_fields)->toHaveCount(2)
         ->and($customer->custom_fields[0]['label'])->toBe('NID');
+
+    $this->assertDatabaseHas('customer_custom_fields', [
+        'name' => 'NID',
+    ]);
+    $this->assertDatabaseHas('customer_custom_fields', [
+        'name' => 'Reference',
+    ]);
 
     $this->assertDatabaseHas('audit_logs', [
         'event' => 'created',
@@ -93,6 +104,15 @@ it('fails validation when customer name is missing', function () {
         'name' => '',
         'mobile' => '01700000000',
     ])->assertSessionHasErrors('name');
+});
+
+it('fails validation when customer mobile is missing', function () {
+    actingAsSuperAdmin();
+
+    $this->post(route('customers.store'), [
+        'name' => 'Valid Customer Name',
+        'mobile' => '',
+    ])->assertSessionHasErrors('mobile');
 });
 
 it('shows the customer edit page', function () {
@@ -234,6 +254,8 @@ it('downloads the customer import CSV template', function () {
     $response->assertOk()
         ->assertHeader('Content-Disposition', 'attachment; filename="customer_import_template.csv"')
         ->assertSee('Customer Name')
+        ->assertSee('Mobile No')
+        ->assertSee('Tel No')
         ->assertSee('Rahim Uddin');
 });
 
@@ -241,7 +263,7 @@ it('imports customers from a valid CSV file', function () {
     actingAsSuperAdmin();
 
     $csvContent = implode("\n", [
-        'Customer Name,Mobile,Phone,Email,Country Name,State Name,City,Postcode,Address,Note',
+        'Customer Name,Mobile No,Tel No,Email,Country Name,State Name,City,Postcode,Address,Note',
         'Imported Customer 1,01700000001,034100001,imp1@example.com,Bangladesh,Chittagong,Cox\'s Bazar,4700,Hotel Motel Zone,First imported note',
         'Imported Customer 2,01700000002,034100002,imp2@example.com,Bangladesh,Chittagong,Cox\'s Bazar,4700,Main Road,Second imported note',
     ]);
@@ -259,17 +281,62 @@ it('imports customers from a valid CSV file', function () {
         ->and(Customer::where('name', 'Imported Customer 2')->exists())->toBeTrue();
 });
 
-it('verifies menu items for customers in MenuHelper', function () {
+it('verifies menu items for parties (customers and suppliers) in MenuHelper', function () {
     $mainNav = MenuHelper::getMainNavItems();
 
-    $customerNav = collect($mainNav)->firstWhere('name', 'Customers');
+    $partiesNav = collect($mainNav)->firstWhere('name', 'Parties');
 
-    expect($customerNav)->not->toBeNull()
-        ->and($customerNav['subItems'])->toHaveCount(3)
-        ->and($customerNav['subItems'][0]['name'])->toBe('New Customer')
-        ->and($customerNav['subItems'][0]['path'])->toBe('/customers/create')
-        ->and($customerNav['subItems'][1]['name'])->toBe('Customers List')
-        ->and($customerNav['subItems'][1]['path'])->toBe('/customers')
-        ->and($customerNav['subItems'][2]['name'])->toBe('Import Customers')
-        ->and($customerNav['subItems'][2]['path'])->toBe('/customers/import');
+    expect($partiesNav)->not->toBeNull()
+        ->and($partiesNav['subItems'])->toHaveCount(2)
+        ->and($partiesNav['subItems'][0]['name'])->toBe('Customers')
+        ->and($partiesNav['subItems'][1]['name'])->toBe('Suppliers');
+
+    $customerSub = $partiesNav['subItems'][0];
+    expect($customerSub['subItems'])->toHaveCount(3)
+        ->and($customerSub['subItems'][0]['name'])->toBe('New Customer')
+        ->and($customerSub['subItems'][0]['path'])->toBe('/customers/create')
+        ->and($customerSub['subItems'][1]['name'])->toBe('Customers List')
+        ->and($customerSub['subItems'][1]['path'])->toBe('/customers')
+        ->and($customerSub['subItems'][2]['name'])->toBe('Import Customers')
+        ->and($customerSub['subItems'][2]['path'])->toBe('/customers/import');
+
+    $supplierSub = $partiesNav['subItems'][1];
+    expect($supplierSub['subItems'])->toHaveCount(3)
+        ->and($supplierSub['subItems'][0]['name'])->toBe('New Supplier')
+        ->and($supplierSub['subItems'][0]['path'])->toBe('/suppliers/create')
+        ->and($supplierSub['subItems'][1]['name'])->toBe('Suppliers List')
+        ->and($supplierSub['subItems'][1]['path'])->toBe('/suppliers')
+        ->and($supplierSub['subItems'][2]['name'])->toBe('Import Suppliers')
+        ->and($supplierSub['subItems'][2]['path'])->toBe('/suppliers/import');
+});
+
+it('dynamically adds and deletes custom field definitions in the database', function () {
+    actingAsSuperAdmin();
+
+    $response = $this->postJson(route('customers.custom-fields.store'), [
+        'name' => 'Trade License',
+    ]);
+
+    $response->assertOk()
+        ->assertJson([
+            'success' => true,
+            'custom_field' => [
+                'name' => 'Trade License',
+                'field_key' => 'trade_license',
+            ],
+        ]);
+
+    $this->assertDatabaseHas('customer_custom_fields', [
+        'name' => 'Trade License',
+        'field_key' => 'trade_license',
+    ]);
+
+    $field = CustomerCustomField::where('name', 'Trade License')->first();
+
+    $deleteResponse = $this->deleteJson(route('customers.custom-fields.destroy', $field));
+    $deleteResponse->assertOk()->assertJson(['success' => true]);
+
+    $this->assertDatabaseMissing('customer_custom_fields', [
+        'name' => 'Trade License',
+    ]);
 });
