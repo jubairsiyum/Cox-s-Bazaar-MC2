@@ -111,6 +111,14 @@
                     }
                 },
 
+                setExpanded(val) {
+                    this.isExpanded = !!val;
+                    this.isMobileOpen = false;
+                    if (window.innerWidth >= 1280) {
+                        localStorage.setItem('sidebarExpanded', this.isExpanded);
+                    }
+                },
+
                 toggleMobileOpen() {
                     this.isMobileOpen = !this.isMobileOpen;
                 },

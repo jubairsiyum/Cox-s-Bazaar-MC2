@@ -67,18 +67,14 @@ function sidebarComponent() {
             @endforeach
         },
         toggleSubmenu(groupIndex, itemIndex) {
+            if (!Alpine.store('sidebar').isExpanded) {
+                Alpine.store('sidebar').setExpanded(true);
+            }
             const key = groupIndex + '-' + itemIndex;
             const newState = !this.openSubmenus[key];
 
             if (newState) {
                 this.openSubmenus = {};
-                // If opening this menu and none of its child submenus is open, default first child (Customers) to open
-                const hasChildOpen = Object.keys(this.openChildSubmenus).some(
-                    k => k.startsWith(key + '-') && this.openChildSubmenus[k]
-                );
-                if (!hasChildOpen) {
-                    this.openChildSubmenus[key + '-0'] = true;
-                }
             }
 
             this.openSubmenus[key] = newState;
@@ -89,16 +85,7 @@ function sidebarComponent() {
         },
         toggleChildSubmenu(groupIndex, itemIndex, subIndex) {
             const key = groupIndex + '-' + itemIndex + '-' + subIndex;
-            const isCurrentlyOpen = this.isChildSubmenuOpen(groupIndex, itemIndex, subIndex);
-
-            // Close sibling child submenus under this parent item (accordion)
-            Object.keys(this.openChildSubmenus).forEach(k => {
-                if (k.startsWith(groupIndex + '-' + itemIndex + '-')) {
-                    this.openChildSubmenus[k] = false;
-                }
-            });
-
-            this.openChildSubmenus[key] = !isCurrentlyOpen;
+            this.openChildSubmenus[key] = !this.openChildSubmenus[key];
         },
         isChildSubmenuOpen(groupIndex, itemIndex, subIndex) {
             const key = groupIndex + '-' + itemIndex + '-' + subIndex;
@@ -142,9 +129,11 @@ function sidebarComponent() {
 </script>
 
 <aside id="sidebar"
-    class="fixed flex flex-col mt-0 top-0 px-5 inset-s-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out max-xl:duration-200 max-xl:w-72.5 z-50 max-xl:z-101 ltr:border-r rtl:border-l border-gray-200 w-22.5 in-[.sidebar-expanded_&]:min-w-72.5"
+    class="fixed flex flex-col mt-0 top-0 px-5 ltr:left-0 rtl:right-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out max-xl:duration-200 max-xl:w-[290px] z-50 max-xl:z-101 ltr:border-r rtl:border-l border-gray-200 w-[90px] [.sidebar-expanded_&]:w-[290px] [.sidebar-expanded_&]:min-w-[290px]"
     x-data="sidebarComponent()"
     :class="{
+        'w-[290px]': $store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen,
+        'w-[90px]': !$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen,
         'translate-x-0': $store.sidebar.isMobileOpen,
         'max-xl:-translate-x-full max-xl:rtl:translate-x-full': !$store.sidebar.isMobileOpen
     }"
@@ -153,9 +142,10 @@ function sidebarComponent() {
 
     <!-- Logo Section -->
     <div class="py-6 flex items-center gap-2 border-b border-gray-100 dark:border-gray-800" :class="(!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen) ? 'justify-center' : 'justify-between'">
-        <a href="{{ route('dashboard') }}" class="flex items-center gap-3">
+        <a href="{{ route('dashboard') }}" class="flex items-center gap-3 overflow-hidden">
             <img src="{{ asset('cmc2-logo.jpeg') }}" alt="{{ config('app.name') }}" class="h-10 w-10 shrink-0 rounded-xl object-contain bg-white p-0.5 shadow-theme-xs">
-            <div class="hidden in-[.sidebar-expanded_&]:block">
+            <div x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen"
+                class="hidden [.sidebar-expanded_&]:block whitespace-nowrap overflow-hidden">
                 <span class="block text-base font-bold text-gray-900 dark:text-white leading-tight">
                     {{ config('app.name', 'Cox\'s Bazaar') }}
                 </span>
@@ -165,7 +155,7 @@ function sidebarComponent() {
     </div>
 
     <!-- Navigation Menu -->
-    <div class="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar pt-4">
+    <div class="flex flex-col overflow-y-auto overflow-x-hidden duration-300 ease-linear no-scrollbar pt-4">
         <nav class="mb-6">
             <div class="flex flex-col gap-4">
                 @foreach ($menuGroups as $groupIndex => $menuGroup)
@@ -240,8 +230,8 @@ function sidebarComponent() {
                                         </button>
 
                                         <!-- Submenu -->
-                                        <div x-show="isSubmenuOpen({{ $groupIndex }}, {{ $itemIndex }}) && ($store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen)" x-collapse>
-                                            <ul class="mt-2 space-y-1.5 ltr:ml-9 rtl:mr-9">
+                                        <div x-show="isSubmenuOpen({{ $groupIndex }}, {{ $itemIndex }}) && ($store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen)">
+                                            <ul class="mt-2 space-y-1 ltr:ml-9 rtl:mr-9">
                                                 @foreach ($item['subItems'] as $subIndex => $subItem)
                                                     @php
                                                         if (!empty($subItem['can']) && !auth()->user()?->can($subItem['can'])) {
@@ -256,21 +246,31 @@ function sidebarComponent() {
                                                         }
                                                     @endphp
                                                     @if (isset($subItem['subItems']))
-                                                        <!-- Nested 2nd-level submenu (e.g. Customers, Suppliers under Parties) -->
+                                                        @php
+                                                            $isSubActive = false;
+                                                            foreach ($subItem['subItems'] as $childSubCheck) {
+                                                                $cleanPath = ltrim($childSubCheck['path'] ?? '', '/');
+                                                                if (request()->is($cleanPath) || request()->is($cleanPath . '/*')) {
+                                                                    $isSubActive = true;
+                                                                    break;
+                                                                }
+                                                            }
+                                                        @endphp
+                                                        <!-- Nested 2nd-level submenu (Customers, Suppliers under Parties) -->
                                                         <li>
                                                             <button type="button"
                                                                 @click.stop="toggleChildSubmenu({{ $groupIndex }}, {{ $itemIndex }}, {{ $subIndex }})"
                                                                 class="menu-dropdown-item group w-full justify-between cursor-pointer"
-                                                                :class="isChildSubmenuOpen({{ $groupIndex }}, {{ $itemIndex }}, {{ $subIndex }}) ?
-                                                                    'text-brand-500 font-semibold bg-gray-50 dark:bg-gray-800/40' :
-                                                                    'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5'">
+                                                                :class="(isChildSubmenuOpen({{ $groupIndex }}, {{ $itemIndex }}, {{ $subIndex }}) || {{ $isSubActive ? 'true' : 'false' }}) ?
+                                                                    'menu-dropdown-item-active' :
+                                                                    'menu-dropdown-item-inactive'">
                                                                 <span>{{ __($subItem['name']) }}</span>
                                                                 <x-svg.chevron-down
-                                                                    class="h-4 w-4 transition-transform duration-200 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200"
+                                                                    class="h-4 w-4 transition-transform duration-200"
                                                                     x-bind:class="{ 'rotate-180 text-brand-500': isChildSubmenuOpen({{ $groupIndex }}, {{ $itemIndex }}, {{ $subIndex }}) }" />
                                                             </button>
-                                                            <div x-show="isChildSubmenuOpen({{ $groupIndex }}, {{ $itemIndex }}, {{ $subIndex }})" x-collapse>
-                                                                <ul class="mt-1 space-y-1 ltr:ml-3 rtl:mr-3 border-l-2 border-brand-100 dark:border-brand-900/40 ltr:pl-2 rtl:pr-2">
+                                                            <div x-show="isChildSubmenuOpen({{ $groupIndex }}, {{ $itemIndex }}, {{ $subIndex }})">
+                                                                <ul class="mt-1 space-y-1 ltr:ml-4 rtl:mr-4">
                                                                     @foreach ($subItem['subItems'] as $childSub)
                                                                         @php
                                                                             if (!empty($childSub['can']) && !auth()->user()?->can($childSub['can'])) {
