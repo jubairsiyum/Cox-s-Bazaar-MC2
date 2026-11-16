@@ -10,8 +10,13 @@
   'returnsCount' => 43,
 ])
 
+@php
+  $pct = min(max(round(($placedUnits / max($dispatchedUnits, 1)) * 100), 0), 100);
+@endphp
+
 <section class="relative overflow-hidden rounded-3xl bg-surface p-6 shadow-card flex flex-col justify-between h-full">
   <div>
+    {{-- Header --}}
     <div class="flex items-start justify-between">
       <div>
         <h3 class="text-base sm:text-lg font-semibold text-ink">{{ $title }}</h3>
@@ -22,22 +27,30 @@
       </div>
     </div>
 
-    {{-- Main Metric --}}
-    <div class="mt-6 flex items-baseline justify-between">
+    {{-- Main Metric with Semi-circle Gauge matching Top Stat Cards --}}
+    <div class="mt-6 flex items-end justify-between gap-4">
       <div>
-        <p class="text-4xl font-extrabold tracking-tight text-ink">{{ $dispatchedUnits }} <span class="text-lg font-medium text-muted">Pcs</span></p>
+        <p class="text-3xl sm:text-4xl font-extrabold tracking-tight text-ink">{{ $dispatchedUnits }} <span class="text-base sm:text-lg font-medium text-muted">Pcs</span></p>
         <p class="mt-1 text-xs text-muted">Total Handsets Dispatched Today</p>
       </div>
-      <div class="text-right">
-        <span class="inline-flex items-center gap-1.5 rounded-full bg-soft px-3 py-1 text-xs font-semibold text-brand-500">
-          <span class="size-2 rounded-full bg-brand-500"></span>
-          {{ round(($placedUnits / max($dispatchedUnits, 1)) * 100) }}% Placed
+
+      {{-- Gauge: pathLength=100 allows dasharray to match percentage directly --}}
+      <div class="relative h-14 w-24 shrink-0 sm:h-16 sm:w-28">
+        <svg viewBox="0 0 120 64" class="h-full w-full">
+          <path d="M10 60 A50 50 0 0 1 110 60" pathLength="100" fill="none" stroke="currentColor"
+                class="text-line" stroke-width="12" stroke-linecap="round"/>
+          <path d="M10 60 A50 50 0 0 1 110 60" pathLength="100" fill="none" stroke="currentColor"
+                class="text-brand-500" stroke-width="12" stroke-linecap="round"
+                stroke-dasharray="{{ $pct }} 100"/>
+        </svg>
+        <span class="absolute inset-x-0 bottom-0 text-center text-[11px] font-semibold text-brand-500">
+          {{ $pct }}% Placed
         </span>
       </div>
     </div>
 
     {{-- Progress bar breakdown --}}
-    <div class="mt-5 space-y-2">
+    <div class="mt-6 space-y-2.5">
       <div class="h-3 w-full overflow-hidden rounded-full bg-line flex">
         <div class="h-full bg-brand-500 transition-all duration-500" style="width: {{ ($placedUnits / max($dispatchedUnits, 1)) * 100 }}%"></div>
         <div class="h-full bg-warning transition-all duration-500" style="width: {{ ($returnsCount / max($dispatchedUnits, 1)) * 100 }}%"></div>
@@ -47,24 +60,8 @@
           <span class="size-2 rounded-full bg-brand-500"></span> Placed: <strong class="text-ink">{{ $placedUnits }} pcs</strong>
         </span>
         <span class="flex items-center gap-1.5 font-medium text-ink">
-          <span class="size-2 rounded-full bg-warning"></span> In-Transit / Pending: <strong class="text-ink">{{ $returnsCount }} pcs</strong>
+          <span class="size-2 rounded-full bg-warning"></span> In-Transit: <strong class="text-ink">{{ $returnsCount }} pcs</strong>
         </span>
-      </div>
-    </div>
-
-    {{-- Stylized Delivery Route SVG background element --}}
-    <div class="mt-6 rounded-2xl border border-line bg-soft/30 p-3.5">
-      <div class="flex items-center justify-between text-xs">
-        <div class="flex items-center gap-2">
-          <span class="grid size-7 place-items-center rounded-xl bg-surface text-brand-500 shadow-xs">
-            <x-icon name="smartphone" class="size-3.5" />
-          </span>
-          <div>
-            <p class="font-semibold text-ink">Chakaria & Teknaf Routes</p>
-            <p class="text-[11px] text-muted">High volume deliveries in progress</p>
-          </div>
-        </div>
-        <span class="font-bold text-brand-500">32 Retailers</span>
       </div>
     </div>
   </div>

@@ -56,13 +56,13 @@
       </div>
     </div>
 
-    {{-- 3. Third Row: Brand Share Distribution (1 Col) + Low Stock & Reorder Alerts (2 Cols) --}}
-    <div class="grid gap-5 lg:grid-cols-2 xl:grid-cols-3 items-stretch">
-      <div class="xl:col-span-1 flex flex-col">
-        <x-dashboard.brand-share-chart />
-      </div>
-      <div class="lg:col-span-1 xl:col-span-2 flex flex-col">
+    {{-- 3. Third Row: Low Stock & Reorder Alerts (50%) + Brand Sales Share (50%) --}}
+    <div class="grid gap-5 lg:grid-cols-2 items-stretch">
+      <div class="flex flex-col">
         <x-dashboard.stock-alerts />
+      </div>
+      <div class="flex flex-col">
+        <x-dashboard.brand-share-chart />
       </div>
     </div>
 
