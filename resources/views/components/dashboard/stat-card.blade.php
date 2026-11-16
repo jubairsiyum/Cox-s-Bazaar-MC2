@@ -34,9 +34,11 @@
   </div>
 
   <div class="mt-4 flex items-end justify-between gap-4">
-    <div>
-      <p class="text-xs text-muted">{{ $caption }}</p>
-      <p class="mt-1 text-2xl font-bold tracking-tight text-ink">{{ $currency }} {{ $fmt }}</p>
+    <div class="min-w-0">
+      <p class="text-2xl sm:text-[26px] font-bold tracking-tight text-ink leading-tight">{{ $currency }} {{ $fmt }}</p>
+      @if ($caption)
+        <p class="mt-1.5 text-xs font-medium text-muted">{{ $caption }}</p>
+      @endif
     </div>
 
     {{-- Gauge: pathLength=100 allows dasharray to match percentage directly --}}

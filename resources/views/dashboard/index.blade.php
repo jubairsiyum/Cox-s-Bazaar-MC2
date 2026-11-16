@@ -22,7 +22,7 @@
           title="Today's Collection" 
           :amount="125000" 
           :change="24" 
-          caption="Cash ৳75k &bull; Bank ৳50k" 
+          caption="Cash ৳75k / Bank ৳50k" 
           icon="wallet"
         />
       </div>
@@ -31,7 +31,7 @@
           title="Retailer Dues (Receivable)" 
           :amount="1420000" 
           :change="-8" 
-          caption="Overdue: ৳1,45,000" 
+          caption="Overdue ৳1,45,000" 
           icon="store"
         />
       </div>
