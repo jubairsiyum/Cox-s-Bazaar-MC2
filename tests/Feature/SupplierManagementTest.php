@@ -358,3 +358,102 @@ it('imports suppliers from a valid CSV file with Mobile No and Tel No', function
     expect(Supplier::where('name', 'Imported Supplier 1')->exists())->toBeTrue()
         ->and(Supplier::where('name', 'Imported Supplier 2')->exists())->toBeTrue();
 });
+
+it('rejects creating a supplier whose name matches an existing supplier', function () {
+    actingAsSuperAdmin();
+
+    Supplier::factory()->create(['name' => 'Samsung Electronics BD']);
+
+    $this->post(route('suppliers.store'), [
+        'name' => '  samsung   electronics   bd ',
+        'mobile' => '01811223344',
+    ])->assertSessionHasErrors('name');
+
+    expect(Supplier::count())->toBe(1);
+});
+
+it('rejects creating a supplier whose tax number or contact details match an existing supplier', function () {
+    actingAsSuperAdmin();
+
+    Supplier::factory()->create([
+        'mobile' => '01811223344',
+        'email' => 'samsung.bd@distributor.com',
+        'tax_number' => 'TAX-SMSG-101',
+    ]);
+
+    $this->post(route('suppliers.store'), [
+        'name' => 'Different Supplier',
+        'mobile' => '01811223344',
+    ])->assertSessionHasErrors('mobile');
+
+    $this->post(route('suppliers.store'), [
+        'name' => 'Another Supplier',
+        'mobile' => '01800000000',
+        'tax_number' => 'tax-smsg-101',
+    ])->assertSessionHasErrors('tax_number');
+
+    $this->post(route('suppliers.store'), [
+        'name' => 'Third Supplier',
+        'mobile' => '01800000001',
+        'email' => 'Samsung.BD@Distributor.com',
+    ])->assertSessionHasErrors('email');
+
+    expect(Supplier::count())->toBe(1);
+});
+
+it('restores a soft-deleted supplier when the same details are submitted again', function () {
+    actingAsSuperAdmin();
+
+    $this->post(route('suppliers.store'), [
+        'name' => 'Samsung Electronics BD',
+        'mobile' => '01811223344',
+        'email' => 'samsung.bd@distributor.com',
+        'tax_number' => 'TAX-SMSG-101',
+    ])->assertRedirect(route('suppliers.index'));
+
+    $supplier = Supplier::where('name', 'Samsung Electronics BD')->firstOrFail();
+    $originalCode = $supplier->supplier_id;
+
+    $this->delete(route('suppliers.destroy', $supplier))->assertRedirect(route('suppliers.index'));
+
+    $this->post(route('suppliers.store'), [
+        'name' => 'Samsung Electronics BD',
+        'mobile' => '01811223344',
+        'email' => 'samsung.bd@distributor.com',
+        'tax_number' => 'TAX-SMSG-101',
+        'opening_balance' => '25000',
+    ])->assertRedirect(route('suppliers.index'));
+
+    expect(Supplier::withTrashed()->count())->toBe(1);
+
+    $restored = Supplier::withTrashed()->firstOrFail();
+    expect($restored->deleted_at)->toBeNull()
+        ->and($restored->supplier_id)->toBe($originalCode)
+        ->and((float) $restored->opening_balance)->toBe(25000.0);
+});
+
+it('skips duplicate rows when importing suppliers', function () {
+    actingAsSuperAdmin();
+
+    Supplier::factory()->create([
+        'name' => 'Existing Supplier',
+        'mobile' => '01800000001',
+    ]);
+
+    $csvContent = implode("\n", [
+        'Supplier Name,Mobile No,Email,Tel No,TAX Number,Country Name,State Name,City,Postcode,Address,Opening Balance',
+        'Existing Supplier,01800000001,,,,,,,,,',
+        'Fresh Supplier,01800000002,fresh@distributor.com,029876543,TAX-303,Bangladesh,Chittagong,Cox\'s Bazar,4700,"Main Road",0.00',
+        'Fresh Supplier,01800000002,fresh@distributor.com,029876543,TAX-303,Bangladesh,Chittagong,Cox\'s Bazar,4700,"Main Road",0.00',
+    ]);
+
+    $file = UploadedFile::fake()->createWithContent('suppliers.csv', $csvContent);
+
+    $this->post(route('suppliers.import.store'), [
+        'file' => $file,
+    ])->assertRedirect(route('suppliers.index'))
+        ->assertSessionHas('success', 'Successfully imported 1 supplier(s). Skipped 2 duplicate row(s).');
+
+    expect(Supplier::count())->toBe(2)
+        ->and(Supplier::where('name', 'Fresh Supplier')->count())->toBe(1);
+});

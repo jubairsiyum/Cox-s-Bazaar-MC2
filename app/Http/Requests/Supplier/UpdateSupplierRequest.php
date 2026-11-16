@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Requests\Supplier;
 
 use App\Models\Supplier;
+use App\Services\DuplicateCheckService;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateSupplierRequest extends FormRequest
@@ -43,6 +45,32 @@ class UpdateSupplierRequest extends FormRequest
             'postcode' => ['nullable', 'string', 'max:20'],
             'address' => ['nullable', 'string', 'max:1000'],
             'status' => ['nullable', 'in:active,inactive'],
+        ];
+    }
+
+    /**
+     * Reject details that already belong to another supplier.
+     *
+     * @return array<callable(Validator): void>
+     */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator): void {
+                if ($validator->errors()->isNotEmpty()) {
+                    return;
+                }
+
+                $supplier = $this->route('supplier');
+                $ignoreId = $supplier instanceof Supplier ? $supplier->getKey() : null;
+
+                foreach (array_keys(DuplicateCheckService::liveConflicts(Supplier::class, $this->validated(), $ignoreId)) as $column) {
+                    $validator->errors()->add(
+                        $column,
+                        __('validation.unique', ['attribute' => $validator->getDisplayableAttribute($column)])
+                    );
+                }
+            },
         ];
     }
 

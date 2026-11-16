@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\DuplicateCheckService;
 use App\Services\NumberingService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -70,6 +71,31 @@ class Supplier extends Model
         return $this->status === 'active';
     }
 
+    public function setNameAttribute(?string $value): void
+    {
+        $this->attributes['name'] = DuplicateCheckService::normalize('name', $value) ?? '';
+    }
+
+    public function setMobileAttribute(?string $value): void
+    {
+        $this->attributes['mobile'] = DuplicateCheckService::normalize('mobile', $value);
+    }
+
+    public function setTelNoAttribute(?string $value): void
+    {
+        $this->attributes['tel_no'] = DuplicateCheckService::normalize('tel_no', $value);
+    }
+
+    public function setEmailAttribute(?string $value): void
+    {
+        $this->attributes['email'] = DuplicateCheckService::normalize('email', $value);
+    }
+
+    public function setTaxNumberAttribute(?string $value): void
+    {
+        $this->attributes['tax_number'] = DuplicateCheckService::normalize('tax_number', $value);
+    }
+
     public function getPhoneAttribute(): ?string
     {
         return $this->tel_no;
@@ -77,7 +103,7 @@ class Supplier extends Model
 
     public function setPhoneAttribute(?string $value): void
     {
-        $this->attributes['tel_no'] = $value;
+        $this->tel_no = $value;
     }
 
     // ── Scopes ─────────────────────────────────────────────

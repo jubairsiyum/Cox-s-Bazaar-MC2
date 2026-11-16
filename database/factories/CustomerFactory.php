@@ -18,9 +18,9 @@ class CustomerFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->name(),
-            'mobile' => fake()->phoneNumber(),
-            'tel_no' => fake()->optional()->phoneNumber(),
+            'name' => fake()->unique()->name(),
+            'mobile' => fake()->unique()->phoneNumber(),
+            'tel_no' => fake()->unique()->phoneNumber(),
             'email' => fake()->unique()->safeEmail(),
             'country' => 'Bangladesh',
             'state' => 'Chittagong',

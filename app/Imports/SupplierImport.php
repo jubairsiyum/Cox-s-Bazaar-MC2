@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Imports;
 
 use App\Models\Supplier;
+use App\Services\DuplicateCheckService;
 use App\Services\NumberingService;
 use Illuminate\Support\Facades\Auth;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
@@ -15,6 +16,8 @@ use Maatwebsite\Excel\Concerns\WithValidation;
 class SupplierImport implements SkipsEmptyRows, ToModel, WithHeadingRow, WithValidation
 {
     private int $importedCount = 0;
+
+    private int $skippedCount = 0;
 
     /**
      * @param  array<string, mixed>  $row
@@ -30,10 +33,7 @@ class SupplierImport implements SkipsEmptyRows, ToModel, WithHeadingRow, WithVal
         $mobile = $row['mobile_no'] ?? $row['mobile'] ?? $row['mobile_number'] ?? null;
         $phone = $row['tel_no'] ?? $row['tel'] ?? $row['phone'] ?? $row['contact_no'] ?? null;
 
-        $this->importedCount++;
-
-        return new Supplier([
-            'supplier_id' => NumberingService::nextSequential('supplier_prefix', 'SP', 4),
+        $attributes = [
             'name' => trim((string) $name),
             'mobile' => $mobile !== null ? trim((string) $mobile) : null,
             'email' => isset($row['email']) ? trim((string) $row['email']) : null,
@@ -49,6 +49,31 @@ class SupplierImport implements SkipsEmptyRows, ToModel, WithHeadingRow, WithVal
             'purchase_return_due' => 0.00,
             'status' => 'active',
             'created_by' => Auth::id(),
+        ];
+
+        if (DuplicateCheckService::liveConflicts(Supplier::class, $attributes) !== []) {
+            $this->skippedCount++;
+
+            return null;
+        }
+
+        $reusable = DuplicateCheckService::reusableRecord(Supplier::class, $attributes);
+
+        if ($reusable instanceof Supplier) {
+            DuplicateCheckService::purgeTrashConflicts(Supplier::class, $attributes, $reusable->id);
+
+            $reusable->fill($attributes);
+            $reusable->deleted_at = null;
+
+            $this->importedCount++;
+
+            return $reusable;
+        }
+
+        $this->importedCount++;
+
+        return new Supplier($attributes + [
+            'supplier_id' => NumberingService::nextSequential('supplier_prefix', 'SP', 4),
         ]);
     }
 
@@ -67,5 +92,10 @@ class SupplierImport implements SkipsEmptyRows, ToModel, WithHeadingRow, WithVal
     public function getImportedCount(): int
     {
         return $this->importedCount;
+    }
+
+    public function getSkippedCount(): int
+    {
+        return $this->skippedCount;
     }
 }
