@@ -125,7 +125,7 @@
 
 <body class="min-h-screen bg-canvas font-sans text-ink antialiased p-3 sm:p-4 lg:p-5 selection:bg-brand-500/20 selection:text-brand-600">
 
-    <div class="flex min-h-[calc(100vh-2.5rem)] w-full gap-5" x-data="{ sidebar: false }">
+    <div class="flex min-h-[calc(100vh-2.5rem)] w-full gap-5 items-start" x-data="{ sidebar: false }">
         <x-dashboard.sidebar />
 
         <div class="flex-1 min-w-0 flex flex-col gap-5">

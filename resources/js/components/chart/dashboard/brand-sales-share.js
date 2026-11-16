@@ -14,6 +14,7 @@ export default (el) => {
 
     const state = {
         mode: config.defaultMode || 'share',
+        selectedBrand: 'all',
     };
 
     const defaultColors = [
@@ -23,12 +24,24 @@ export default (el) => {
         '#8b5cf6',
     ];
 
-    const getColors = () => {
-        return brands.map((b, i) => b.colorHex || defaultColors[i % defaultColors.length]);
+    const getActiveBrands = () => {
+        if (state.selectedBrand === 'all') {
+            return brands;
+        }
+        const filtered = brands.filter((b) => b.name === state.selectedBrand);
+        return filtered.length > 0 ? filtered : brands;
     };
 
-    const getSeries = () => {
-        return brands.map((b) => ({
+    const getColors = (activeList) => {
+        return activeList.map((b) => {
+            if (b.colorHex) return b.colorHex;
+            const originalIndex = brands.findIndex((orig) => orig.name === b.name);
+            return defaultColors[originalIndex >= 0 ? originalIndex % defaultColors.length : 0];
+        });
+    };
+
+    const getSeries = (activeList) => {
+        return activeList.map((b) => ({
             name: b.name,
             data: state.mode === 'volume' ? b.volumeData : b.shareData,
         }));
@@ -36,10 +49,23 @@ export default (el) => {
 
     const build = (dark) => {
         const isShare = state.mode === 'share';
-        const colors = getColors();
+        const activeBrands = getActiveBrands();
+        const colors = getColors(activeBrands);
+        const series = getSeries(activeBrands);
+
+        let yMax = 50;
+        if (!isShare) {
+            let maxVal = 0;
+            activeBrands.forEach((b) => {
+                const bMax = Math.max(...(b.volumeData || []));
+                if (bMax > maxVal) maxVal = bMax;
+            });
+            yMax = Math.ceil((maxVal * 1.15) / 5) * 5;
+            if (yMax < 10) yMax = 10;
+        }
 
         return {
-            series: getSeries(),
+            series: series,
             legend: {
                 show: false,
             },
@@ -53,6 +79,15 @@ export default (el) => {
                 },
                 zoom: {
                     enabled: false,
+                },
+                animations: {
+                    enabled: true,
+                    easing: 'easeinout',
+                    speed: 350,
+                    dynamicAnimation: {
+                        enabled: true,
+                        speed: 300,
+                    },
                 },
             },
             stroke: {
@@ -97,14 +132,22 @@ export default (el) => {
                 enabled: true,
                 shared: true,
                 intersect: false,
-                custom: function ({ series: chartSeries, dataPointIndex, w }) {
+                custom: function ({ series: chartSeries, seriesIndex, dataPointIndex, w }) {
                     const category = w.globals?.categoryLabels?.[dataPointIndex] ??
                         w.config.xaxis?.categories?.[dataPointIndex] ?? '';
                     const seriesColors = w.config.colors ?? colors;
                     const seriesList = w.config.series ?? [];
+
+                    if (!seriesList.length) return '';
+
                     const rows = seriesList
                         .map((s, idx) => {
-                            const val = chartSeries[idx]?.[dataPointIndex];
+                            let val = chartSeries[idx]?.[dataPointIndex];
+                            if (val === undefined && chartSeries[dataPointIndex] !== undefined && seriesList.length === 1) {
+                                val = chartSeries[dataPointIndex];
+                            }
+                            if (val === undefined || val === null) return '';
+
                             const color = seriesColors[idx] ?? '#465fff';
                             const formattedVal = isShare
                                 ? `${val}%`
@@ -119,7 +162,10 @@ export default (el) => {
                                 </div>
                             `;
                         })
+                        .filter(Boolean)
                         .join('');
+
+                    if (!rows) return '';
 
                     return `
                         <div class="rounded-xl border border-line bg-surface p-3 shadow-lg min-w-44">
@@ -173,7 +219,7 @@ export default (el) => {
             },
             yaxis: {
                 min: 0,
-                max: isShare ? 50 : undefined,
+                max: isShare ? 50 : yMax,
                 tickAmount: 5,
                 labels: {
                     formatter: (val) => {
@@ -199,12 +245,24 @@ export default (el) => {
         if (event.detail?.mode) {
             state.mode = event.detail.mode;
         }
-        chart.updateOptions(build(document.documentElement.classList.contains('dark')));
+        if (event.detail?.selectedBrand !== undefined) {
+            state.selectedBrand = event.detail.selectedBrand;
+        }
+        const dark = document.documentElement.classList.contains('dark');
+        const nextOpts = build(dark);
+        chart.updateOptions(nextOpts, false, true);
     });
 
-    el.addEventListener('toggle-brand', (event) => {
-        if (event.detail?.brandName) {
-            chart.toggleSeries(event.detail.brandName);
+    el.addEventListener('highlight-brand', (event) => {
+        const name = event.detail?.brandName;
+        if (name && typeof chart.highlightSeries === 'function') {
+            chart.highlightSeries(name);
+        }
+    });
+
+    el.addEventListener('unhighlight-brand', () => {
+        if (typeof chart.highlightSeries === 'function') {
+            chart.highlightSeries('');
         }
     });
 };

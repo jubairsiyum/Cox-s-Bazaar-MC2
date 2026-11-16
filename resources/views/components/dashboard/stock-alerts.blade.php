@@ -57,14 +57,14 @@
           <p class="text-xs text-muted">Handsets below safe reorder thresholds</p>
         </div>
       </div>
-      <span class="rounded-full bg-danger/10 px-3 py-1 text-xs font-bold text-danger">
-        {{ count($items) }} Items Alert
+      <span class="rounded-full {{ count($items) > 0 ? 'bg-danger/10 text-danger' : 'bg-success/10 text-success' }} px-3 py-1 text-xs font-bold">
+        {{ count($items) > 0 ? count($items) . ' Items Alert' : 'Healthy Stock' }}
       </span>
     </div>
 
     {{-- Alert List --}}
     <div class="mt-5 space-y-3">
-      @foreach ($items as $item)
+      @forelse ($items as $item)
         <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-3.5 transition hover:border-line/80 hover:bg-soft/20">
           <div class="flex items-center gap-3 min-w-0">
             <span class="grid size-9 shrink-0 place-items-center rounded-xl bg-soft text-brand-500 font-bold text-xs">
@@ -97,7 +97,12 @@
             </a>
           </div>
         </div>
-      @endforeach
+      @empty
+        <div class="rounded-2xl border border-line bg-surface/50 p-6 text-center">
+          <p class="text-sm font-semibold text-ink">All handset stocks are healthy!</p>
+          <p class="text-xs text-muted mt-1">No items currently below reorder thresholds.</p>
+        </div>
+      @endforelse
     </div>
   </div>
 
