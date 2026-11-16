@@ -108,6 +108,24 @@
                     </tr>
                     <tr>
                         <td class="p-3 text-center font-medium">2</td>
+                        <td class="p-3 font-semibold text-ink">Storage</td>
+                        <td class="p-3 text-center">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold text-ink bg-line">
+                                Optional
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="p-3 text-center font-medium">3</td>
+                        <td class="p-3 font-semibold text-ink">Color</td>
+                        <td class="p-3 text-center">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold text-ink bg-line">
+                                Optional
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="p-3 text-center font-medium">4</td>
                         <td class="p-3 font-semibold text-ink">Quantity</td>
                         <td class="p-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-on-brand"
@@ -117,7 +135,7 @@
                         </td>
                     </tr>
                     <tr>
-                        <td class="p-3 text-center font-medium">3</td>
+                        <td class="p-3 text-center font-medium">5</td>
                         <td class="p-3 font-semibold text-ink">Unit</td>
                         <td class="p-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-on-brand"
@@ -127,7 +145,7 @@
                         </td>
                     </tr>
                     <tr>
-                        <td class="p-3 text-center font-medium">4</td>
+                        <td class="p-3 text-center font-medium">6</td>
                         <td class="p-3 font-semibold text-ink">Note</td>
                         <td class="p-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold text-ink bg-line">

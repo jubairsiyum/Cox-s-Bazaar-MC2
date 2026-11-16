@@ -18,11 +18,15 @@ class MenuHelper
             [
                 'icon' => 'box',
                 'name' => 'Master Data',
+                'canany' => [
+                    'brands.view', 'brands.manage', 'categories.view', 'categories.manage',
+                    'units.view', 'units.manage', 'products.view', 'products.manage',
+                ],
                 'subItems' => [
-                    ['name' => 'Brands', 'path' => '/brands'],
-                    ['name' => 'Categories', 'path' => '/categories'],
-                    ['name' => 'Units', 'path' => '/units'],
-                    ['name' => 'Products', 'path' => '/products'],
+                    ['name' => 'Brands', 'path' => '/brands', 'canany' => ['brands.view', 'brands.manage']],
+                    ['name' => 'Categories', 'path' => '/categories', 'canany' => ['categories.view', 'categories.manage']],
+                    ['name' => 'Units', 'path' => '/units', 'canany' => ['units.view', 'units.manage']],
+                    ['name' => 'Products', 'path' => '/products', 'canany' => ['products.view', 'products.manage']],
                 ],
             ],
             [
@@ -53,30 +57,33 @@ class MenuHelper
             [
                 'icon' => 'tables',
                 'name' => 'Inventory',
+                'canany' => ['warehouses.manage', 'inventory.view', 'stock-adjustments.manage', 'stock-transfers.manage'],
                 'subItems' => [
-                    ['name' => 'Warehouses', 'path' => '/warehouses'],
-                    ['name' => 'Stock Levels', 'path' => '/inventory'],
-                    ['name' => 'Adjustments', 'path' => '/stock-adjustments'],
-                    ['name' => 'Transfers', 'path' => '/stock-transfers'],
+                    ['name' => 'Warehouses', 'path' => '/warehouses', 'can' => 'warehouses.manage'],
+                    ['name' => 'Stock Levels', 'path' => '/inventory', 'can' => 'inventory.view'],
+                    ['name' => 'Adjustments', 'path' => '/stock-adjustments', 'can' => 'stock-adjustments.manage'],
+                    ['name' => 'Transfers', 'path' => '/stock-transfers', 'can' => 'stock-transfers.manage'],
                 ],
             ],
             [
                 'icon' => 'forms',
                 'name' => 'Purchasing',
+                'canany' => ['purchase-orders.manage', 'purchase-invoices.view', 'purchase-invoices.manage', 'purchase-invoices.post', 'purchase-returns.manage'],
                 'subItems' => [
-                    ['name' => 'Purchase Orders', 'path' => '/purchase-orders'],
-                    ['name' => 'Purchase Invoices', 'path' => '/purchase-invoices'],
-                    ['name' => 'Purchase Returns', 'path' => '/purchase-returns'],
+                    ['name' => 'Purchase Orders', 'path' => '/purchase-orders', 'can' => 'purchase-orders.manage'],
+                    ['name' => 'Purchase Invoices', 'path' => '/purchase-invoices', 'canany' => ['purchase-invoices.view', 'purchase-invoices.manage', 'purchase-invoices.post']],
+                    ['name' => 'Purchase Returns', 'path' => '/purchase-returns', 'can' => 'purchase-returns.manage'],
                 ],
             ],
             [
                 'icon' => 'ecommerce',
                 'name' => 'Sales',
+                'canany' => ['sales-orders.manage', 'sales-invoices.view', 'sales-invoices.manage', 'sales-invoices.post', 'sales-returns.manage', 'customer-collections.manage'],
                 'subItems' => [
-                    ['name' => 'Sales Orders', 'path' => '/sales-orders'],
-                    ['name' => 'Sales Invoices', 'path' => '/sales-invoices'],
-                    ['name' => 'Sales Returns', 'path' => '/sales-returns'],
-                    ['name' => 'Collections', 'path' => '/customer-collections'],
+                    ['name' => 'Sales Orders', 'path' => '/sales-orders', 'can' => 'sales-orders.manage'],
+                    ['name' => 'Sales Invoices', 'path' => '/sales-invoices', 'canany' => ['sales-invoices.view', 'sales-invoices.manage', 'sales-invoices.post']],
+                    ['name' => 'Sales Returns', 'path' => '/sales-returns', 'can' => 'sales-returns.manage'],
+                    ['name' => 'Collections', 'path' => '/customer-collections', 'can' => 'customer-collections.manage'],
                 ],
             ],
             [
@@ -88,19 +95,26 @@ class MenuHelper
             [
                 'icon' => 'charts',
                 'name' => 'Finance',
+                'canany' => [
+                    'finance.view', 'finance.manage',
+                    'cash-accounts.manage', 'bank-accounts.manage',
+                    'income-transactions.manage', 'expense-transactions.manage',
+                    'account-transfers.manage', 'supplier-payments.view', 'supplier-payments.manage',
+                ],
                 'subItems' => [
-                    ['name' => 'Cash Accounts', 'path' => '/cash-accounts'],
-                    ['name' => 'Bank Accounts', 'path' => '/bank-accounts'],
-                    ['name' => 'Income', 'path' => '/income-transactions'],
-                    ['name' => 'Expenses', 'path' => '/expense-transactions'],
-                    ['name' => 'Transfers', 'path' => '/account-transfers'],
-                    ['name' => 'Supplier Payments', 'path' => '/supplier-payments'],
+                    ['name' => 'Cash Accounts', 'path' => '/cash-accounts', 'canany' => ['finance.view', 'finance.manage', 'cash-accounts.manage']],
+                    ['name' => 'Bank Accounts', 'path' => '/bank-accounts', 'canany' => ['finance.view', 'finance.manage', 'bank-accounts.manage']],
+                    ['name' => 'Income', 'path' => '/income-transactions', 'canany' => ['finance.view', 'finance.manage', 'income-transactions.manage']],
+                    ['name' => 'Expenses', 'path' => '/expense-transactions', 'canany' => ['finance.view', 'finance.manage', 'expense-transactions.manage']],
+                    ['name' => 'Transfers', 'path' => '/account-transfers', 'canany' => ['finance.view', 'finance.manage', 'account-transfers.manage']],
+                    ['name' => 'Supplier Payments', 'path' => '/supplier-payments', 'canany' => ['finance.view', 'finance.manage', 'supplier-payments.view', 'supplier-payments.manage']],
                 ],
             ],
             [
                 'icon' => 'charts',
                 'name' => 'Reports',
                 'path' => '/reports/sales',
+                'canany' => ['reports.view', 'reports.export'],
             ],
             [
                 'icon' => 'authentication',

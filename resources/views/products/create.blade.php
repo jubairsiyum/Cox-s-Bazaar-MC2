@@ -202,6 +202,39 @@
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
+                        <label for="quantity"
+                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
+                            Opening Quantity
+                        </label>
+                        <div class="sm:col-span-2">
+                            <input type="number" id="quantity" name="quantity" value="{{ old('quantity') }}"
+                                step="1" min="0"
+                                class="form-control @error('quantity') is-invalid @enderror"
+                                placeholder="0">
+                            @error('quantity')
+                                <div class="form-error">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
+                        <label for="unit"
+                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
+                            Unit
+                        </label>
+                        <div class="sm:col-span-2">
+                            <select id="unit" name="unit" class="form-control @error('unit') is-invalid @enderror">
+                                @foreach(\App\Models\Unit::UNITS as $unitOption)
+                                    <option value="{{ $unitOption }}" @selected(old('unit', 'Pcs') === $unitOption)>{{ $unitOption }}</option>
+                                @endforeach
+                            </select>
+                            @error('unit')
+                                <div class="form-error">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
                         <label for="status"
                             class="text-sm font-semibold text-ink sm:text-right">
                             Status

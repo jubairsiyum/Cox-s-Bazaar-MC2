@@ -9,6 +9,7 @@ use App\Http\Requests\Unit\ImportUnitRequest;
 use App\Http\Requests\Unit\StoreUnitRequest;
 use App\Http\Requests\Unit\UpdateUnitRequest;
 use App\Imports\UnitImport;
+use App\Models\Product;
 use App\Models\Unit;
 use App\Services\AuditService;
 use App\Services\StockService;
@@ -29,9 +30,6 @@ class UnitController extends Controller
      */
     protected const SORTABLE = ['product_name', 'quantity', 'unit', 'note'];
 
-    /**
-     * Display a listing of quantity entries.
-     */
     public function index(Request $request): View
     {
         $this->authorize('viewAny', Unit::class);
@@ -47,8 +45,11 @@ class UnitController extends Controller
         $direction = $request->string('direction')->toString() === 'desc' ? 'desc' : 'asc';
 
         $units = Unit::query()
+            ->with('product')
             ->when($request->filled('search'), fn ($q) => $q->search($request->string('search')->toString()))
-            ->orderBy($sort, $direction)
+            ->tap(fn ($q) => $sort === 'product_name'
+                ? $q->orderBy(Product::query()->select('name')->whereColumn('products.id', 'units.product_id'), $direction)
+                : $q->orderBy($sort, $direction))
             ->paginate($perPage)
             ->withQueryString();
 
@@ -60,61 +61,71 @@ class UnitController extends Controller
         ]);
     }
 
-    /**
-     * Store a newly created quantity entry in storage.
-     */
     public function store(StoreUnitRequest $request): RedirectResponse
     {
         $validated = $request->validated();
-        $validated['created_by'] = $request->user()->id;
+        $userId = $request->user()->id;
 
-        $unit = Unit::create($validated);
+        // A quantity entry is a product variant: creating one creates the product too.
+        $product = Product::create([
+            'name' => $validated['product_name'],
+            'storage' => $validated['storage'] ?? null,
+            'color' => $validated['color'] ?? null,
+            'status' => 'active',
+            'created_by' => $userId,
+        ]);
 
-        AuditService::created($unit, "Quantity '{$unit->quantity} {$unit->unit}' for '{$unit->product_name}' created.");
+        $unit = $product->stockRow()->create([
+            'quantity' => (int) $validated['quantity'],
+            'unit' => $validated['unit'],
+            'note' => $validated['note'] ?? null,
+            'created_by' => $userId,
+        ]);
+
+        AuditService::created($unit, "Quantity '{$unit->quantity} {$unit->unit}' for '{$unit->displayName()}' created.");
 
         return redirect()->route('units.index')
-            ->with('success', "Quantity for '{$unit->product_name}' created successfully.");
+            ->with('success', "Quantity for '{$unit->displayName()}' created successfully.");
     }
 
-    /**
-     * Update the specified quantity entry in storage.
-     */
     public function update(UpdateUnitRequest $request, Unit $unit): RedirectResponse
     {
         $original = $unit->getOriginal();
         $validated = $request->validated();
 
+        $unit->product->update([
+            'name' => $validated['product_name'],
+            'storage' => $validated['storage'] ?? null,
+            'color' => $validated['color'] ?? null,
+        ]);
+
         // Quantity changes go through the stock ledger; metadata is saved below.
         StockService::adjust($unit, (int) $validated['quantity']);
-        unset($validated['quantity']);
+        unset($validated['quantity'], $validated['product_name'], $validated['storage'], $validated['color']);
 
         $unit->update($validated);
         $unit->refresh();
 
-        AuditService::updated($unit, $original, "Quantity '{$unit->quantity} {$unit->unit}' for '{$unit->product_name}' updated.");
+        AuditService::updated($unit, $original, "Quantity '{$unit->quantity} {$unit->unit}' for '{$unit->displayName()}' updated.");
 
         return redirect()->route('units.index')
-            ->with('success', "Quantity for '{$unit->product_name}' updated successfully.");
+            ->with('success', "Quantity for '{$unit->displayName()}' updated successfully.");
     }
 
-    /**
-     * Remove the specified quantity entry from storage.
-     */
     public function destroy(Unit $unit): RedirectResponse
     {
         $this->authorize('delete', $unit);
 
+        // A product variant and its stock row live and die together.
+        $unit->product?->delete();
         $unit->delete();
 
-        AuditService::deleted($unit, "Quantity '{$unit->quantity} {$unit->unit}' for '{$unit->product_name}' deleted.");
+        AuditService::deleted($unit, "Quantity '{$unit->quantity} {$unit->unit}' for '{$unit->displayName()}' deleted.");
 
         return redirect()->route('units.index')
-            ->with('success', "Quantity for '{$unit->product_name}' deleted successfully.");
+            ->with('success', "Quantity for '{$unit->displayName()}' deleted successfully.");
     }
 
-    /**
-     * Show the import quantity entries view.
-     */
     public function importView(): View
     {
         $this->authorize('import', Unit::class);
@@ -122,9 +133,6 @@ class UnitController extends Controller
         return view('units.import');
     }
 
-    /**
-     * Handle quantity entry import from CSV / Excel.
-     */
     public function import(ImportUnitRequest $request): RedirectResponse
     {
         $import = new UnitImport;
@@ -138,23 +146,23 @@ class UnitController extends Controller
             ->with('success', "Successfully imported {$count} quantity entr".($count === 1 ? 'y' : 'ies').'.');
     }
 
-    /**
-     * Download example CSV template for quantity entry import.
-     */
     public function downloadTemplate(): Response
     {
         $this->authorize('viewAny', Unit::class);
 
         $headers = [
             'Product Name',
+            'Storage',
+            'Color',
             'Quantity',
             'Unit',
             'Note',
         ];
 
         $sampleRows = [
-            ['Screen Protector', '20', 'Box', '10 pcs per box'],
-            ['Phone Charger 20W', '50', 'Pcs', 'Fast chargers'],
+            ['Screen Protector', '', '', '20', 'Box', '10 pcs per box'],
+            ['Phone Charger 20W', '', '', '50', 'Pcs', 'Fast chargers'],
+            ['iPhone 13', '128GB', 'Black', '10', 'Pcs', 'Variant example'],
         ];
 
         $handle = fopen('php://temp', 'r+');
@@ -172,9 +180,6 @@ class UnitController extends Controller
         ]);
     }
 
-    /**
-     * Show clean PDF preview matching the reference layout.
-     */
     public function pdfView(Request $request): View
     {
         $this->authorize('viewAny', Unit::class);
@@ -187,9 +192,6 @@ class UnitController extends Controller
         ]);
     }
 
-    /**
-     * Show clean print layout matching the reference layout.
-     */
     public function printView(Request $request): View
     {
         $this->authorize('viewAny', Unit::class);
@@ -202,9 +204,6 @@ class UnitController extends Controller
         ]);
     }
 
-    /**
-     * Export quantity entries to Excel or CSV.
-     */
     public function export(Request $request, string $format = 'xlsx'): BinaryFileResponse
     {
         $this->authorize('viewAny', Unit::class);
@@ -221,8 +220,6 @@ class UnitController extends Controller
     }
 
     /**
-     * Resolve the visible columns and matching quantity entries for PDF / print views.
-     *
      * @return array{0: array<string, string>, 1: Collection<int, Unit>}
      */
     private function exportData(Request $request): array
@@ -253,8 +250,9 @@ class UnitController extends Controller
         }
 
         $units = Unit::query()
+            ->with('product')
             ->when($search !== '', fn ($q) => $q->search($search))
-            ->orderBy('product_name')
+            ->orderBy(Product::query()->select('name')->whereColumn('products.id', 'units.product_id'))
             ->get();
 
         return [$columns, $units];

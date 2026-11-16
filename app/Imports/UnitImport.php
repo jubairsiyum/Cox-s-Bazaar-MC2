@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Imports;
 
+use App\Models\Product;
 use App\Models\Unit;
+use App\Services\StockService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
@@ -21,19 +23,47 @@ class UnitImport implements SkipsEmptyRows, ToModel, WithHeadingRow, WithValidat
      */
     public function model(array $row): ?Unit
     {
-        $productName = $row['product_name'] ?? $row['product'] ?? null;
+        $productName = trim((string) ($row['product_name'] ?? $row['product'] ?? ''));
 
-        if (blank($productName)) {
+        if ($productName === '') {
             return null;
         }
 
+        $storage = trim((string) ($row['storage'] ?? ''));
+        $color = trim((string) ($row['color'] ?? ''));
+        $quantity = (int) ($row['quantity'] ?? 0);
+        $unit = $this->normalizeUnit($row['unit'] ?? null);
+        $note = isset($row['note']) ? trim((string) $row['note']) : null;
+
         $this->importedCount++;
 
+        // An existing variant gets its quantity updated instead of a duplicate row.
+        $product = Product::query()
+            ->matchingVariant($productName, $storage ?: null, $color ?: null)
+            ->first();
+
+        if ($product instanceof Product) {
+            $stockRow = $product->stockRow
+                ?? $product->stockRow()->create(['quantity' => 0, 'unit' => $unit, 'created_by' => Auth::id()]);
+
+            StockService::adjust($stockRow, $quantity, $note);
+
+            return null;
+        }
+
+        $product = Product::create([
+            'name' => $productName,
+            'storage' => $storage ?: null,
+            'color' => $color ?: null,
+            'status' => 'active',
+            'created_by' => Auth::id(),
+        ]);
+
         return new Unit([
-            'product_name' => trim((string) $productName),
-            'quantity' => (int) ($row['quantity'] ?? 0),
-            'unit' => $this->normalizeUnit($row['unit'] ?? null),
-            'note' => isset($row['note']) ? trim((string) $row['note']) : null,
+            'product_id' => $product->id,
+            'quantity' => $quantity,
+            'unit' => $unit,
+            'note' => $note,
             'created_by' => Auth::id(),
         ]);
     }
@@ -43,6 +73,8 @@ class UnitImport implements SkipsEmptyRows, ToModel, WithHeadingRow, WithValidat
         return [
             '*.product_name' => ['required_without:*.product'],
             '*.product' => ['required_without:*.product_name'],
+            '*.storage' => ['nullable', 'string', 'max:100'],
+            '*.color' => ['nullable', 'string', 'max:100'],
             '*.quantity' => ['nullable', 'integer', 'min:0'],
             '*.unit' => ['nullable', 'string', 'max:50'],
         ];

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exports;
 
+use App\Models\Product;
 use App\Models\Unit;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
@@ -44,8 +45,9 @@ class UnitExport implements FromCollection, WithHeadings, WithMapping
     public function collection(): Collection
     {
         return Unit::query()
+            ->with('product')
             ->when($this->search, fn ($q) => $q->search($this->search))
-            ->orderBy('product_name')
+            ->orderBy(Product::query()->select('name')->whereColumn('products.id', 'units.product_id'))
             ->get();
     }
 
@@ -62,7 +64,7 @@ class UnitExport implements FromCollection, WithHeadings, WithMapping
         $mapped = [];
         foreach ($this->activeColumns as $col) {
             $mapped[] = match ($col) {
-                'product_name' => $unit->product_name,
+                'product_name' => $unit->displayName(),
                 'quantity' => (int) $unit->quantity,
                 'unit' => $unit->unit,
                 'note' => $unit->note ?: '—',

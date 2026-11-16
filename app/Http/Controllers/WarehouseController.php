@@ -1,0 +1,121 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers;
+
+use App\Http\Requests\Location\StoreLocationRequest;
+use App\Http\Requests\Location\UpdateLocationRequest;
+use App\Models\Location;
+use App\Services\AuditService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
+
+class WarehouseController extends Controller
+{
+    /**
+     * Columns that the list can be sorted by.
+     *
+     * @var array<string>
+     */
+    protected const SORTABLE = ['name', 'code', 'type', 'status'];
+
+    /**
+     * Display a listing of business locations.
+     */
+    public function index(Request $request): View
+    {
+        $this->authorize('viewAny', Location::class);
+
+        $perPage = (int) $request->input('per_page', 25);
+        if (! in_array($perPage, [10, 25, 50, 100], true)) {
+            $perPage = 25;
+        }
+
+        $sort = in_array($request->string('sort')->toString(), self::SORTABLE, true)
+            ? $request->string('sort')->toString()
+            : 'name';
+        $direction = $request->string('direction')->toString() === 'desc' ? 'desc' : 'asc';
+
+        $locations = Location::query()
+            ->when($request->filled('search'), fn ($q) => $q->search($request->string('search')->toString()))
+            ->orderBy($sort, $direction)
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return view('warehouses.index', [
+            'locations' => $locations,
+            'perPage' => $perPage,
+            'sort' => $sort,
+            'direction' => $direction,
+        ]);
+    }
+
+    /**
+     * Show the form for creating a new location.
+     */
+    public function create(): View
+    {
+        $this->authorize('create', Location::class);
+
+        return view('warehouses.create');
+    }
+
+    /**
+     * Store a newly created location in storage.
+     */
+    public function store(StoreLocationRequest $request): RedirectResponse
+    {
+        $validated = $request->validated();
+        $validated['created_by'] = $request->user()->id;
+
+        $location = Location::create($validated);
+
+        AuditService::created($location, "Location '{$location->name}' created.");
+
+        return redirect()->route('warehouses.index')
+            ->with('success', "Location '{$location->name}' created successfully.");
+    }
+
+    /**
+     * Show the form for editing the specified location.
+     */
+    public function edit(Location $location): View
+    {
+        $this->authorize('update', $location);
+
+        return view('warehouses.edit', ['location' => $location]);
+    }
+
+    /**
+     * Update the specified location in storage.
+     */
+    public function update(UpdateLocationRequest $request, Location $location): RedirectResponse
+    {
+        $original = $location->getOriginal();
+        $validated = $request->validated();
+
+        $location->update($validated);
+
+        AuditService::updated($location, $original, "Location '{$location->name}' updated.");
+
+        return redirect()->route('warehouses.index')
+            ->with('success', "Location '{$location->name}' updated successfully.");
+    }
+
+    /**
+     * Remove the specified location from storage.
+     */
+    public function destroy(Location $location): RedirectResponse
+    {
+        $this->authorize('delete', $location);
+
+        $location->delete();
+
+        AuditService::deleted($location, "Location '{$location->name}' deleted.");
+
+        return redirect()->route('warehouses.index')
+            ->with('success', "Location '{$location->name}' deleted successfully.");
+    }
+}

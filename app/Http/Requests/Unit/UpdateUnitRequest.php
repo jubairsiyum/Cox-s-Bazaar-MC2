@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Unit;
 
+use App\Models\Product;
 use App\Models\Unit;
-use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -13,9 +13,7 @@ class UpdateUnitRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        $unit = $this->route('unit');
-
-        return $unit instanceof Unit && ($this->user()?->can('update', $unit) ?? false);
+        return $this->user()?->can('update', $this->route('unit')) ?? false;
     }
 
     /**
@@ -24,7 +22,9 @@ class UpdateUnitRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'product_name' => ['required', 'string', 'max:255'],
+            'product_name' => ['required', 'string', 'max:255', Product::uniqueVariantRule($this->input('storage'), $this->input('color'), $this->route('unit')?->product_id)],
+            'storage' => ['nullable', 'string', 'max:100'],
+            'color' => ['nullable', 'string', 'max:100'],
             'quantity' => ['required', 'integer', 'min:0'],
             'unit' => ['required', 'string', 'max:50', Rule::in(Unit::UNITS)],
             'note' => ['nullable', 'string', 'max:500'],
@@ -38,6 +38,8 @@ class UpdateUnitRequest extends FormRequest
     {
         return [
             'product_name' => 'Product Name',
+            'storage' => 'Storage',
+            'color' => 'Color',
             'quantity' => 'Quantity',
             'unit' => 'Unit',
             'note' => 'Note',
