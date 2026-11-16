@@ -13,9 +13,11 @@ use App\Http\Controllers\BrandController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\PlaceholderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\StockAdjustmentController;
 use App\Http\Controllers\StockTransferController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\UnitController;
@@ -270,6 +272,34 @@ Route::middleware('auth')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
+    | Stock Levels / Inventory overview
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['verified', 'permission:inventory.view'])->group(function () {
+        Route::get('inventory', [InventoryController::class, 'index'])->name('inventory.index');
+        Route::get('inventory/{unit}/movements', [InventoryController::class, 'movements'])->name('inventory.movements');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Stock Adjustments (Inventory)
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['verified', 'permission:stock-adjustments.manage'])->group(function () {
+        Route::get('stock-adjustments', [StockAdjustmentController::class, 'index'])->name('stock-adjustments.index');
+        Route::get('stock-adjustments/search-units', [StockAdjustmentController::class, 'searchUnits'])->name('stock-adjustments.search-units');
+        Route::get('stock-adjustments/create', [StockAdjustmentController::class, 'create'])->name('stock-adjustments.create');
+        Route::post('stock-adjustments', [StockAdjustmentController::class, 'store'])->name('stock-adjustments.store');
+        Route::get('stock-adjustments/pdf-view', [StockAdjustmentController::class, 'pdfView'])->name('stock-adjustments.pdf-view');
+        Route::get('stock-adjustments/print-view', [StockAdjustmentController::class, 'printView'])->name('stock-adjustments.print-view');
+        Route::get('stock-adjustments/export/{format?}', [StockAdjustmentController::class, 'export'])->name('stock-adjustments.export');
+        Route::get('stock-adjustments/{stockAdjustment}/edit', [StockAdjustmentController::class, 'edit'])->name('stock-adjustments.edit');
+        Route::patch('stock-adjustments/{stockAdjustment}', [StockAdjustmentController::class, 'update'])->name('stock-adjustments.update');
+        Route::delete('stock-adjustments/{stockAdjustment}', [StockAdjustmentController::class, 'destroy'])->name('stock-adjustments.destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
     | TailAdmin Showcase & Demos
     |--------------------------------------------------------------------------
     */
@@ -297,8 +327,6 @@ Route::middleware('auth')->group(function () {
 */
 Route::middleware(['auth', 'verified'])->group(function () {
     $placeholders = [
-        'inventory.index' => 'Stock Levels',
-        'stock-adjustments.index' => 'Stock Adjustments',
         'purchase-orders.index' => 'Purchase Orders',
         'purchase-invoices.index' => 'Purchase Invoices',
         'purchase-returns.index' => 'Purchase Returns',
@@ -318,8 +346,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Permission guards for placeholders whose module permissions are already seeded.
     $placeholderPermissions = [
-        'inventory.index' => 'permission:inventory.view',
-        'stock-adjustments.index' => 'permission:stock-adjustments.manage',
         'purchase-orders.index' => 'permission:purchase-orders.manage',
         'purchase-invoices.index' => 'permission:purchase-invoices.view|purchase-invoices.manage|purchase-invoices.post',
         'purchase-returns.index' => 'permission:purchase-returns.manage',
