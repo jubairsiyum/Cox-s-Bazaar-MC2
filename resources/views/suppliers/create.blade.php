@@ -36,8 +36,7 @@
                     {{-- Left Column --}}
                     <div class="space-y-4">
                         <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                            <label for="name"
-                                class="text-sm font-semibold text-ink sm:text-right">
+                            <label for="name" class="text-sm font-semibold text-ink sm:text-right">
                                 Supplier Name<span class="text-danger font-bold">*</span>
                             </label>
                             <div class="sm:col-span-2">
@@ -51,8 +50,7 @@
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                            <label for="mobile"
-                                class="text-sm font-semibold text-ink sm:text-right">
+                            <label for="mobile" class="text-sm font-semibold text-ink sm:text-right">
                                 Mobile No.<span class="text-danger font-bold">*</span>
                             </label>
                             <div class="sm:col-span-2">
@@ -66,8 +64,7 @@
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                            <label for="email"
-                                class="text-sm font-semibold text-ink sm:text-right">
+                            <label for="email" class="text-sm font-semibold text-ink sm:text-right">
                                 Email
                             </label>
                             <div class="sm:col-span-2">
@@ -81,8 +78,7 @@
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                            <label for="tel_no"
-                                class="text-sm font-semibold text-ink sm:text-right">
+                            <label for="tel_no" class="text-sm font-semibold text-ink sm:text-right">
                                 Tel No.
                             </label>
                             <div class="sm:col-span-2">
@@ -97,8 +93,7 @@
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                            <label for="tax_number"
-                                class="text-sm font-semibold text-ink sm:text-right">
+                            <label for="tax_number" class="text-sm font-semibold text-ink sm:text-right">
                                 TAX Number
                             </label>
                             <div class="sm:col-span-2">
@@ -115,8 +110,7 @@
                     {{-- Right Column --}}
                     <div class="space-y-4">
                         <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                            <label for="opening_balance"
-                                class="text-sm font-semibold text-ink sm:text-right">
+                            <label for="opening_balance" class="text-sm font-semibold text-ink sm:text-right">
                                 Opening Balance
                             </label>
                             <div class="sm:col-span-2">
@@ -130,8 +124,7 @@
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                            <label for="country"
-                                class="text-sm font-semibold text-ink sm:text-right">
+                            <label for="country" class="text-sm font-semibold text-ink sm:text-right">
                                 Country
                             </label>
                             <div class="sm:col-span-2">
@@ -152,8 +145,7 @@
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                            <label for="state"
-                                class="text-sm font-semibold text-ink sm:text-right">
+                            <label for="state" class="text-sm font-semibold text-ink sm:text-right">
                                 State
                             </label>
                             <div class="sm:col-span-2">
@@ -168,8 +160,7 @@
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                            <label for="city"
-                                class="text-sm font-semibold text-ink sm:text-right">
+                            <label for="city" class="text-sm font-semibold text-ink sm:text-right">
                                 City
                             </label>
                             <div class="sm:col-span-2">
@@ -183,8 +174,7 @@
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                            <label for="postcode"
-                                class="text-sm font-semibold text-ink sm:text-right">
+                            <label for="postcode" class="text-sm font-semibold text-ink sm:text-right">
                                 Postcode
                             </label>
                             <div class="sm:col-span-2">
@@ -198,8 +188,7 @@
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-3 items-start gap-2">
-                            <label for="address"
-                                class="text-sm font-semibold text-ink sm:text-right pt-2">
+                            <label for="address" class="text-sm font-semibold text-ink sm:text-right pt-2">
                                 Address
                             </label>
                             <div class="sm:col-span-2">
@@ -214,8 +203,7 @@
                 </div>
 
                 {{-- Action Buttons --}}
-                <div
-                    class="mt-8 pt-4 border-t border-line flex justify-center items-center gap-4">
+                <div class="mt-8 pt-4 border-t border-line flex justify-center items-center gap-4">
                     <button type="submit"
                         class="px-8 py-2.5 rounded-md text-on-brand font-medium text-sm transition-all shadow-sm flex items-center gap-2"
                         style="background-color: var(--success);">
