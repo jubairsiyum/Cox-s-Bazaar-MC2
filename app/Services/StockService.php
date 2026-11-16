@@ -57,6 +57,22 @@ class StockService
     }
 
     /**
+     * Stock dispatched from the source location of a transfer: stock goes out.
+     */
+    public static function transferOut(Unit $unit, int $quantity, ?Model $reference = null, ?string $note = null): StockMovement
+    {
+        return self::apply($unit, -self::positiveAmount($quantity), StockMovementType::TransferOut, $reference, $note);
+    }
+
+    /**
+     * Stock arrived at the destination location of a transfer: stock comes back in.
+     */
+    public static function transferIn(Unit $unit, int $quantity, ?Model $reference = null, ?string $note = null): StockMovement
+    {
+        return self::apply($unit, self::positiveAmount($quantity), StockMovementType::TransferIn, $reference, $note);
+    }
+
+    /**
      * Set the stock to an absolute quantity (stock count / correction).
      * Returns null when the quantity is already correct.
      */
@@ -131,6 +147,8 @@ class StockService
             StockMovementType::PurchaseReturn => 'Returned to supplier',
             StockMovementType::Adjustment => 'Adjusted',
             StockMovementType::Opening => 'Opened',
+            StockMovementType::TransferOut => 'Transferred out',
+            StockMovementType::TransferIn => 'Transferred in',
         };
 
         AuditService::log(

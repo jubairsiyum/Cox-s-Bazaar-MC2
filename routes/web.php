@@ -16,8 +16,10 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PlaceholderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\StockTransferController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\UnitController;
+use App\Http\Controllers\WarehouseController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
@@ -236,6 +238,38 @@ Route::middleware('auth')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
+    | Location / Warehouse Management (Inventory)
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['verified', 'permission:warehouses.manage'])->group(function () {
+        Route::get('warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
+        Route::get('warehouses/create', [WarehouseController::class, 'create'])->name('warehouses.create');
+        Route::post('warehouses', [WarehouseController::class, 'store'])->name('warehouses.store');
+        Route::get('warehouses/{location}/edit', [WarehouseController::class, 'edit'])->name('warehouses.edit');
+        Route::patch('warehouses/{location}', [WarehouseController::class, 'update'])->name('warehouses.update');
+        Route::delete('warehouses/{location}', [WarehouseController::class, 'destroy'])->name('warehouses.destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Stock Transfers (Inventory)
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['verified', 'permission:stock-transfers.manage'])->group(function () {
+        Route::get('stock-transfers', [StockTransferController::class, 'index'])->name('stock-transfers.index');
+        Route::get('stock-transfers/search-units', [StockTransferController::class, 'searchUnits'])->name('stock-transfers.search-units');
+        Route::get('stock-transfers/create', [StockTransferController::class, 'create'])->name('stock-transfers.create');
+        Route::post('stock-transfers', [StockTransferController::class, 'store'])->name('stock-transfers.store');
+        Route::get('stock-transfers/pdf-view', [StockTransferController::class, 'pdfView'])->name('stock-transfers.pdf-view');
+        Route::get('stock-transfers/print-view', [StockTransferController::class, 'printView'])->name('stock-transfers.print-view');
+        Route::get('stock-transfers/export/{format?}', [StockTransferController::class, 'export'])->name('stock-transfers.export');
+        Route::get('stock-transfers/{stockTransfer}/edit', [StockTransferController::class, 'edit'])->name('stock-transfers.edit');
+        Route::patch('stock-transfers/{stockTransfer}', [StockTransferController::class, 'update'])->name('stock-transfers.update');
+        Route::delete('stock-transfers/{stockTransfer}', [StockTransferController::class, 'destroy'])->name('stock-transfers.destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
     | TailAdmin Showcase & Demos
     |--------------------------------------------------------------------------
     */
@@ -263,10 +297,8 @@ Route::middleware('auth')->group(function () {
 */
 Route::middleware(['auth', 'verified'])->group(function () {
     $placeholders = [
-        'warehouses.index' => 'Warehouses',
         'inventory.index' => 'Stock Levels',
         'stock-adjustments.index' => 'Stock Adjustments',
-        'stock-transfers.index' => 'Stock Transfers',
         'purchase-orders.index' => 'Purchase Orders',
         'purchase-invoices.index' => 'Purchase Invoices',
         'purchase-returns.index' => 'Purchase Returns',
@@ -286,10 +318,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Permission guards for placeholders whose module permissions are already seeded.
     $placeholderPermissions = [
-        'warehouses.index' => 'permission:warehouses.manage',
         'inventory.index' => 'permission:inventory.view',
         'stock-adjustments.index' => 'permission:stock-adjustments.manage',
-        'stock-transfers.index' => 'permission:stock-transfers.manage',
         'purchase-orders.index' => 'permission:purchase-orders.manage',
         'purchase-invoices.index' => 'permission:purchase-invoices.view|purchase-invoices.manage|purchase-invoices.post',
         'purchase-returns.index' => 'permission:purchase-returns.manage',

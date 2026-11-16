@@ -12,6 +12,8 @@ enum StockMovementType: string
     case Restock = 'restock';
     case PurchaseReturn = 'purchase_return';
     case Adjustment = 'adjustment';
+    case TransferOut = 'transfer_out';
+    case TransferIn = 'transfer_in';
 
     public function label(): string
     {
@@ -22,6 +24,8 @@ enum StockMovementType: string
             self::Restock => 'Restock',
             self::PurchaseReturn => 'Purchase Return',
             self::Adjustment => 'Adjustment',
+            self::TransferOut => 'Transfer Out',
+            self::TransferIn => 'Transfer In',
         };
     }
 }
