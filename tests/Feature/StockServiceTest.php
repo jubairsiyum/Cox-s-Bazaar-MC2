@@ -149,6 +149,6 @@ it('records stock changes in the audit log', function () {
         'event' => 'updated',
         'auditable_type' => Unit::class,
         'auditable_id' => $unit->id,
-        'description' => "Sold 3 Pcs of '{$unit->product_name}' (7 remaining).",
+        'description' => "Sold 3 Pcs of '{$unit->displayName()}' (7 remaining).",
     ]);
 });

@@ -10,6 +10,8 @@
         'mode' => old('_form_mode', 'add'),
         'unitId' => (int) old('unit_id', 0) ?: null,
         'productName' => (string) old('product_name', ''),
+        'storage' => (string) old('storage', ''),
+        'color' => (string) old('color', ''),
         'quantity' => (string) old('quantity', ''),
         'unit' => (string) old('unit', 'Pcs'),
         'note' => (string) old('note', ''),
@@ -192,7 +194,7 @@
                         @forelse($units as $unit)
                             <tr class="odd:bg-gray-50 dark:odd:bg-gray-800/40 hover:bg-gray-100 dark:hover:bg-gray-800/70 transition">
                                 <td x-show="columns.product_name" data-col="product_name" class="p-3 text-sm font-medium text-gray-900 dark:text-gray-100">
-                                    {{ $unit->product_name }}
+                                    {{ $unit->displayName() }}
                                 </td>
                                 <td x-show="columns.quantity" data-col="quantity" class="p-3 text-sm font-semibold text-gray-900 dark:text-gray-100">
                                     {{ number_format((float) $unit->quantity) }}
@@ -214,7 +216,7 @@
                                     <div class="flex items-center gap-2">
                                         @can('update', $unit)
                                             <button type="button"
-                                                    @click="openEdit(@js(['id' => $unit->id, 'productName' => $unit->product_name, 'quantity' => (string) $unit->quantity, 'unit' => $unit->unit, 'note' => $unit->note]))"
+                                                    @click="openEdit(@js(['id' => $unit->id, 'productName' => $unit->product?->name ?? '', 'storage' => $unit->product?->storage ?? '', 'color' => $unit->product?->color ?? '', 'quantity' => (string) $unit->quantity, 'unit' => $unit->unit, 'note' => $unit->note]))"
                                                     class="inline-flex items-center gap-1 rounded-full border border-indigo-500/60 px-3 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 transition hover:bg-indigo-50 dark:hover:bg-indigo-500/10 cursor-pointer">
                                                 <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -292,6 +294,35 @@
                         @error('product_name')
                             <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
                         @enderror
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            One row per variant — 128GB / 256GB or different colors are separate entries.
+                        </p>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="unit-storage" class="mb-1.5 block text-sm font-bold text-gray-800 dark:text-gray-200">
+                                Storage:
+                            </label>
+                            <input type="text" id="unit-storage" name="storage" x-model="form.storage"
+                                   placeholder="e.g. 128GB (optional variant)"
+                                   class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-hidden focus:border-indigo-500 @error('storage') border-red-500 @enderror">
+                            @error('storage')
+                                <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div>
+                            <label for="unit-color" class="mb-1.5 block text-sm font-bold text-gray-800 dark:text-gray-200">
+                                Color:
+                            </label>
+                            <input type="text" id="unit-color" name="color" x-model="form.color"
+                                   placeholder="e.g. Black (optional variant)"
+                                   class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-hidden focus:border-indigo-500 @error('color') border-red-500 @enderror">
+                            @error('color')
+                                <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                            @enderror
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -362,6 +393,8 @@ function unitsPage(state) {
         unitId: state.unitId,
         form: {
             productName: state.productName,
+            storage: state.storage,
+            color: state.color,
             quantity: state.quantity,
             unit: state.unit,
             note: state.note
@@ -390,7 +423,7 @@ function unitsPage(state) {
         openAdd() {
             this.editMode = false;
             this.unitId = null;
-            this.form = { productName: '', quantity: '', unit: 'Pcs', note: '' };
+            this.form = { productName: '', storage: '', color: '', quantity: '', unit: 'Pcs', note: '' };
             this.modalOpen = true;
         },
 
@@ -399,6 +432,8 @@ function unitsPage(state) {
             this.unitId = unit.id;
             this.form = {
                 productName: unit.productName,
+                storage: unit.storage ?? '',
+                color: unit.color ?? '',
                 quantity: unit.quantity,
                 unit: unit.unit ?? 'Pcs',
                 note: unit.note ?? ''

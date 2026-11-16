@@ -318,7 +318,7 @@ function transferForm(state) {
                     product_name: product.product_name,
                     unit: product.unit,
                     quantity: 1,
-                    unit_price: 0
+                    unit_price: parseFloat(product.purchase_price) || 0
                 });
             }
 

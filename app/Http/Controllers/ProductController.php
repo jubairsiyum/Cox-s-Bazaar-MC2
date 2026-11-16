@@ -10,6 +10,7 @@ use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
 use App\Services\AuditService;
+use App\Services\StockService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -66,9 +67,19 @@ class ProductController extends Controller
     public function store(StoreProductRequest $request): RedirectResponse
     {
         $validated = $request->validated();
+        $quantity = isset($validated['quantity']) ? (int) $validated['quantity'] : 0;
+        $unitOfMeasure = $validated['unit'] ?? 'Pcs';
+        unset($validated['quantity'], $validated['unit']);
         $validated['created_by'] = $request->user()->id;
 
         $product = Product::create($validated);
+
+        // Every product gets a single stock row so it shows up in Units and Transfers.
+        $product->stockRow()->create([
+            'quantity' => $quantity,
+            'unit' => $unitOfMeasure,
+            'created_by' => $request->user()->id,
+        ]);
 
         AuditService::created($product, "Product '{$product->name}' ({$product->product_id}) created.");
 
@@ -97,8 +108,13 @@ class ProductController extends Controller
     {
         $original = $product->getOriginal();
         $validated = $request->validated();
+        $quantity = isset($validated['quantity']) ? (int) $validated['quantity'] : null;
+        $unitOfMeasure = $validated['unit'] ?? null;
+        unset($validated['quantity'], $validated['unit']);
 
         $product->update($validated);
+
+        $this->syncStockRow($product, $quantity, $unitOfMeasure, $request->user()->id);
 
         AuditService::updated($product, $original, "Product '{$product->name}' ({$product->product_id}) updated.");
 
@@ -113,6 +129,8 @@ class ProductController extends Controller
     {
         $this->authorize('delete', $product);
 
+        // A product variant and its stock row live and die together.
+        $product->stockRow?->delete();
         $product->delete();
 
         AuditService::deleted($product, "Product '{$product->name}' ({$product->product_id}) deleted.");
@@ -142,5 +160,32 @@ class ProductController extends Controller
         );
 
         return back()->with('success', "Product '{$product->name}' status updated to ".ucfirst($newStatus).'.');
+    }
+
+    /**
+     * Keep the product's single stock row in sync with the form's quantity and unit.
+     * Quantity changes go through the stock ledger (StockService::adjust).
+     */
+    private function syncStockRow(Product $product, ?int $quantity, ?string $unitOfMeasure, int $userId): void
+    {
+        $stockRow = $product->stockRow;
+
+        if (! $stockRow) {
+            $product->stockRow()->create([
+                'quantity' => $quantity ?? 0,
+                'unit' => $unitOfMeasure ?? 'Pcs',
+                'created_by' => $userId,
+            ]);
+
+            return;
+        }
+
+        if ($quantity !== null && $quantity !== $stockRow->quantity) {
+            StockService::adjust($stockRow, $quantity);
+        }
+
+        if ($unitOfMeasure !== null && $unitOfMeasure !== $stockRow->unit) {
+            $stockRow->update(['unit' => $unitOfMeasure]);
+        }
     }
 }

@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\StockMovementType;
+use App\Models\Product;
 use App\Models\Setting;
 use App\Models\Unit;
 use App\Models\User;
@@ -26,8 +27,7 @@ it('forbids users without permission from viewing units', function () {
 it('lists quantity entries for a Super Admin', function () {
     actingAsSuperAdmin();
 
-    Unit::factory()->create([
-        'product_name' => 'Phone Charger 20W',
+    stockRowFor('Phone Charger 20W', [
         'quantity' => 50,
         'unit' => 'Pcs',
     ]);
@@ -65,7 +65,7 @@ it('creates a quantity entry from the add quantity form', function () {
 
     $response->assertRedirect(route('units.index'));
 
-    $unit = Unit::where('product_name', 'Tempered Glass Screen Protector')->first();
+    $unit = stockRowOf('Tempered Glass Screen Protector');
 
     expect($unit)->not->toBeNull()
         ->and((float) $unit->quantity)->toBe(25.0)
@@ -77,6 +77,60 @@ it('creates a quantity entry from the add quantity form', function () {
         'auditable_type' => Unit::class,
         'auditable_id' => $unit->id,
     ]);
+});
+
+it('creates the product too when a quantity entry is added', function () {
+    actingAsSuperAdmin();
+
+    $this->post(route('units.store'), [
+        'product_name' => 'iPhone 13',
+        'storage' => '128GB',
+        'color' => 'Black',
+        'quantity' => 10,
+        'unit' => 'Pcs',
+    ])->assertRedirect(route('units.index'));
+
+    $this->assertDatabaseHas('products', [
+        'name' => 'iPhone 13',
+        'storage' => '128GB',
+        'color' => 'Black',
+    ]);
+
+    // The product created here is visible for stock transfers as well.
+    $this->getJson(route('stock-transfers.search-units', ['q' => 'iPhone 13']))
+        ->assertOk()
+        ->assertJsonPath('items.0.product_name', 'iPhone 13 (128GB / Black)');
+});
+
+it('rejects a duplicate product variant from the quantity form', function () {
+    actingAsSuperAdmin();
+
+    $this->post(route('units.store'), [
+        'product_name' => 'iPhone 13',
+        'storage' => '128GB',
+        'color' => 'Black',
+        'quantity' => 10,
+        'unit' => 'Pcs',
+    ]);
+
+    $this->post(route('units.store'), [
+        'product_name' => 'iPhone 13',
+        'storage' => '128GB',
+        'color' => 'Black',
+        'quantity' => 5,
+        'unit' => 'Pcs',
+    ])->assertSessionHasErrors('product_name');
+
+    // A different variant of the same product name is allowed.
+    $this->post(route('units.store'), [
+        'product_name' => 'iPhone 13',
+        'storage' => '256GB',
+        'color' => 'Black',
+        'quantity' => 5,
+        'unit' => 'Pcs',
+    ])->assertRedirect(route('units.index'));
+
+    expect(Unit::whereHas('product', fn ($q) => $q->where('name', 'iPhone 13'))->count())->toBe(2);
 });
 
 it('fails validation when product name is missing', function () {
@@ -118,8 +172,7 @@ it('fails validation when quantity is not a whole number', function () {
 it('displays quantities as whole numbers without decimals', function () {
     actingAsSuperAdmin();
 
-    Unit::factory()->create([
-        'product_name' => 'Phone Charger 20W',
+    stockRowFor('Phone Charger 20W', [
         'quantity' => 50,
         'unit' => 'Pcs',
     ]);
@@ -144,8 +197,7 @@ it('fails validation when unit is not a standard unit', function () {
 it('updates an existing quantity entry', function () {
     actingAsSuperAdmin();
 
-    $unit = Unit::factory()->create([
-        'product_name' => 'Memory Card 64GB',
+    $unit = stockRowFor('Memory Card 64GB', [
         'quantity' => 100,
         'unit' => 'Pcs',
     ]);
@@ -170,16 +222,18 @@ it('updates an existing quantity entry', function () {
     ]);
 });
 
-it('soft deletes a quantity entry', function () {
+it('soft deletes a quantity entry together with its product', function () {
     actingAsSuperAdmin();
 
-    $unit = Unit::factory()->create(['product_name' => 'To Delete']);
+    $unit = stockRowFor('To Delete');
 
     $this->delete(route('units.destroy', $unit))
         ->assertRedirect(route('units.index'));
 
     expect(Unit::find($unit->id))->toBeNull()
-        ->and(Unit::withTrashed()->find($unit->id))->not->toBeNull();
+        ->and(Unit::withTrashed()->find($unit->id))->not->toBeNull()
+        ->and(Product::find($unit->product_id))->toBeNull()
+        ->and(Product::withTrashed()->find($unit->product_id))->not->toBeNull();
 
     $this->assertDatabaseHas('audit_logs', [
         'event' => 'deleted',
@@ -190,7 +244,7 @@ it('soft deletes a quantity entry', function () {
 
 it('forbids unauthorized users from deleting a quantity entry', function () {
     $user = User::factory()->create(['email_verified_at' => now()]);
-    $unit = Unit::factory()->create(['product_name' => 'Protected']);
+    $unit = stockRowFor('Protected');
 
     $this->actingAs($user)
         ->delete(route('units.destroy', $unit))
@@ -242,19 +296,40 @@ it('imports quantity entries from a CSV file', function () {
     $response->assertRedirect(route('units.index'));
     $response->assertSessionHas('success', 'Successfully imported 2 quantity entries.');
 
-    $cable = Unit::where('product_name', 'USB Type-C Cable')->first();
+    $cable = stockRowOf('USB Type-C Cable');
 
     expect($cable)->not->toBeNull()
         ->and($cable->unit)->toBe('Box')
         ->and((float) $cable->quantity)->toBe(20.0)
-        ->and(Unit::where('product_name', 'Phone Charger 20W')->first()->unit)->toBe('Pcs');
+        ->and(stockRowOf('Phone Charger 20W')->unit)->toBe('Pcs');
+
+    // Imported rows are real products, visible in the products list.
+    $this->assertDatabaseHas('products', ['name' => 'USB Type-C Cable']);
+});
+
+it('updates the quantity of an existing variant on import instead of duplicating it', function () {
+    actingAsSuperAdmin();
+
+    $unit = stockRowFor('USB Type-C Cable', ['quantity' => 20, 'unit' => 'Box']);
+
+    $csvContent = implode("\n", [
+        'Product Name,Quantity,Unit,Note',
+        'USB Type-C Cable,40,Box,Restocked',
+    ]);
+
+    $file = UploadedFile::fake()->createWithContent('units.csv', $csvContent);
+
+    $this->post(route('units.import.store'), ['file' => $file])
+        ->assertRedirect(route('units.index'));
+
+    expect((int) $unit->fresh()->quantity)->toBe(40)
+        ->and(Unit::whereHas('product', fn ($q) => $q->where('name', 'USB Type-C Cable'))->count())->toBe(1);
 });
 
 it('renders the pdf preview page with quantity entries and headers', function () {
     actingAsSuperAdmin();
 
-    Unit::factory()->create([
-        'product_name' => 'Bluetooth Earbuds',
+    stockRowFor('Bluetooth Earbuds', [
         'quantity' => 6,
         'unit' => 'Box',
     ]);
@@ -270,7 +345,7 @@ it('renders the pdf preview page with quantity entries and headers', function ()
 it('renders the print preview page with quantity entries and grid table', function () {
     actingAsSuperAdmin();
 
-    Unit::factory()->create(['product_name' => 'Bluetooth Earbuds']);
+    stockRowFor('Bluetooth Earbuds');
 
     $this->get(route('units.print-view', ['columns' => 'product_name,quantity,unit']))
         ->assertOk()
@@ -282,7 +357,7 @@ it('renders the print preview page with quantity entries and grid table', functi
 it('exports quantity entries with selected columns to excel or csv', function () {
     actingAsSuperAdmin();
 
-    Unit::factory()->create(['product_name' => 'Export Product']);
+    stockRowFor('Export Product');
 
     $response = $this->get(route('units.export', [
         'format' => 'csv',
@@ -296,8 +371,8 @@ it('exports quantity entries with selected columns to excel or csv', function ()
 it('searches quantity entries by product name and unit', function () {
     actingAsSuperAdmin();
 
-    Unit::factory()->create(['product_name' => 'Power Bank 10000mAh', 'unit' => 'Box']);
-    Unit::factory()->create(['product_name' => 'Smart Watch Band', 'unit' => 'Dozen']);
+    stockRowFor('Power Bank 10000mAh', ['unit' => 'Box']);
+    stockRowFor('Smart Watch Band', ['unit' => 'Dozen']);
 
     $this->get(route('units.index', ['search' => 'Power Bank']))
         ->assertOk()
@@ -308,8 +383,8 @@ it('searches quantity entries by product name and unit', function () {
 it('sorts quantity entries by product name', function () {
     actingAsSuperAdmin();
 
-    Unit::factory()->create(['product_name' => 'Vivo Phone Case']);
-    Unit::factory()->create(['product_name' => 'Apple Phone Case']);
+    stockRowFor('Vivo Phone Case');
+    stockRowFor('Apple Phone Case');
 
     $response = $this->get(route('units.index', ['sort' => 'product_name', 'direction' => 'asc']));
     $response->assertOk();
@@ -328,7 +403,7 @@ it('records an opening movement when a quantity entry is created', function () {
         'unit' => 'Pcs',
     ]);
 
-    $unit = Unit::where('product_name', 'Phone Charger 20W')->first();
+    $unit = stockRowOf('Phone Charger 20W');
 
     expect($unit->stockMovements()->count())->toBe(1)
         ->and($unit->stockMovements()->first()->type)->toBe(StockMovementType::Opening)
@@ -338,7 +413,7 @@ it('records an opening movement when a quantity entry is created', function () {
 it('records an adjustment movement when the quantity is edited through the form', function () {
     actingAsSuperAdmin();
 
-    $unit = Unit::factory()->create(['product_name' => 'Memory Card 64GB', 'quantity' => 100, 'unit' => 'Pcs']);
+    $unit = stockRowFor('Memory Card 64GB', ['quantity' => 100, 'unit' => 'Pcs']);
 
     $this->patch(route('units.update', $unit), [
         'product_name' => 'Memory Card 64GB',
@@ -369,8 +444,8 @@ it('records an adjustment movement when stock is changed outside the stock servi
 });
 
 it('flags low stock products using the low stock threshold setting', function () {
-    $low = Unit::factory()->create(['product_name' => 'Low Stock Item', 'quantity' => 3]);
-    $healthy = Unit::factory()->create(['product_name' => 'Healthy Stock Item', 'quantity' => 50]);
+    $low = stockRowFor('Low Stock Item', ['quantity' => 3]);
+    $healthy = stockRowFor('Healthy Stock Item', ['quantity' => 50]);
 
     expect($low->isLowStock())->toBeTrue()
         ->and($healthy->isLowStock())->toBeFalse();
@@ -383,7 +458,7 @@ it('flags low stock products using the low stock threshold setting', function ()
 it('shows a low stock badge on the units list for products below the threshold', function () {
     actingAsSuperAdmin();
 
-    Unit::factory()->create(['product_name' => 'Almost Gone Item', 'quantity' => 2]);
+    stockRowFor('Almost Gone Item', ['quantity' => 2]);
 
     $this->get(route('units.index'))
         ->assertOk()

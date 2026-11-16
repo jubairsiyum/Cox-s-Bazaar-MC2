@@ -78,7 +78,7 @@
                     @foreach($columns as $key => $label)
                         <td class="{{ $key === 'quantity' ? 'num-cell' : '' }}">
                             @if($key === 'product_name')
-                                {{ $unit->product_name }}
+                                {{ $unit->displayName() }}
                             @elseif($key === 'quantity')
                                 {{ number_format((float) $unit->quantity) }}
                             @elseif($key === 'unit')

@@ -220,7 +220,7 @@ it('prevents deleting an in-transit transfer', function () {
 it('searches products for the transfer form', function () {
     actingAsSuperAdmin();
 
-    Unit::factory()->create(['product_name' => 'iPhone 16 Silicone Case']);
+    stockRowFor('iPhone 16 Silicone Case');
 
     $this->getJson(route('stock-transfers.search-units', ['q' => 'iPhone']))
         ->assertOk()

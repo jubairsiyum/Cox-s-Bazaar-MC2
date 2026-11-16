@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Models\Product;
 use App\Models\Unit;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -17,7 +18,7 @@ class UnitFactory extends Factory
     public function definition(): array
     {
         return [
-            'product_name' => fake()->unique()->words(3, true),
+            'product_id' => Product::factory(),
             'quantity' => fake()->numberBetween(1, 500),
             'unit' => fake()->randomElement(Unit::UNITS),
             'note' => fake()->sentence(),

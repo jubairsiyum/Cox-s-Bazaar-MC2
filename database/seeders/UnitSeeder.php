@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Models\Product;
 use App\Models\Unit;
 use Illuminate\Database\Seeder;
 
@@ -12,7 +13,7 @@ class UnitSeeder extends Seeder
     /**
      * Sample quantity data for the mobile shop.
      *
-     * @var array<int, array{product_name: string, quantity: float|string, unit: string, note: string|null}>
+     * @var array<int, array{product_name: string, quantity: int, unit: string, note: string|null}>
      */
     protected const ENTRIES = [
         ['product_name' => 'iPhone 15', 'quantity' => 25, 'unit' => 'Pcs', 'note' => '128GB / 256GB'],
@@ -30,13 +31,18 @@ class UnitSeeder extends Seeder
     ];
 
     /**
-     * Seed the units table.
+     * Seed the quantity entries together with their product variants.
      */
     public function run(): void
     {
         foreach (self::ENTRIES as $entry) {
+            $product = Product::firstOrCreate(
+                ['name' => $entry['product_name'], 'storage' => null, 'color' => null],
+                ['status' => 'active']
+            );
+
             Unit::firstOrCreate(
-                ['product_name' => $entry['product_name']],
+                ['product_id' => $product->id],
                 ['quantity' => $entry['quantity'], 'unit' => $entry['unit'], 'note' => $entry['note']]
             );
         }

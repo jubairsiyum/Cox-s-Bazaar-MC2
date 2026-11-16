@@ -108,7 +108,7 @@ class StockService
             $new = $current + $delta;
 
             if ($new < 0 && ! self::allowsNegativeStock()) {
-                throw InsufficientStockException::for($locked->product_name, $current, abs($delta));
+                throw InsufficientStockException::for($locked->displayName(), $current, abs($delta));
             }
 
             $locked->updateQuietly(['quantity' => $new]);
@@ -156,7 +156,7 @@ class StockService
             $unit,
             ['quantity' => $old],
             ['quantity' => $new],
-            "{$action} ".abs($delta)." {$unit->unit} of '{$unit->product_name}' ({$new} remaining)."
+            "{$action} ".abs($delta)." {$unit->unit} of '{$unit->displayName()}' ({$new} remaining)."
         );
 
         return $movement;

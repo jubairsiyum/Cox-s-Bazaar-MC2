@@ -112,6 +112,24 @@
                     </tr>
                     <tr>
                         <td class="p-3 text-center font-medium">2</td>
+                        <td class="p-3 font-semibold text-gray-900 dark:text-gray-100">Storage</td>
+                        <td class="p-3 text-center">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold text-gray-700 bg-gray-200 dark:bg-gray-700 dark:text-gray-300">
+                                Optional
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="p-3 text-center font-medium">3</td>
+                        <td class="p-3 font-semibold text-gray-900 dark:text-gray-100">Color</td>
+                        <td class="p-3 text-center">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold text-gray-700 bg-gray-200 dark:bg-gray-700 dark:text-gray-300">
+                                Optional
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="p-3 text-center font-medium">4</td>
                         <td class="p-3 font-semibold text-gray-900 dark:text-gray-100">Quantity</td>
                         <td class="p-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-white"
@@ -121,7 +139,7 @@
                         </td>
                     </tr>
                     <tr>
-                        <td class="p-3 text-center font-medium">3</td>
+                        <td class="p-3 text-center font-medium">5</td>
                         <td class="p-3 font-semibold text-gray-900 dark:text-gray-100">Unit</td>
                         <td class="p-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold text-white"
@@ -131,7 +149,7 @@
                         </td>
                     </tr>
                     <tr>
-                        <td class="p-3 text-center font-medium">4</td>
+                        <td class="p-3 text-center font-medium">6</td>
                         <td class="p-3 font-semibold text-gray-900 dark:text-gray-100">Note</td>
                         <td class="p-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold text-gray-700 bg-gray-200 dark:bg-gray-700 dark:text-gray-300">

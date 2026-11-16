@@ -10,6 +10,7 @@ use App\Exports\StockTransferExport;
 use App\Http\Requests\StockTransfer\StoreStockTransferRequest;
 use App\Http\Requests\StockTransfer\UpdateStockTransferRequest;
 use App\Models\Location;
+use App\Models\Product;
 use App\Models\StockTransfer;
 use App\Models\Unit;
 use App\Services\AuditService;
@@ -214,15 +215,17 @@ class StockTransferController extends Controller
         $this->authorize('viewAny', StockTransfer::class);
 
         $units = Unit::query()
+            ->with('product')
             ->search($request->string('q')->toString())
-            ->orderBy('product_name')
+            ->orderBy(Product::query()->select('name')->whereColumn('products.id', 'units.product_id'))
             ->limit(10)
             ->get()
             ->map(fn (Unit $unit) => [
                 'id' => $unit->id,
-                'product_name' => $unit->product_name,
+                'product_name' => $unit->displayName(),
                 'unit' => $unit->unit,
                 'quantity' => $unit->quantity,
+                'purchase_price' => (float) ($unit->product?->purchase_price ?? 0),
             ]);
 
         return response()->json(['success' => true, 'items' => $units]);
@@ -349,7 +352,7 @@ class StockTransferController extends Controller
 
             return [
                 'unit_id' => (int) ($row['unit_id'] ?? 0),
-                'product_name' => $unit?->product_name ?? 'Unknown product',
+                'product_name' => $unit?->displayName() ?? 'Unknown product',
                 'unit' => $unit?->unit ?? '',
                 'quantity' => (int) ($row['quantity'] ?? 1),
                 'unit_price' => (float) ($row['unit_price'] ?? 0),
@@ -366,7 +369,7 @@ class StockTransferController extends Controller
     {
         return $stockTransfer->items->map(fn ($item) => [
             'unit_id' => (int) $item->unit_id,
-            'product_name' => $item->unit?->product_name ?? 'Unknown product',
+            'product_name' => $item->unit?->displayName() ?? 'Unknown product',
             'unit' => $item->unit?->unit ?? '',
             'quantity' => (int) $item->quantity,
             'unit_price' => (float) $item->unit_price,

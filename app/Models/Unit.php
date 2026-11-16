@@ -17,15 +17,10 @@ class Unit extends Model
 {
     use HasFactory, SoftDeletes;
 
-    /**
-     * Quantity units used by the mobile shop (bulk units included).
-     *
-     * @var array<string>
-     */
     public const UNITS = ['Pcs', 'Box', 'Dozen', 'Pack', 'Carton', 'Pair', 'Set'];
 
     protected $fillable = [
-        'product_name',
+        'product_id',
         'quantity',
         'unit',
         'note',
@@ -41,7 +36,7 @@ class Unit extends Model
 
     protected static function booted(): void
     {
-        // Record the opening stock movement for every new quantity entry.
+        // Record the opening stock movement for every new stock row.
         static::created(function (Unit $unit) {
             $quantity = (int) $unit->quantity;
 
@@ -78,7 +73,12 @@ class Unit extends Model
         });
     }
 
-    // ── Relationships ──────────────────────────────────────
+    // ── Relationships ────────────────────────────────────────────────
+
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
+    }
 
     public function creator(): BelongsTo
     {
@@ -90,6 +90,16 @@ class Unit extends Model
         return $this->hasMany(StockMovement::class);
     }
 
+    // ── Helpers ──────────────────────────────────────────────────────
+
+    /**
+     * Human-readable product name (including the variant) for this stock row.
+     */
+    public function displayName(): string
+    {
+        return $this->product?->displayName() ?? 'Unknown product';
+    }
+
     /**
      * Whether the product is at or below the configured low stock threshold.
      */
@@ -98,7 +108,7 @@ class Unit extends Model
         return $this->quantity <= (int) Setting::get('low_stock_threshold', 5);
     }
 
-    // ── Scopes ─────────────────────────────────────────────
+    // ── Scopes ───────────────────────────────────────────────────────
 
     public function scopeSearch(Builder $query, ?string $term): Builder
     {
@@ -107,9 +117,9 @@ class Unit extends Model
         }
 
         return $query->where(function (Builder $q) use ($term) {
-            $q->where('product_name', 'like', "%{$term}%")
-                ->orWhere('unit', 'like', "%{$term}%")
-                ->orWhere('note', 'like', "%{$term}%");
+            $q->where('unit', 'like', "%{$term}%")
+                ->orWhere('note', 'like', "%{$term}%")
+                ->orWhereHas('product', fn (Builder $p) => $p->search($term));
         });
     }
 }
