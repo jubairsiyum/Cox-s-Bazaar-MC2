@@ -32,8 +32,8 @@
 
         @include('stock-adjustments._form', [
             'stockAdjustment' => $stockAdjustment,
-            'locations' => $locations,
             'types' => $types,
+            'typeHints' => $typeHints,
             'items' => $items,
         ])
     </form>

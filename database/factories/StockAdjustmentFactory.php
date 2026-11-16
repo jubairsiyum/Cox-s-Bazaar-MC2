@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Enums\StockAdjustmentType;
-use App\Models\Location;
 use App\Models\StockAdjustment;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -20,18 +19,23 @@ class StockAdjustmentFactory extends Factory
     {
         return [
             'adjustment_date' => now(),
-            'location_id' => Location::factory(),
-            'type' => StockAdjustmentType::Normal->value,
+            'type' => StockAdjustmentType::Set->value,
             'total_amount' => 0,
-            'total_amount_recovered' => 0,
             'reason' => fake()->sentence(),
         ];
     }
 
-    public function abnormal(): static
+    public function add(): static
     {
         return $this->state(fn (array $attributes): array => [
-            'type' => StockAdjustmentType::Abnormal->value,
+            'type' => StockAdjustmentType::Add->value,
+        ]);
+    }
+
+    public function remove(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'type' => StockAdjustmentType::Remove->value,
         ]);
     }
 }

@@ -147,7 +147,6 @@
                                     <span class="text-xs opacity-70">{{ $sort === 'reference_no' ? ($direction === 'asc' ? '↑' : '↓') : '⇅' }}</span>
                                 </a>
                             </th>
-                            <th x-show="columns.location" class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">Location</th>
                             <th x-show="columns.type" class="p-3">
                                 <a href="{{ $sortLink('type') }}" class="flex items-center gap-1 text-sm font-bold text-gray-800 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400">
                                     Adjustment type
@@ -158,12 +157,6 @@
                                 <a href="{{ $sortLink('total_amount') }}" class="flex items-center gap-1 text-sm font-bold text-gray-800 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400">
                                     Total Amount
                                     <span class="text-xs opacity-70">{{ $sort === 'total_amount' ? ($direction === 'asc' ? '↑' : '↓') : '⇅' }}</span>
-                                </a>
-                            </th>
-                            <th x-show="columns.total_amount_recovered" class="p-3">
-                                <a href="{{ $sortLink('total_amount_recovered') }}" class="flex items-center gap-1 text-sm font-bold text-gray-800 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400">
-                                    Total amount recovered
-                                    <span class="text-xs opacity-70">{{ $sort === 'total_amount_recovered' ? ($direction === 'asc' ? '↑' : '↓') : '⇅' }}</span>
                                 </a>
                             </th>
                             <th x-show="columns.reason" class="p-3">
@@ -213,17 +206,11 @@
                                 <td x-show="columns.reference_no" data-col="reference_no" class="p-3 text-sm font-medium text-gray-900 dark:text-gray-100">
                                     {{ $adjustment->reference_no }}
                                 </td>
-                                <td x-show="columns.location" data-col="location" class="p-3 text-sm text-gray-600 dark:text-gray-300">
-                                    {{ $adjustment->location?->name ?? '—' }}
-                                </td>
                                 <td x-show="columns.type" data-col="type" class="p-3">
                                     <x-status-badge :status="$adjustment->type->value" :label="$adjustment->type->label()" />
                                 </td>
                                 <td x-show="columns.total_amount" data-col="total_amount" class="p-3 text-sm font-medium text-gray-900 dark:text-gray-100">
                                     {{ \App\Helpers\Money::format($adjustment->total_amount) }}
-                                </td>
-                                <td x-show="columns.total_amount_recovered" data-col="total_amount_recovered" class="p-3 text-sm text-gray-600 dark:text-gray-300">
-                                    {{ \App\Helpers\Money::format($adjustment->total_amount_recovered) }}
                                 </td>
                                 <td x-show="columns.reason" data-col="reason" class="p-3 text-sm text-gray-600 dark:text-gray-300">
                                     {{ $adjustment->reason ?: '—' }}
@@ -258,20 +245,16 @@ function adjustmentsPage() {
         columns: {
             adjustment_date: true,
             reference_no: true,
-            location: true,
             type: true,
             total_amount: true,
-            total_amount_recovered: true,
             reason: true,
             creator: true
         },
         columnList: [
             { key: 'adjustment_date', label: 'Date' },
             { key: 'reference_no', label: 'Reference No' },
-            { key: 'location', label: 'Location' },
             { key: 'type', label: 'Adjustment type' },
             { key: 'total_amount', label: 'Total Amount' },
-            { key: 'total_amount_recovered', label: 'Total amount recovered' },
             { key: 'reason', label: 'Reason' },
             { key: 'creator', label: 'Added By' }
         ],

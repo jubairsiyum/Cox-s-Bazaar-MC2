@@ -18,10 +18,8 @@ class StockAdjustmentExport implements FromCollection, WithHeadings, WithMapping
     protected const COLUMN_DEFINITIONS = [
         'adjustment_date' => 'Date',
         'reference_no' => 'Reference No',
-        'location' => 'Location',
         'type' => 'Adjustment type',
         'total_amount' => 'Total Amount',
-        'total_amount_recovered' => 'Total amount recovered',
         'reason' => 'Reason',
         'creator' => 'Added By',
     ];
@@ -48,7 +46,7 @@ class StockAdjustmentExport implements FromCollection, WithHeadings, WithMapping
     public function collection(): Collection
     {
         return StockAdjustment::query()
-            ->with(['location', 'creator'])
+            ->with('creator')
             ->when($this->search, fn ($q) => $q->search($this->search))
             ->orderBy('adjustment_date', 'desc')
             ->get();
@@ -68,10 +66,8 @@ class StockAdjustmentExport implements FromCollection, WithHeadings, WithMapping
         foreach ($this->activeColumns as $col) {
             $mapped[] = match ($col) {
                 'adjustment_date' => $adjustment->adjustment_date->format('d/m/Y H:i'),
-                'location' => $adjustment->location?->name ?? '—',
                 'type' => $adjustment->type->label(),
                 'total_amount' => number_format((float) $adjustment->total_amount, 2),
-                'total_amount_recovered' => number_format((float) $adjustment->total_amount_recovered, 2),
                 'reason' => $adjustment->reason ?: '—',
                 'creator' => $adjustment->creator?->name ?? '—',
                 default => $adjustment->{$col} ?? '',

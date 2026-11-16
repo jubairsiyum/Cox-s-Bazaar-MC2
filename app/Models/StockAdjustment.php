@@ -20,10 +20,8 @@ class StockAdjustment extends Model
     protected $fillable = [
         'reference_no',
         'adjustment_date',
-        'location_id',
         'type',
         'total_amount',
-        'total_amount_recovered',
         'reason',
         'created_by',
     ];
@@ -34,7 +32,6 @@ class StockAdjustment extends Model
             'adjustment_date' => 'datetime',
             'type' => StockAdjustmentType::class,
             'total_amount' => 'decimal:2',
-            'total_amount_recovered' => 'decimal:2',
         ];
     }
 
@@ -52,11 +49,6 @@ class StockAdjustment extends Model
     public function items(): HasMany
     {
         return $this->hasMany(StockAdjustmentItem::class);
-    }
-
-    public function location(): BelongsTo
-    {
-        return $this->belongsTo(Location::class);
     }
 
     public function creator(): BelongsTo
@@ -87,7 +79,7 @@ class StockAdjustment extends Model
         return $query->where(function (Builder $q) use ($term) {
             $q->where('reference_no', 'like', "%{$term}%")
                 ->orWhere('reason', 'like', "%{$term}%")
-                ->orWhereHas('location', fn (Builder $l) => $l->where('name', 'like', "%{$term}%"));
+                ->orWhereHas('items', fn (Builder $i) => $i->whereHas('unit', fn (Builder $u) => $u->search($term)));
         });
     }
 }

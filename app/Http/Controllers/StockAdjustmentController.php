@@ -8,7 +8,6 @@ use App\Enums\StockAdjustmentType;
 use App\Exports\StockAdjustmentExport;
 use App\Http\Requests\StockAdjustment\StoreStockAdjustmentRequest;
 use App\Http\Requests\StockAdjustment\UpdateStockAdjustmentRequest;
-use App\Models\Location;
 use App\Models\Product;
 use App\Models\StockAdjustment;
 use App\Models\Unit;
@@ -30,7 +29,7 @@ class StockAdjustmentController extends Controller
      *
      * @var array<string>
      */
-    protected const SORTABLE = ['reference_no', 'adjustment_date', 'type', 'total_amount', 'total_amount_recovered', 'reason'];
+    protected const SORTABLE = ['reference_no', 'adjustment_date', 'type', 'total_amount', 'reason'];
 
     public function index(Request $request): View
     {
@@ -47,7 +46,7 @@ class StockAdjustmentController extends Controller
         $direction = $request->string('direction')->toString() === 'asc' ? 'asc' : 'desc';
 
         $adjustments = StockAdjustment::query()
-            ->with(['location', 'creator'])
+            ->with('creator')
             ->when($request->filled('search'), fn ($q) => $q->search($request->string('search')->toString()))
             ->orderBy($sort, $direction)
             ->paginate($perPage)
@@ -61,14 +60,14 @@ class StockAdjustmentController extends Controller
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
         $this->authorize('create', StockAdjustment::class);
 
         return view('stock-adjustments.create', [
-            'locations' => Location::query()->active()->orderBy('name')->get(),
             'types' => StockAdjustmentType::options(),
-            'items' => $this->hydrateItems(collect(old('items', []))->all()),
+            'typeHints' => collect(StockAdjustmentType::cases())->mapWithKeys(fn (StockAdjustmentType $type) => [$type->value => $type->hint()])->all(),
+            'items' => $this->formItems($request),
         ]);
     }
 
@@ -81,11 +80,9 @@ class StockAdjustmentController extends Controller
             $adjustment = StockAdjustment::create([
                 'reference_no' => $validated['reference_no'] ?? null,
                 'adjustment_date' => $validated['adjustment_date'],
-                'location_id' => $validated['location_id'],
                 'type' => $validated['type'],
                 'total_amount' => $this->itemsTotal($items),
-                'total_amount_recovered' => round((float) ($validated['total_amount_recovered'] ?? 0), 2),
-                'reason' => $validated['reason'] ?? null,
+                'reason' => $validated['reason'],
                 'created_by' => $request->user()->id,
             ]);
 
@@ -107,18 +104,14 @@ class StockAdjustmentController extends Controller
 
         if (! $stockAdjustment->isReversible()) {
             return redirect()->route('stock-adjustments.index')
-                ->with('error', "Stock adjustment '{$stockAdjustment->reference_no}' cannot be edited because stock has moved since it was posted. Create a correction adjustment instead.");
+                ->with('error', "Stock adjustment '{$stockAdjustment->reference_no}' can no longer be edited because stock has moved since it was posted. Create a new adjustment to correct it.");
         }
-
-        $items = $this->oldItems() !== []
-            ? $this->hydrateItems($this->oldItems())
-            : $this->presentItems($stockAdjustment);
 
         return view('stock-adjustments.edit', [
             'stockAdjustment' => $stockAdjustment,
-            'locations' => Location::query()->orderBy('name')->get(),
             'types' => StockAdjustmentType::options(),
-            'items' => $items,
+            'typeHints' => collect(StockAdjustmentType::cases())->mapWithKeys(fn (StockAdjustmentType $type) => [$type->value => $type->hint()])->all(),
+            'items' => $this->oldItems() !== [] ? $this->hydrateItems($this->oldItems()) : $this->presentItems($stockAdjustment),
         ]);
     }
 
@@ -126,7 +119,7 @@ class StockAdjustmentController extends Controller
     {
         if (! $stockAdjustment->isReversible()) {
             return redirect()->route('stock-adjustments.index')
-                ->with('error', "Stock adjustment '{$stockAdjustment->reference_no}' cannot be updated because stock has moved since it was posted. Create a correction adjustment instead.");
+                ->with('error', "Stock adjustment '{$stockAdjustment->reference_no}' can no longer be updated because stock has moved since it was posted. Create a new adjustment to correct it.");
         }
 
         $original = $stockAdjustment->getOriginal();
@@ -140,11 +133,9 @@ class StockAdjustmentController extends Controller
             $stockAdjustment->update([
                 'reference_no' => $validated['reference_no'] ?: $stockAdjustment->reference_no,
                 'adjustment_date' => $validated['adjustment_date'],
-                'location_id' => $validated['location_id'],
                 'type' => $validated['type'],
                 'total_amount' => $this->itemsTotal($items),
-                'total_amount_recovered' => round((float) ($validated['total_amount_recovered'] ?? 0), 2),
-                'reason' => $validated['reason'] ?? null,
+                'reason' => $validated['reason'],
             ]);
 
             StockAdjustmentService::saveItems($stockAdjustment, $items);
@@ -162,7 +153,7 @@ class StockAdjustmentController extends Controller
         $this->authorize('delete', $stockAdjustment);
 
         if (! $stockAdjustment->isReversible()) {
-            return back()->with('error', "Stock adjustment '{$stockAdjustment->reference_no}' cannot be deleted because stock has moved since it was posted. Create a correction adjustment instead.");
+            return back()->with('error', "Stock adjustment '{$stockAdjustment->reference_no}' can no longer be deleted because stock has moved since it was posted. Create a new adjustment to correct it.");
         }
 
         DB::transaction(function () use ($stockAdjustment) {
@@ -241,10 +232,8 @@ class StockAdjustmentController extends Controller
         $availableColumns = [
             'adjustment_date' => 'Date',
             'reference_no' => 'Reference No',
-            'location' => 'Location',
             'type' => 'Adjustment type',
             'total_amount' => 'Total Amount',
-            'total_amount_recovered' => 'Total amount recovered',
             'reason' => 'Reason',
             'creator' => 'Added By',
         ];
@@ -265,12 +254,41 @@ class StockAdjustmentController extends Controller
         }
 
         $adjustments = StockAdjustment::query()
-            ->with(['location', 'creator'])
+            ->with('creator')
             ->when($search !== '', fn ($q) => $q->search($search))
             ->orderBy('adjustment_date', 'desc')
             ->get();
 
         return [$columns, $adjustments];
+    }
+
+    /**
+     * Line items for the form: old input, a pre-filled stock line (when opened
+     * from Stock Levels) or an empty list.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function formItems(Request $request): array
+    {
+        if ($this->oldItems() !== []) {
+            return $this->hydrateItems($this->oldItems());
+        }
+
+        if ($request->filled('unit_id')) {
+            $unit = Unit::query()->with('product')->find($request->integer('unit_id'));
+
+            if ($unit) {
+                return [[
+                    'unit_id' => (int) $unit->id,
+                    'product_name' => $unit->displayName(),
+                    'unit' => $unit->unit,
+                    'quantity' => (int) $unit->quantity,
+                    'unit_price' => (float) ($unit->product?->purchase_price ?? 0),
+                ]];
+            }
+        }
+
+        return [];
     }
 
     /**

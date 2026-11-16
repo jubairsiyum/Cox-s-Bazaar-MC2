@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Models\Location;
+use App\Models\Product;
 use App\Models\StockAdjustment;
 use App\Models\Unit;
 use App\Models\User;
@@ -20,14 +20,12 @@ beforeEach(function () {
  *
  * @return array<string, mixed>
  */
-function adjustmentPayload(Unit $unit, string $type = 'normal', int $quantity = 5, float $unitPrice = 200.0, float $recovered = 0.0, ?string $reason = null): array
+function adjustmentPayload(Unit $unit, string $type = 'set', int $quantity = 5, float $unitPrice = 200.0, ?string $reason = 'Stock count correction'): array
 {
     return [
-        'location_id' => Location::factory()->create()->id,
         'reference_no' => null,
         'adjustment_date' => now()->format('Y-m-d\TH:i'),
         'type' => $type,
-        'total_amount_recovered' => $recovered,
         'reason' => $reason,
         'items' => [
             ['unit_id' => $unit->id, 'quantity' => $quantity, 'unit_price' => $unitPrice],
@@ -43,8 +41,7 @@ it('lists stock adjustments', function () {
     $this->get(route('stock-adjustments.index'))
         ->assertOk()
         ->assertSee($adjustment->reference_no)
-        ->assertSee('Adjustment type', false)
-        ->assertSee('Total amount recovered', false);
+        ->assertSee('Adjustment type', false);
 });
 
 it('shows the add stock adjustment form', function () {
@@ -52,37 +49,47 @@ it('shows the add stock adjustment form', function () {
 
     $this->get(route('stock-adjustments.create'))
         ->assertOk()
-        ->assertSee('Business Location', false)
         ->assertSee('Adjustment type', false)
-        ->assertSee('Search products for stock adjustment', false)
-        ->assertSee('Total amount recovered', false)
+        ->assertSee('Search products to adjust', false)
+        ->assertSee('Add Stock')
+        ->assertSee('Remove Stock')
+        ->assertSee('Set Stock (Count)')
         ->assertSee('Reason');
 });
 
-it('creates a normal adjustment that corrects stock to the counted quantity', function () {
+it('pre-fills the form when opened from stock levels', function () {
+    actingAsSuperAdmin();
+
+    $product = Product::factory()->create(['name' => 'iPhone 13', 'storage' => null, 'color' => null]);
+    $unit = Unit::factory()->for($product)->create(['quantity' => 12]);
+
+    $this->get(route('stock-adjustments.create', ['unit_id' => $unit->id]))
+        ->assertOk()
+        ->assertSee('iPhone 13');
+});
+
+it('adds stock to a product', function () {
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 30]);
 
-    $response = $this->post(route('stock-adjustments.store'), adjustmentPayload($unit, 'normal', 22, 200.0));
-
-    $response->assertRedirect(route('stock-adjustments.index'));
+    $this->post(route('stock-adjustments.store'), adjustmentPayload($unit, 'add', 5, 200.0, 'Found in back store'))
+        ->assertRedirect(route('stock-adjustments.index'));
 
     $adjustment = StockAdjustment::first();
 
-    expect($adjustment)->not->toBeNull()
-        ->and($adjustment->reference_no)->toStartWith('ADJ')
-        ->and((float) $adjustment->total_amount)->toBe(4400.0)
-        ->and((int) $unit->fresh()->quantity)->toBe(22);
+    expect($adjustment->reference_no)->toStartWith('ADJ')
+        ->and((float) $adjustment->total_amount)->toBe(1000.0)
+        ->and((int) $unit->fresh()->quantity)->toBe(35);
 
     $item = $adjustment->items->first();
 
     expect($item->quantity_before)->toBe(30)
-        ->and($item->quantity_after)->toBe(22);
+        ->and($item->quantity_after)->toBe(35);
 
     $movement = $unit->fresh()->stockMovements()->latest('id')->first();
 
-    expect($movement->quantity)->toBe(-8);
+    expect($movement->quantity)->toBe(5);
 
     $this->assertDatabaseHas('audit_logs', [
         'event' => 'created',
@@ -91,20 +98,33 @@ it('creates a normal adjustment that corrects stock to the counted quantity', fu
     ]);
 });
 
-it('creates an abnormal adjustment that removes stock and records recovery', function () {
+it('removes stock from a product', function () {
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 30]);
 
-    $this->post(route('stock-adjustments.store'), adjustmentPayload($unit, 'abnormal', 5, 200.0, 500.0, 'Damaged in flood'))
+    $this->post(route('stock-adjustments.store'), adjustmentPayload($unit, 'remove', 5, 200.0, 'Damaged in flood'))
+        ->assertRedirect(route('stock-adjustments.index'));
+
+    expect((int) $unit->fresh()->quantity)->toBe(25)
+        ->and(StockAdjustment::first()->items->first()->quantity_after)->toBe(25)
+        ->and($unit->fresh()->stockMovements()->latest('id')->first()->quantity)->toBe(-5);
+});
+
+it('sets stock to the counted quantity', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 30]);
+
+    $this->post(route('stock-adjustments.store'), adjustmentPayload($unit, 'set', 22, 200.0, 'Monthly stock take'))
         ->assertRedirect(route('stock-adjustments.index'));
 
     $adjustment = StockAdjustment::first();
 
-    expect((int) $unit->fresh()->quantity)->toBe(25)
-        ->and((float) $adjustment->total_amount)->toBe(1000.0)
-        ->and((float) $adjustment->total_amount_recovered)->toBe(500.0)
-        ->and($adjustment->reason)->toBe('Damaged in flood');
+    expect((int) $unit->fresh()->quantity)->toBe(22)
+        ->and($adjustment->items->first()->quantity_before)->toBe(30)
+        ->and($adjustment->items->first()->quantity_after)->toBe(22)
+        ->and($unit->fresh()->stockMovements()->latest('id')->first()->quantity)->toBe(-8);
 });
 
 it('validates the adjustment form', function () {
@@ -113,17 +133,16 @@ it('validates the adjustment form', function () {
     $unit = Unit::factory()->create();
 
     $this->post(route('stock-adjustments.store'), [
-        'adjustment_date' => now()->format('Y-m-d\TH:i'),
         'items' => [],
-    ])->assertSessionHasErrors(['location_id', 'type', 'items']);
+    ])->assertSessionHasErrors(['adjustment_date', 'type', 'reason', 'items']);
 });
 
-it('requires a reason for abnormal adjustments', function () {
+it('requires a reason', function () {
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 30]);
 
-    $this->post(route('stock-adjustments.store'), adjustmentPayload($unit, 'abnormal', 5))
+    $this->post(route('stock-adjustments.store'), adjustmentPayload($unit, 'add', 5, 200.0, null))
         ->assertSessionHasErrors('reason');
 });
 
@@ -132,19 +151,19 @@ it('rejects removing more than the available stock', function () {
 
     $unit = Unit::factory()->create(['quantity' => 3]);
 
-    $this->post(route('stock-adjustments.store'), adjustmentPayload($unit, 'abnormal', 5, 200.0, 0.0, 'Damaged'))
+    $this->post(route('stock-adjustments.store'), adjustmentPayload($unit, 'remove', 5))
         ->assertSessionHasErrors('items.0.quantity');
 
     expect((int) $unit->fresh()->quantity)->toBe(3);
 });
 
-it('rejects recovery above the total amount', function () {
+it('rejects a negative counted quantity', function () {
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 30]);
 
-    $this->post(route('stock-adjustments.store'), adjustmentPayload($unit, 'abnormal', 2, 100.0, 500.0, 'Damaged'))
-        ->assertSessionHasErrors('total_amount_recovered');
+    $this->post(route('stock-adjustments.store'), adjustmentPayload($unit, 'set', -5))
+        ->assertSessionHasErrors('items.0.quantity');
 });
 
 it('rejects duplicate products in the items', function () {
@@ -152,7 +171,7 @@ it('rejects duplicate products in the items', function () {
 
     $unit = Unit::factory()->create(['quantity' => 30]);
 
-    $payload = adjustmentPayload($unit, 'normal', 5);
+    $payload = adjustmentPayload($unit, 'add', 5);
     $payload['items'][] = ['unit_id' => $unit->id, 'quantity' => 2, 'unit_price' => 100.0];
 
     $this->post(route('stock-adjustments.store'), $payload)
@@ -164,7 +183,7 @@ it('deletes an adjustment and restores stock', function () {
 
     $unit = Unit::factory()->create(['quantity' => 30]);
 
-    $this->post(route('stock-adjustments.store'), adjustmentPayload($unit, 'normal', 22))->assertRedirect();
+    $this->post(route('stock-adjustments.store'), adjustmentPayload($unit, 'set', 22))->assertRedirect();
     $adjustment = StockAdjustment::first();
 
     $this->delete(route('stock-adjustments.destroy', $adjustment))
@@ -180,7 +199,7 @@ it('prevents deleting an adjustment once stock has moved since posting', functio
 
     $unit = Unit::factory()->create(['quantity' => 30]);
 
-    $this->post(route('stock-adjustments.store'), adjustmentPayload($unit, 'normal', 22))->assertRedirect();
+    $this->post(route('stock-adjustments.store'), adjustmentPayload($unit, 'set', 22))->assertRedirect();
     $adjustment = StockAdjustment::first();
 
     // Another stock event happens after the adjustment was posted.
@@ -198,10 +217,10 @@ it('updates an adjustment and re-posts stock', function () {
 
     $unit = Unit::factory()->create(['quantity' => 30]);
 
-    $this->post(route('stock-adjustments.store'), adjustmentPayload($unit, 'normal', 22))->assertRedirect();
+    $this->post(route('stock-adjustments.store'), adjustmentPayload($unit, 'set', 22))->assertRedirect();
     $adjustment = StockAdjustment::first();
 
-    $this->patch(route('stock-adjustments.update', $adjustment), adjustmentPayload($unit, 'normal', 25))
+    $this->patch(route('stock-adjustments.update', $adjustment), adjustmentPayload($unit, 'set', 25))
         ->assertRedirect(route('stock-adjustments.index'));
 
     expect((int) $unit->fresh()->quantity)->toBe(25)
@@ -213,12 +232,12 @@ it('blocks editing an adjustment once stock has moved since posting', function (
 
     $unit = Unit::factory()->create(['quantity' => 30]);
 
-    $this->post(route('stock-adjustments.store'), adjustmentPayload($unit, 'normal', 22))->assertRedirect();
+    $this->post(route('stock-adjustments.store'), adjustmentPayload($unit, 'set', 22))->assertRedirect();
     $adjustment = StockAdjustment::first();
 
     StockService::adjust($unit, 25);
 
-    $this->patch(route('stock-adjustments.update', $adjustment), adjustmentPayload($unit, 'normal', 26))
+    $this->patch(route('stock-adjustments.update', $adjustment), adjustmentPayload($unit, 'set', 26))
         ->assertSessionHas('error');
 
     expect((int) $unit->fresh()->quantity)->toBe(25);

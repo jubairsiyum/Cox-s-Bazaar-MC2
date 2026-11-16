@@ -31,8 +31,8 @@
 
         @include('stock-adjustments._form', [
             'stockAdjustment' => $stockAdjustment ?? new \App\Models\StockAdjustment,
-            'locations' => $locations,
             'types' => $types,
+            'typeHints' => $typeHints,
             'items' => $items,
         ])
     </form>

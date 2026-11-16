@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Models\Brand;
+use App\Models\Category;
 use App\Models\Product;
 use App\Models\Unit;
 use App\Models\User;
@@ -82,6 +84,57 @@ it('returns the stock ledger for a product', function () {
         ->assertJsonCount(2, 'items')
         ->assertJsonPath('items.0.quantity', -3)
         ->assertJsonPath('items.0.quantity_after', 7);
+});
+
+it('filters by search term', function () {
+    actingAsSuperAdmin();
+
+    stockLineWithCost('iPhone 13', 10, 1000.0);
+    stockLineWithCost('Galaxy Charger', 20, 200.0);
+
+    $this->get(route('inventory.index', ['search' => 'iPhone']))
+        ->assertOk()
+        ->assertSee('iPhone 13')
+        ->assertDontSee('Galaxy Charger');
+});
+
+it('filters by brand and category', function () {
+    actingAsSuperAdmin();
+
+    $brand = Brand::factory()->create(['name' => 'Samsung']);
+    $category = Category::factory()->create(['name' => 'Chargers']);
+
+    $product = Product::factory()->create([
+        'name' => 'Samsung Charger',
+        'storage' => null,
+        'color' => null,
+        'brand_id' => $brand->id,
+        'category_id' => $category->id,
+        'purchase_price' => 200.0,
+    ]);
+    Unit::factory()->for($product)->create(['quantity' => 20, 'unit' => 'Pcs']);
+
+    stockLineWithCost('iPhone 13', 10, 1000.0);
+
+    $this->get(route('inventory.index', ['brand_id' => $brand->id]))
+        ->assertOk()
+        ->assertSee('Samsung Charger')
+        ->assertDontSee('iPhone 13');
+
+    $this->get(route('inventory.index', ['category_id' => $category->id]))
+        ->assertOk()
+        ->assertSee('Samsung Charger')
+        ->assertDontSee('iPhone 13');
+});
+
+it('offers an adjust stock shortcut for every product', function () {
+    actingAsSuperAdmin();
+
+    stockLineWithCost('iPhone 13', 10, 1000.0);
+
+    $this->get(route('inventory.index'))
+        ->assertOk()
+        ->assertSee('Adjust Stock');
 });
 
 it('denies access without the inventory.view permission', function () {

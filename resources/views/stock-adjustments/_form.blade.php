@@ -4,11 +4,7 @@
     $typeValue = old('type', $isEdit ? $stockAdjustment->type->value : '');
 @endphp
 
-<div x-data="adjustmentForm({
-        items: @js($items),
-        type: @js($typeValue),
-        recovered: {{ (float) old('total_amount_recovered', $isEdit ? $stockAdjustment->total_amount_recovered : 0) }}
-    })">
+<div x-data="adjustmentForm({ items: @js($items), type: @js($typeValue) })">
 
     @if ($errors->any())
         <div class="card mb-4 border-t-4 border-t-red-500 shadow-sm">
@@ -26,18 +22,14 @@
     {{-- Adjustment Details --}}
     <div class="card border-t-4 border-t-cyan-500 shadow-sm mb-4">
         <div class="card-body p-5">
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                    <label for="location_id" class="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-1.5">
-                        Business Location<span class="text-red-500 font-bold">*</span>:
+                    <label for="adjustment_date" class="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-1.5">
+                        Date<span class="text-red-500 font-bold">*</span>:
                     </label>
-                    <select id="location_id" name="location_id" required class="form-control @error('location_id') is-invalid @enderror">
-                        <option value="">Please Select</option>
-                        @foreach($locations as $location)
-                            <option value="{{ $location->id }}" @selected(old('location_id', $isEdit ? $stockAdjustment->location_id : null) == $location->id)>{{ $location->name }}</option>
-                        @endforeach
-                    </select>
-                    @error('location_id')
+                    <input type="datetime-local" id="adjustment_date" name="adjustment_date" value="{{ $dateValue }}" required
+                           class="form-control @error('adjustment_date') is-invalid @enderror">
+                    @error('adjustment_date')
                         <div class="form-error">{{ $message }}</div>
                     @enderror
                 </div>
@@ -55,21 +47,8 @@
                 </div>
 
                 <div>
-                    <label for="adjustment_date" class="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-1.5">
-                        Date<span class="text-red-500 font-bold">*</span>:
-                    </label>
-                    <input type="datetime-local" id="adjustment_date" name="adjustment_date" value="{{ $dateValue }}" required
-                           class="form-control @error('adjustment_date') is-invalid @enderror">
-                    @error('adjustment_date')
-                        <div class="form-error">{{ $message }}</div>
-                    @enderror
-                </div>
-
-                <div>
                     <label for="type" class="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-1.5">
-                        Adjustment type<span class="text-red-500 font-bold">*</span>
-                        <span title="Normal: the quantity entered is the counted stock level (used for stock takes and corrections). Abnormal: the quantity entered is removed from stock (damage, loss, theft)."
-                              class="inline-flex items-center justify-center size-4 rounded-full bg-blue-500 text-white text-[10px] font-bold cursor-help align-middle">i</span>:
+                        Adjustment type<span class="text-red-500 font-bold">*</span>:
                     </label>
                     <select id="type" name="type" required x-model="type" class="form-control @error('type') is-invalid @enderror">
                         <option value="">Please Select</option>
@@ -77,6 +56,7 @@
                             <option value="{{ $value }}" @selected($typeValue === $value)>{{ $label }}</option>
                         @endforeach
                     </select>
+                    <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400" x-text="typeHints[type] || 'Choose how stock should change: add, remove, or set the counted quantity.'"></p>
                     @error('type')
                         <div class="form-error">{{ $message }}</div>
                     @enderror
@@ -97,7 +77,7 @@
                         </svg>
                     </span>
                     <input type="text" x-model="searchQuery" @input.debounce.300ms="searchProducts()"
-                           placeholder="Search products for stock adjustment"
+                           placeholder="Search products to adjust"
                            class="form-control rounded-l-none">
                 </div>
                 <div x-show="searchResults.length" x-cloak
@@ -107,7 +87,7 @@
                                 class="w-full flex items-center justify-between gap-3 px-4 py-2 text-sm text-left text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
                             <span class="font-medium" x-text="product.product_name"></span>
                             <span class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"
-                                  x-text="`${product.unit} · Stock: ${product.quantity}`"></span>
+                                  x-text="`${product.unit} · In stock: ${product.quantity}`"></span>
                         </button>
                     </template>
                 </div>
@@ -119,7 +99,11 @@
                     <thead>
                         <tr class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
                             <th class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">Product</th>
-                            <th class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">Quantity</th>
+                            <th class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">
+                                Quantity
+                                <span class="block text-[11px] font-normal text-gray-500 dark:text-gray-400"
+                                      x-text="type === 'set' ? 'counted stock' : (type === 'remove' ? 'to remove' : 'to add')"></span>
+                            </th>
                             <th class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">Unit Price</th>
                             <th class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">Subtotal</th>
                             <th class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100 text-center">
@@ -136,12 +120,13 @@
                                     <div class="text-sm font-medium text-gray-900 dark:text-gray-100" x-text="item.product_name"></div>
                                     <div class="text-xs text-gray-500 dark:text-gray-400">
                                         <span x-text="item.unit"></span>
-                                        <span> · In stock: <span x-text="item.quantity_before ?? item.stock"></span></span>
+                                        <span> · In stock: <span x-text="item.stock"></span></span>
                                     </div>
                                     <input type="hidden" :name="`items[${index}][unit_id]`" :value="item.unit_id">
                                 </td>
                                 <td class="p-3">
-                                    <input type="number" min="1" step="1" :name="`items[${index}][quantity]`" x-model="item.quantity"
+                                    <input type="number" :min="type === 'set' ? 0 : 1" step="1"
+                                           :name="`items[${index}][quantity]`" x-model="item.quantity"
                                            class="form-control w-24">
                                 </td>
                                 <td class="p-3">
@@ -163,10 +148,7 @@
                     </tbody>
                     <tfoot>
                         <tr class="bg-white dark:bg-gray-900">
-                            <td colspan="3" class="p-3 text-xs text-gray-500 dark:text-gray-400">
-                                <span x-show="type === 'abnormal'">Abnormal: enter the quantity to remove from stock.</span>
-                                <span x-show="type !== 'abnormal'">Normal: enter the counted quantity (stock is corrected to it).</span>
-                            </td>
+                            <td colspan="3"></td>
                             <td class="p-3 text-sm font-semibold text-gray-900 dark:text-gray-100 text-right">
                                 Total Amount: <span x-text="itemsTotal.toFixed(2)"></span>
                             </td>
@@ -191,35 +173,19 @@
         </div>
     </div>
 
-    {{-- Recovery & Reason --}}
+    {{-- Reason --}}
     <div class="card border-t-4 border-t-cyan-500 shadow-sm">
         <div class="card-body p-5">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label for="total_amount_recovered" class="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-1.5">
-                        Total amount recovered
-                        <span title="Money salvaged or recovered from an abnormal adjustment (scrap sale, insurance). Cannot exceed the total amount."
-                              class="inline-flex items-center justify-center size-4 rounded-full bg-blue-500 text-white text-[10px] font-bold cursor-help align-middle">i</span>:
-                    </label>
-                    <input type="number" id="total_amount_recovered" name="total_amount_recovered" step="0.01" min="0"
-                           x-model="recovered"
-                           class="form-control @error('total_amount_recovered') is-invalid @enderror">
-                    @error('total_amount_recovered')
-                        <div class="form-error">{{ $message }}</div>
-                    @enderror
-                </div>
-
-                <div>
-                    <label for="reason" class="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-1.5">
-                        Reason<span x-show="type === 'abnormal'" class="text-red-500 font-bold">*</span>:
-                    </label>
-                    <textarea id="reason" name="reason" rows="3"
-                              class="form-control @error('reason') is-invalid @enderror"
-                              placeholder="e.g. damaged in flood, stock take correction, found in back store">{{ old('reason', $isEdit ? $stockAdjustment->reason : '') }}</textarea>
-                    @error('reason')
-                        <div class="form-error">{{ $message }}</div>
-                    @enderror
-                </div>
+            <div>
+                <label for="reason" class="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-1.5">
+                    Reason<span class="text-red-500 font-bold">*</span>:
+                </label>
+                <textarea id="reason" name="reason" rows="3"
+                          class="form-control @error('reason') is-invalid @enderror"
+                          placeholder="e.g. damaged in flood, stock take correction, found in back store">{{ old('reason', $isEdit ? $stockAdjustment->reason : '') }}</textarea>
+                @error('reason')
+                    <div class="form-error">{{ $message }}</div>
+                @enderror
             </div>
 
             {{-- Action Buttons --}}
@@ -247,9 +213,9 @@ function adjustmentForm(state) {
     return {
         items: state.items || [],
         type: state.type || '',
-        recovered: parseFloat(state.recovered) || 0,
         searchQuery: '',
         searchResults: [],
+        typeHints: @js($typeHints),
 
         async searchProducts() {
             const query = this.searchQuery.trim();

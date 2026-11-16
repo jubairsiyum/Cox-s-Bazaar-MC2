@@ -117,8 +117,8 @@ class Unit extends Model
         }
 
         return $query->where(function (Builder $q) use ($term) {
-            $q->where('unit', 'like', "%{$term}%")
-                ->orWhere('note', 'like', "%{$term}%")
+            $q->where('units.unit', 'like', "%{$term}%")
+                ->orWhere('units.note', 'like', "%{$term}%")
                 ->orWhereHas('product', fn (Builder $p) => $p->search($term));
         });
     }

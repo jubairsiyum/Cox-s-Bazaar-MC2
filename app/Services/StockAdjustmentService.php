@@ -11,11 +11,10 @@ use App\Models\Unit;
 /**
  * Posts and reverses stock adjustments against the stock ledger.
  *
- * Semantics of a line's quantity depend on the adjustment type:
- *  - Normal   (stock take / correction): the quantity is the COUNTED stock
- *             level; stock is set to it (delta is recorded as an Adjustment).
- *  - Abnormal (damage / loss / theft):   the quantity is the amount REMOVED
- *             from stock.
+ * Each line is one of three plain operations:
+ *  - Add:    stock goes up by the entered quantity
+ *  - Remove: stock goes down by the entered quantity
+ *  - Set:    stock is corrected to the entered (counted) quantity
  *
  * Every line stores the stock level before and after the document, so an
  * adjustment can be reversed exactly as long as nothing has moved since.
@@ -28,8 +27,9 @@ class StockAdjustmentService
     public static function targetQuantity(StockAdjustmentType $type, int $quantity, int $quantityBefore): int
     {
         return match ($type) {
-            StockAdjustmentType::Normal => $quantity,
-            StockAdjustmentType::Abnormal => max($quantityBefore - $quantity, 0),
+            StockAdjustmentType::Add => $quantityBefore + $quantity,
+            StockAdjustmentType::Remove => max($quantityBefore - $quantity, 0),
+            StockAdjustmentType::Set => $quantity,
         };
     }
 

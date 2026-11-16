@@ -171,17 +171,11 @@
                                     @case('adjustment_date')
                                         {{ $adjustment->adjustment_date->format('d/m/Y H:i') }}
                                         @break
-                                    @case('location')
-                                        {{ $adjustment->location?->name ?? '—' }}
-                                        @break
                                     @case('type')
                                         {{ $adjustment->type->label() }}
                                         @break
                                     @case('total_amount')
                                         {{ \App\Helpers\Money::format($adjustment->total_amount) }}
-                                        @break
-                                    @case('total_amount_recovered')
-                                        {{ \App\Helpers\Money::format($adjustment->total_amount_recovered) }}
                                         @break
                                     @case('reason')
                                         {{ $adjustment->reason ?: '—' }}
