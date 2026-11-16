@@ -284,9 +284,33 @@ Route::middleware(['auth', 'verified'])->group(function () {
         'reports.sales' => 'Reports',
     ];
 
+    // Permission guards for placeholders whose module permissions are already seeded.
+    $placeholderPermissions = [
+        'warehouses.index' => 'permission:warehouses.manage',
+        'inventory.index' => 'permission:inventory.view',
+        'stock-adjustments.index' => 'permission:stock-adjustments.manage',
+        'stock-transfers.index' => 'permission:stock-transfers.manage',
+        'purchase-orders.index' => 'permission:purchase-orders.manage',
+        'purchase-invoices.index' => 'permission:purchase-invoices.view|purchase-invoices.manage|purchase-invoices.post',
+        'purchase-returns.index' => 'permission:purchase-returns.manage',
+        'sales-orders.index' => 'permission:sales-orders.manage',
+        'sales-invoices.index' => 'permission:sales-invoices.view|sales-invoices.manage|sales-invoices.post',
+        'sales-returns.index' => 'permission:sales-returns.manage',
+        'customer-collections.index' => 'permission:customer-collections.manage',
+        'pos.index' => 'permission:pos.access',
+        'cash-accounts.index' => 'permission:finance.view|finance.manage|cash-accounts.manage',
+        'bank-accounts.index' => 'permission:finance.view|finance.manage|bank-accounts.manage',
+        'income-transactions.index' => 'permission:finance.view|finance.manage|income-transactions.manage',
+        'expense-transactions.index' => 'permission:finance.view|finance.manage|expense-transactions.manage',
+        'account-transfers.index' => 'permission:finance.view|finance.manage|account-transfers.manage',
+        'supplier-payments.index' => 'permission:finance.view|finance.manage|supplier-payments.view|supplier-payments.manage',
+        'reports.sales' => 'permission:reports.view|reports.export',
+    ];
+
     foreach ($placeholders as $name => $label) {
         Route::get($name === 'reports.sales' ? 'reports/sales' : str_replace('.index', '', $name), [PlaceholderController::class, '__invoke'])
             ->defaults('module', $label)
+            ->middleware($placeholderPermissions[$name] ?? [])
             ->name($name);
     }
 });
