@@ -1,6 +1,6 @@
 @use('App\Support\Ui\ButtonVariants')
 <div class="flex items-center justify-between">
-    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">
+    <h3 class="text-lg font-semibold text-ink">
         {{ __('ecommerce.monthlySales.title') }}
     </h3>
 

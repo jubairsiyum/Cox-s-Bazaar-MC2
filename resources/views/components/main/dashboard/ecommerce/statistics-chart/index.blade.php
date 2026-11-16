@@ -37,7 +37,7 @@
             this.$refs.chart.dispatchEvent(new CustomEvent('chart-update', { detail: { tab: this.tab, factor: this.factor } }));
         },
     }"
-    class="rounded-2xl border border-gray-200 bg-white px-5 pt-5 pb-5 sm:px-6 sm:pt-6 dark:border-gray-800 dark:bg-white/3">
+    class="rounded-2xl border border-line bg-surface px-5 pt-5 pb-5 sm:px-6 sm:pt-6">
     <x-main.dashboard.ecommerce.statistics-chart.card-header :tabs="$config['tabs']" />
 
     <div class="custom-scrollbar max-w-full overflow-x-auto">

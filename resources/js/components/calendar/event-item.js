@@ -1,33 +1,33 @@
 const colorMap = {
     success: {
-        bg: 'border border-green-100 bg-green-50 dark:border-green-500/20 dark:bg-green-500/15',
-        dot: 'bg-green-500',
-        title: 'text-green-700 dark:text-green-400',
-        time: 'text-green-600/80 dark:text-green-400/80',
+        bg: 'border border-success/20 bg-soft',
+        dot: 'bg-success',
+        title: 'text-success',
+        time: 'text-success/80',
     },
     danger: {
-        bg: 'border border-red-100 bg-red-50 dark:border-red-500/20 dark:bg-red-500/15',
-        dot: 'bg-red-500',
-        title: 'text-red-700 dark:text-red-400',
-        time: 'text-red-600/80 dark:text-red-400/80',
+        bg: 'border border-danger/20 bg-soft',
+        dot: 'bg-danger',
+        title: 'text-danger',
+        time: 'text-danger/80',
     },
     primary: {
-        bg: 'border border-brand-100 bg-brand-50 dark:border-brand-500/20 dark:bg-brand-500/15',
+        bg: 'border border-brand-100 bg-brand-50  ',
         dot: 'bg-brand-500',
-        title: 'text-brand-700 dark:text-brand-400',
-        time: 'text-brand-600/80 dark:text-brand-400/80',
+        title: 'text-brand-700 ',
+        time: 'text-brand-600/80 ',
     },
     warning: {
-        bg: 'border border-orange-100 bg-orange-50 dark:border-orange-500/20 dark:bg-orange-500/15',
-        dot: 'bg-orange-500',
-        title: 'text-orange-700 dark:text-orange-400',
-        time: 'text-orange-600/80 dark:text-orange-400/80',
+        bg: 'border border-warning/20 bg-soft',
+        dot: 'bg-warning',
+        title: 'text-warning',
+        time: 'text-warning/80',
     },
     info: {
-        bg: 'border border-blue-100 bg-blue-50 dark:border-blue-500/20 dark:bg-blue-500/15',
-        dot: 'bg-blue-500',
-        title: 'text-blue-700 dark:text-blue-400',
-        time: 'text-blue-600/80 dark:text-blue-400/80',
+        bg: 'border border-brand-500/20 bg-soft',
+        dot: 'bg-brand-500',
+        title: 'text-brand-500',
+        time: 'text-brand-500/80',
     },
 };
 
@@ -55,7 +55,7 @@ export const renderEventItem = (eventInfo) => {
     return `
         <div dir="ltr" class="event-fc-color flex items-center rounded-md py-1 ps-1.5 pe-2 transition-colors sm:rounded-lg sm:py-1.5 sm:ps-2.5 sm:pe-3 ${colors.bg}">
             <div class="fc-daygrid-event-dot ms-0 me-1 h-2.5 w-1 shrink-0 rounded-full border-none sm:me-2 sm:h-3.5 ${colors.dot}"></div>
-            ${timeText ? `<div class="fc-event-time me-1 p-0 text-[10px] font-normal text-gray-500 sm:me-1.5 sm:text-xs dark:text-gray-400">${timeText}</div>` : ''}
-            <div class="fc-event-title truncate p-0 text-[11px] font-medium text-gray-700 sm:text-xs dark:text-white">${title}</div>
+            ${timeText ? `<div class="fc-event-time me-1 p-0 text-[10px] font-normal text-muted sm:me-1.5 sm:text-xs ">${timeText}</div>` : ''}
+            <div class="fc-event-title truncate p-0 text-[11px] font-medium text-ink sm:text-xs ">${title}</div>
         </div>`;
 };

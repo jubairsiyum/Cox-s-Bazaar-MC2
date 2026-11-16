@@ -1,3 +1,4 @@
+import { getToken } from '../helpers';
 import { mountChart } from '../helpers';
 
 export default (el) => {
@@ -11,7 +12,7 @@ export default (el) => {
             position: 'top',
             horizontalAlign: 'left',
         },
-        colors: ['#465FFF', '#9CB9FF'], // Define line colors
+        colors: [getToken('--chart-1'), getToken('--brand-400')], // Define line colors
         chart: {
             fontFamily: 'Outfit, sans-serif',
             height: 310,
@@ -34,7 +35,7 @@ export default (el) => {
         },
         markers: {
             size: 0, // Size of the marker points
-            strokeColors: '#fff', // Marker border color
+            strokeColors: getToken('--surface'), // Marker border color
             strokeWidth: 2,
             hover: {
                 size: 6, // Marker size on hover
@@ -63,28 +64,28 @@ export default (el) => {
                 const category = w.globals?.categoryLabels?.[dataPointIndex] ??
                     w.config.xaxis?.categories?.[dataPointIndex] ??
                     '';
-                const colors = w.config.colors ?? ['#465FFF', '#9CB9FF'];
+                const colors = w.config.colors ?? [getToken('--chart-1'), getToken('--brand-400')];
                 const seriesList = w.config.series ?? [];
                 const rows = seriesList
                     .map((s, idx) => {
                     const val = chartSeries[idx]?.[dataPointIndex];
-                    const color = colors[idx] ?? '#465FFF';
+                    const color = colors[idx] ?? getToken('--chart-1');
                     const formattedVal = typeof val === 'number' ? val.toLocaleString() : (val ?? '');
                     return `
                   <div class="flex items-center gap-2">
                     <div class="flex items-center gap-1.5">
                       <span class="size-1.5 rounded-full shrink-0" style="background-color: ${color}"></span>
-                      <span class="w-13 text-xs text-gray-800 dark:text-white/90">${s.name ?? ''}</span>
-                      <span class="text-xs font-medium text-gray-400 dark:text-gray-500">:</span>
+                      <span class="w-13 text-xs text-ink">${s.name ?? ''}</span>
+                      <span class="text-xs font-medium text-muted">:</span>
                     </div>
-                    <span class="text-xs font-medium text-gray-800 dark:text-white/90">${formattedVal}</span>
+                    <span class="text-xs font-medium text-ink">${formattedVal}</span>
                   </div>
                 `;
                 })
                     .join('');
                 return `
               <div class="min-w-32.5">
-                <p class="mb-1 text-[10px] leading-4 text-gray-500 dark:text-gray-400">${category}</p>
+                <p class="mb-1 text-[10px] leading-4 text-muted">${category}</p>
                 <div class="flex flex-col gap-1">
                   ${rows}
                 </div>
@@ -126,8 +127,8 @@ export default (el) => {
                 fill: {
                     type: 'gradient',
                     gradient: {
-                        colorFrom: isDarkMode.value ? 'rgba(255, 255, 255, 0.1)' : '#ffffff',
-                        colorTo: '#9CB9FF',
+                        colorFrom: isDarkMode.value ? getToken('--soft') : getToken('--surface'),
+                        colorTo: getToken('--brand-400'),
                         stops: [0, 100],
                         opacityFrom: 1,
                         opacityTo: 1,
@@ -142,7 +143,7 @@ export default (el) => {
             labels: {
                 style: {
                     fontSize: '12px', // Adjust font size for y-axis labels
-                    colors: ['#6B7280'], // Color of the labels
+                    colors: [getToken('--muted')], // Color of the labels
                 },
             },
             title: {

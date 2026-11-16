@@ -1,5 +1,5 @@
 <div {{ $attributes->merge(['class' => 'flex flex-col gap-2 sm:gap-3']) }}>
-    <p class="text-xs font-normal text-gray-500 sm:text-sm dark:text-gray-400">Social links</p>
+    <p class="text-xs font-normal text-muted sm:text-sm">Social links</p>
     <div class="flex flex-wrap items-center gap-2">
         <template x-for="link in socialList" :key="link.name">
             <div>
@@ -13,7 +13,7 @@
                             </x-ui.button>
                         </template>
                         <template x-if="!link.hasLink">
-                            <div :aria-label="link.name" class="flex size-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 shadow-theme-xs sm:size-11 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-600">
+                            <div :aria-label="link.name" class="flex size-10 items-center justify-center rounded-full border border-line bg-surface text-muted shadow-card sm:size-11">
                                 <x-svg.facebook class="size-5 fill-current" />
                             </div>
                         </template>
@@ -29,7 +29,7 @@
                             </x-ui.button>
                         </template>
                         <template x-if="!link.hasLink">
-                            <div :aria-label="link.name" class="flex size-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 shadow-theme-xs sm:size-11 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-600">
+                            <div :aria-label="link.name" class="flex size-10 items-center justify-center rounded-full border border-line bg-surface text-muted shadow-card sm:size-11">
                                 <x-svg.twitter-x class="size-5 fill-current" />
                             </div>
                         </template>
@@ -45,7 +45,7 @@
                             </x-ui.button>
                         </template>
                         <template x-if="!link.hasLink">
-                            <div :aria-label="link.name" class="flex size-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 shadow-theme-xs sm:size-11 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-600">
+                            <div :aria-label="link.name" class="flex size-10 items-center justify-center rounded-full border border-line bg-surface text-muted shadow-card sm:size-11">
                                 <x-svg.linkedin class="size-5 fill-current" />
                             </div>
                         </template>
@@ -61,7 +61,7 @@
                             </x-ui.button>
                         </template>
                         <template x-if="!link.hasLink">
-                            <div :aria-label="link.name" class="flex size-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 shadow-theme-xs sm:size-11 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-600">
+                            <div :aria-label="link.name" class="flex size-10 items-center justify-center rounded-full border border-line bg-surface text-muted shadow-card sm:size-11">
                                 <x-svg.instagram class="size-5 fill-current" />
                             </div>
                         </template>

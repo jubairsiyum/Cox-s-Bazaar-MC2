@@ -9,25 +9,25 @@
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
             <div class="flex items-baseline gap-2">
-                <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Customers List</h1>
-                <span class="text-sm text-gray-500 dark:text-gray-400">View/Search Customers</span>
+                <h1 class="text-2xl font-bold tracking-tight text-ink">Customers List</h1>
+                <span class="text-sm text-muted">View/Search Customers</span>
             </div>
         </div>
         <div class="flex items-center gap-4">
-            <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                <a href="{{ route('dashboard') }}" class="hover:text-brand-500 flex items-center gap-1">
+            <div class="flex items-center gap-1.5 text-xs text-muted">
+                <a href="{{ route('dashboard') }}" class="hover:border-line flex items-center gap-1">
                     <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
                     </svg>
                     Home
                 </a>
                 <span>&rsaquo;</span>
-                <span class="text-gray-700 dark:text-gray-300 font-medium">Customers List</span>
+                <span class="text-ink font-medium">Customers List</span>
             </div>
             @can('create', App\Models\Customer::class)
                 <a href="{{ route('customers.create') }}"
-                   class="px-4 py-2 rounded-md text-white font-medium text-sm transition-all shadow-sm flex items-center gap-1.5 hover:opacity-95"
-                   style="background-color: #00c0ef;">
+                   class="px-4 py-2 rounded-md text-on-brand font-medium text-sm transition-all shadow-sm flex items-center gap-1.5 hover:opacity-95"
+                   style="background-color: var(--brand-500);">
                     <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
@@ -38,9 +38,9 @@
     </div>
 
     {{-- Main Card --}}
-    <div class="card border-t-4 border-t-cyan-500 shadow-sm">
-        <div class="card-header border-b border-gray-100 dark:border-gray-800">
-            <h2 class="text-base font-semibold text-gray-800 dark:text-gray-100">Customers List</h2>
+    <div class="card border-line border-t-cyan-500 shadow-sm">
+        <div class="card-header border-b border-line">
+            <h2 class="text-base font-semibold text-ink">Customers List</h2>
         </div>
 
         <div class="card-body p-4">
@@ -50,10 +50,10 @@
                 <form method="GET" action="{{ route('customers.index') }}" class="flex items-center gap-2">
                     @if(request('search'))<input type="hidden" name="search" value="{{ request('search') }}">@endif
                     @if(request('status'))<input type="hidden" name="status" value="{{ request('status') }}">@endif
-                    <label class="text-gray-600 dark:text-gray-400 flex items-center gap-1 text-xs sm:text-sm">
+                    <label class="text-muted flex items-center gap-1 text-xs sm:text-sm">
                         Show
                         <select name="per_page" onchange="this.form.submit()"
-                                class="form-select py-1 px-2 text-xs rounded border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800">
+                                class="form-select py-1 px-2 text-xs rounded border-line bg-surface">
                             <option value="10" @selected($perPage == 10)>10</option>
                             <option value="25" @selected($perPage == 25)>25</option>
                             <option value="50" @selected($perPage == 50)>50</option>
@@ -66,46 +66,46 @@
                 {{-- Middle: Export Buttons --}}
                 <div class="flex items-center gap-1 flex-wrap">
                     <button type="button" @click="copyTable()"
-                            class="px-3 py-1.5 rounded text-xs font-semibold text-white shadow-xs transition hover:opacity-90 cursor-pointer"
-                            style="background-color: #26c6da;">
+                            class="px-3 py-1.5 rounded text-xs font-semibold text-on-brand shadow-xs transition hover:opacity-90 cursor-pointer"
+                            style="background-color: var(--brand-500);">
                         Copy
                     </button>
                     <a :href="exportUrl('xlsx')"
-                       class="px-3 py-1.5 rounded text-xs font-semibold text-white shadow-xs transition hover:opacity-90 cursor-pointer"
-                       style="background-color: #26c6da;">
+                       class="px-3 py-1.5 rounded text-xs font-semibold text-on-brand shadow-xs transition hover:opacity-90 cursor-pointer"
+                       style="background-color: var(--brand-500);">
                         Excel
                     </a>
                     <button type="button" @click="openPdf()"
-                            class="px-3 py-1.5 rounded text-xs font-semibold text-white shadow-xs transition hover:opacity-90 cursor-pointer"
-                            style="background-color: #26c6da;">
+                            class="px-3 py-1.5 rounded text-xs font-semibold text-on-brand shadow-xs transition hover:opacity-90 cursor-pointer"
+                            style="background-color: var(--brand-500);">
                         PDF
                     </button>
                     <button type="button" @click="printTable()"
-                            class="px-3 py-1.5 rounded text-xs font-semibold text-white shadow-xs transition hover:opacity-90 cursor-pointer"
-                            style="background-color: #26c6da;">
+                            class="px-3 py-1.5 rounded text-xs font-semibold text-on-brand shadow-xs transition hover:opacity-90 cursor-pointer"
+                            style="background-color: var(--brand-500);">
                         Print
                     </button>
                     <a :href="exportUrl('csv')"
-                       class="px-3 py-1.5 rounded text-xs font-semibold text-white shadow-xs transition hover:opacity-90 cursor-pointer"
-                       style="background-color: #26c6da;">
+                       class="px-3 py-1.5 rounded text-xs font-semibold text-on-brand shadow-xs transition hover:opacity-90 cursor-pointer"
+                       style="background-color: var(--brand-500);">
                         CSV
                     </a>
 
                     {{-- Columns Visibility Dropdown --}}
                     <div class="relative inline-block text-left">
                         <button type="button" @click.stop="columnsDropdownOpen = !columnsDropdownOpen"
-                                class="px-3 py-1.5 rounded text-xs font-semibold text-white shadow-xs transition hover:opacity-90 cursor-pointer flex items-center gap-1"
-                                style="background-color: #26c6da;">
+                                class="px-3 py-1.5 rounded text-xs font-semibold text-on-brand shadow-xs transition hover:opacity-90 cursor-pointer flex items-center gap-1"
+                                style="background-color: var(--brand-500);">
                             Columns
                         </button>
 
                         <div x-show="columnsDropdownOpen" x-cloak
                              @click.outside="columnsDropdownOpen = false"
-                             class="absolute left-0 sm:right-0 sm:left-auto mt-1 w-44 rounded shadow-2xl py-1 z-50 text-left border border-blue-400"
-                             style="background-color: #2580ab;">
+                             class="absolute left-0 sm:right-0 sm:left-auto mt-1 w-44 rounded shadow-2xl py-1 z-50 text-left border border-line"
+                             style="background-color: var(--brand-500);">
                             <template x-for="col in columnList" :key="col.key">
                                 <button type="button" @click="toggleColumn(col.key)"
-                                        class="w-full flex items-center justify-between px-3.5 py-1.5 text-xs font-medium text-white transition hover:bg-[#1e6b94] text-left cursor-pointer"
+                                        class="w-full flex items-center justify-between px-3.5 py-1.5 text-xs font-medium text-on-brand transition hover:border-line text-left cursor-pointer"
                                         :class="{ 'opacity-50 line-through': !columns[col.key] }">
                                     <span x-text="col.label"></span>
                                     <span x-show="columns[col.key]" class="text-[10px] font-bold">✓</span>
@@ -119,23 +119,23 @@
                 <form method="GET" action="{{ route('customers.index') }}" class="flex items-center gap-2">
                     @if(request('per_page'))<input type="hidden" name="per_page" value="{{ request('per_page') }}">@endif
                     @if(request('status'))<input type="hidden" name="status" value="{{ request('status') }}">@endif
-                    <label class="text-gray-600 dark:text-gray-400 flex items-center gap-1.5 text-xs sm:text-sm">
+                    <label class="text-muted flex items-center gap-1.5 text-xs sm:text-sm">
                         Search:
                         <input type="search" name="search" value="{{ request('search') }}"
                                placeholder="Search customers..."
-                               class="form-control py-1 px-2.5 text-xs rounded border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 w-40 sm:w-48">
+                               class="form-control py-1 px-2.5 text-xs rounded border-line bg-surface w-40 sm:w-48">
                     </label>
                 </form>
             </div>
 
             {{-- Table --}}
-            <div class="table-wrap border border-gray-200 dark:border-gray-800 rounded-md overflow-x-auto">
+            <div class="table-wrap border border-line rounded-md overflow-x-auto">
                 <table id="customers-table" class="data-table w-full text-left text-xs sm:text-sm">
                     <thead>
-                        <tr class="text-white uppercase font-bold text-xs" style="background-color: #205081;">
+                        <tr class="text-on-brand uppercase font-bold text-xs" style="background-color: var(--brand-500);">
                             <th class="w-10 p-2.5 text-center">
                                 <input type="checkbox" @change="toggleSelectAll()" :checked="allSelected"
-                                       class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 size-3.5">
+                                       class="rounded border-line border-line focus:border-line size-3.5">
                             </th>
                             <th x-show="columns.customer_id" class="p-2.5 whitespace-nowrap">Customer ID</th>
                             <th x-show="columns.name" class="p-2.5 whitespace-nowrap">Customer Name</th>
@@ -149,29 +149,29 @@
                             @endcan
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-gray-900">
+                    <tbody class="divide-y divide-line bg-surface">
                         @forelse($customers as $customer)
-                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
+                            <tr class="hover:bg-soft/50 transition">
                                 <td class="p-2.5 text-center">
                                     <input type="checkbox" value="{{ $customer->id }}"
-                                           class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 size-3.5">
+                                           class="rounded border-line border-line focus:border-line size-3.5">
                                 </td>
-                                <td x-show="columns.customer_id" data-col="customer_id" class="p-2.5 font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
+                                <td x-show="columns.customer_id" data-col="customer_id" class="p-2.5 font-medium text-ink whitespace-nowrap">
                                     {{ $customer->customer_id }}
                                 </td>
-                                <td x-show="columns.name" data-col="name" class="p-2.5 font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
+                                <td x-show="columns.name" data-col="name" class="p-2.5 font-medium text-ink whitespace-nowrap">
                                     {{ $customer->name }}
                                 </td>
-                                <td x-show="columns.mobile" data-col="mobile" class="p-2.5 text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                                <td x-show="columns.mobile" data-col="mobile" class="p-2.5 text-muted whitespace-nowrap">
                                     {{ $customer->mobile ?: '—' }}
                                 </td>
-                                <td x-show="columns.tel_no" data-col="tel_no" class="p-2.5 text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                                <td x-show="columns.tel_no" data-col="tel_no" class="p-2.5 text-muted whitespace-nowrap">
                                     {{ $customer->tel_no ?: '—' }}
                                 </td>
-                                <td x-show="columns.email" data-col="email" class="p-2.5 text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                                <td x-show="columns.email" data-col="email" class="p-2.5 text-muted whitespace-nowrap">
                                     {{ $customer->email ?: '—' }}
                                 </td>
-                                <td x-show="columns.city" data-col="city" class="p-2.5 text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                                <td x-show="columns.city" data-col="city" class="p-2.5 text-muted whitespace-nowrap">
                                     {{ $customer->city ?: '—' }}
                                 </td>
                                 <td x-show="columns.status" data-col="status" class="p-2.5 text-center whitespace-nowrap">
@@ -181,14 +181,14 @@
                                             @method('PATCH')
                                             <button type="submit"
                                                     title="Click to toggle status"
-                                                    class="px-2.5 py-0.5 rounded text-[11px] font-bold text-white transition-opacity hover:opacity-80 cursor-pointer shadow-xs"
-                                                    style="background-color: {{ $customer->status === 'active' ? '#00a65a' : '#dd4b39' }};">
+                                                    class="px-2.5 py-0.5 rounded text-[11px] font-bold text-on-brand transition-opacity hover:opacity-80 cursor-pointer shadow-xs"
+                                                    style="background-color: {{ $customer->status === 'active' ? 'var(--success)' : 'var(--danger)' }};">
                                                 {{ ucfirst($customer->status) }}
                                             </button>
                                         </form>
                                     @else
-                                        <span class="px-2.5 py-0.5 rounded text-[11px] font-bold text-white shadow-xs"
-                                              style="background-color: {{ $customer->status === 'active' ? '#00a65a' : '#dd4b39' }};">
+                                        <span class="px-2.5 py-0.5 rounded text-[11px] font-bold text-on-brand shadow-xs"
+                                              style="background-color: {{ $customer->status === 'active' ? 'var(--success)' : 'var(--danger)' }};">
                                             {{ ucfirst($customer->status) }}
                                         </span>
                                     @endcan
@@ -198,8 +198,8 @@
                                         <div class="relative inline-block text-left">
                                             <button type="button"
                                                     @click.stop="toggleActionMenu($event, {{ json_encode(['id' => $customer->id, 'name' => $customer->name]) }})"
-                                                    class="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold text-white rounded shadow-xs hover:opacity-90 transition cursor-pointer"
-                                                    style="background-color: #00c0ef;">
+                                                    class="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold text-on-brand rounded shadow-xs hover:opacity-90 transition cursor-pointer"
+                                                    style="background-color: var(--brand-500);">
                                                 Action
                                                 <svg class="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -211,7 +211,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td :colspan="totalColspan()" class="p-8 text-center text-gray-500 dark:text-gray-400">
+                                <td :colspan="totalColspan()" class="p-8 text-center text-muted">
                                     No customers found matching your criteria.
                                 </td>
                             </tr>
@@ -225,11 +225,11 @@
                 <div x-show="actionMenuOpen"
                      x-cloak
                      @click.outside="actionMenuOpen = false"
-                     class="fixed z-9999 w-44 rounded-md bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700 py-1 text-xs text-gray-700 dark:text-gray-200"
+                     class="fixed z-9999 w-44 rounded-md bg-surface shadow-xl border border-line py-1 text-xs text-ink"
                      :style="`top: ${menuTop}; left: ${menuLeft};`">
                     @can('customers.manage')
                         <a :href="`/customers/${openActionCustomer?.id}/edit`"
-                           class="flex items-center gap-2 px-3 py-1.5 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 font-medium transition">
+                           class="flex items-center gap-2 px-3 py-1.5 hover:bg-soft border-line font-medium transition">
                             <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                             </svg>
@@ -243,7 +243,7 @@
                             @csrf
                             @method('DELETE')
                             <button type="submit"
-                                    class="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 font-medium text-left transition">
+                                    class="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-soft text-danger font-medium text-left transition">
                                 <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                 </svg>

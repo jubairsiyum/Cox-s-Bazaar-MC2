@@ -1,3 +1,4 @@
+const getToken = (t, fb = '') => (typeof window !== 'undefined' ? getComputedStyle(document.documentElement).getPropertyValue(t).trim() || fb : fb);
 import jsVectorMap from 'jsvectormap';
 import 'jsvectormap/dist/jsvectormap.min.css';
 import 'jsvectormap/dist/maps/world';
@@ -14,11 +15,11 @@ export const initMap = () => {
             regionStyle: {
                 initial: {
                     fontFamily: "Outfit",
-                    fill: "#D9D9D9",
+                    fill: getToken('--line'),
                 },
                 hover: {
                     fillOpacity: 1,
-                    fill: "#465fff",
+                    fill: getToken('--brand-500'),
                 },
             },
             markers: [
@@ -39,12 +40,12 @@ export const initMap = () => {
             markerStyle: {
                 initial: {
                     strokeWidth: 1,
-                    fill: "#465fff",
+                    fill: getToken('--brand-500'),
                     fillOpacity: 1,
                     r: 4,
                 },
                 hover: {
-                    fill: "#465fff",
+                    fill: getToken('--brand-500'),
                     fillOpacity: 1,
                 },
                 selected: {},
@@ -71,16 +72,16 @@ export const initMap = () => {
             regionStyle: {
                 initial: {
                     fontFamily: "Outfit",
-                    fill: "#9CB9FF",
+                    fill: getToken('--brand-400'),
                     stroke: "transparent",
                     strokeWidth: 1,
                 },
                 hover: {
                     fillOpacity: 1,
-                    fill: "#8098F9",
+                    fill: getToken('--brand-400'),
                 },
                 selected: {
-                    fill: "#465FFF",
+                    fill: getToken('--brand-500'),
                 },
                 selectedHover: {},
             },
@@ -111,12 +112,12 @@ export const initMap = () => {
             markerStyle: {
                 initial: {
                     strokeWidth: 0,
-                    fill: "#465FFF",
+                    fill: getToken('--brand-500'),
                     fillOpacity: 1,
                     r: 5,
                 },
                 hover: {
-                    fill: "#3538CD",
+                    fill: getToken('--brand-600'),
                     fillOpacity: 1,
                     r: 7,
                 },

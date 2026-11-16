@@ -1,11 +1,19 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="ltr" class="h-full bg-gray-50 dark:bg-gray-900">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="ltr" class="h-full bg-canvas">
 
 <head>
     <script>
-        (function () {
-            if (localStorage.getItem('dir') === 'rtl') document.documentElement.setAttribute('dir', 'rtl');
-        })();
+      (function () {
+        var root = document.documentElement, allowed = ['swift'], theme = 'swift';
+        try {
+          var c = localStorage.getItem('color-theme');
+          if (c && allowed.indexOf(c) > -1) theme = c;
+          var t = localStorage.getItem('theme');
+          if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) root.classList.add('dark');
+          if (localStorage.getItem('dir') === 'rtl') root.setAttribute('dir', 'rtl');
+        } catch (e) {}
+        root.setAttribute('data-theme', theme);
+      })();
     </script>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -14,7 +22,6 @@
     {{-- Title & Meta --}}
     <title>@yield('title', 'Dashboard') — {{ config('app.name', 'ERP') }}</title>
     <meta name="description" content="@yield('meta_description', 'Cox\'s Bazaar Mobile Distribution ERP')">
-    <meta name="theme-color" content="#004EFC">
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" href="/favicon.ico" sizes="any">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
@@ -31,47 +38,9 @@
         }
     </style>
 
-    <!-- Theme & Sidebar Stores -->
+    <!-- Sidebar Store -->
     <script>
         document.addEventListener('alpine:init', () => {
-            Alpine.store('theme', {
-                init() {
-                    const savedTheme = localStorage.getItem('theme');
-                    this.theme = savedTheme === 'dark' ? 'dark' : 'light';
-                    this.updateTheme();
-                },
-                theme: 'light',
-                resolvedTheme: 'light',
-                set(value) {
-                    value = value === 'dark' ? 'dark' : 'light';
-                    this.theme = value;
-                    localStorage.setItem('theme', value);
-                    this.updateTheme();
-                    window.dispatchEvent(new CustomEvent('theme-changed', { detail: value }));
-                },
-                toggle() {
-                    this.set(this.resolvedTheme === 'dark' ? 'light' : 'dark');
-                },
-                updateTheme() {
-                    const html = document.documentElement;
-                    const isDark = this.theme === 'dark';
-                    if (isDark) {
-                        html.classList.add('dark');
-                    } else {
-                        html.classList.remove('dark');
-                    }
-
-                    this.resolvedTheme = isDark ? 'dark' : 'light';
-                    html.setAttribute('data-color-scheme', this.resolvedTheme);
-                    html.dataset['theme'] = this.resolvedTheme;
-                    html.style.colorScheme = this.resolvedTheme;
-                    if (document.body) {
-                        document.body.dataset['theme'] = this.resolvedTheme;
-                        document.body.style.colorScheme = this.resolvedTheme;
-                    }
-                }
-            });
-
             Alpine.store('sidebar', {
                 isExpanded: false,
                 isMobileOpen: false,
@@ -154,20 +123,20 @@
     @stack('head')
 </head>
 
-<body class="bg-gray-50 dark:bg-gray-900 font-outfit antialiased">
+<body class="min-h-screen bg-canvas font-sans text-ink antialiased p-3 sm:p-4 lg:p-5 selection:bg-brand-500/20 selection:text-brand-600">
 
-    <div class="min-h-screen xl:flex sidebar-expanded" x-data :class="{ 'sidebar-expanded': $store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen }">
-        @include('layouts.backdrop')
-        @include('layouts.sidebar')
+    <div class="flex min-h-[calc(100vh-2.5rem)] w-full gap-5" x-data="{ sidebar: false }">
+        <x-dashboard.sidebar />
 
-        <div class="flex-1 min-w-0 ml-0 ltr:xl:ml-[90px] rtl:xl:ml-0 rtl:xl:mr-[90px] [.sidebar-expanded_&]:ltr:xl:ml-[290px] [.sidebar-expanded_&]:rtl:xl:ml-0 [.sidebar-expanded_&]:rtl:xl:mr-[290px] transition-all duration-300 ease-in-out">
-            <!-- App header -->
-            @include('layouts.app-header')
+        <div class="flex-1 min-w-0 flex flex-col gap-5">
+            <!-- App topbar -->
+            <x-dashboard.topbar />
 
             <!-- Main Content Area -->
-            <div class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
+            <main class="flex-1 min-w-0">
+                {{ $slot ?? '' }}
                 @yield('content')
-            </div>
+            </main>
         </div>
     </div>
 
@@ -206,20 +175,12 @@
                 x-transition:leave="transition ease-in duration-200"
                 x-transition:leave-start="opacity-100 translate-x-0"
                 x-transition:leave-end="opacity-0 translate-x-6"
-                class="pointer-events-auto flex items-start gap-3 rounded-xl border bg-white p-4 shadow-xl dark:bg-gray-800"
-                :class="{
-                    'border-success-200 dark:border-success-500/30': toast.type === 'success',
-                    'border-error-200 dark:border-error-500/30': toast.type === 'error',
-                    'border-warning-200 dark:border-warning-500/30': toast.type === 'warning',
-                }"
+                class="pointer-events-auto flex items-start gap-3 rounded-xl border bg-surface p-4 shadow-xl"
+                :class="{ 'border-success-200 -500/30': toast.type === 'success', 'border-error-200 ': toast.type === 'error', 'border-warning-200 -500/30': toast.type === 'warning', }"
             >
                 <span
                     class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full"
-                    :class="{
-                        'bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400': toast.type === 'success',
-                        'bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-400': toast.type === 'error',
-                        'bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-400': toast.type === 'warning',
-                    }"
+                    :class="{ 'bg-success-50 text-success-600 -500/15 -400': toast.type === 'success', 'bg-error-50 text-error-600 ': toast.type === 'error', 'bg-warning-50 text-warning-600 -500/15 -400': toast.type === 'warning', }"
                 >
                     <svg x-show="toast.type === 'success'" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
@@ -232,12 +193,12 @@
                     </svg>
                 </span>
 
-                <p class="flex-1 text-sm font-medium text-gray-800 dark:text-gray-200" x-text="toast.message"></p>
+                <p class="flex-1 text-sm font-medium text-ink" x-text="toast.message"></p>
 
                 <button
                     type="button"
                     @click="$store.toast.remove(toast.id)"
-                    class="shrink-0 text-gray-400 transition hover:text-gray-600 dark:hover:text-gray-200"
+                    class="shrink-0 text-muted transition hover:text-muted"
                     aria-label="Dismiss"
                 >
                     <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

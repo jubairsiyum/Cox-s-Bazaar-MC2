@@ -7,11 +7,11 @@
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
             <div class="flex items-baseline gap-2">
-                <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Product</h1>
-                <span class="text-sm text-gray-500 dark:text-gray-400">Add/Update Product</span>
+                <h1 class="text-2xl font-bold tracking-tight text-ink">Product</h1>
+                <span class="text-sm text-muted">Add/Update Product</span>
             </div>
         </div>
-        <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+        <div class="flex items-center gap-1.5 text-xs text-muted">
             <a href="{{ route('dashboard') }}" class="hover:text-brand-500 flex items-center gap-1">
                 <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -22,14 +22,14 @@
             <span>&rsaquo;</span>
             <a href="{{ route('products.index') }}" class="hover:text-brand-500">Products List</a>
             <span>&rsaquo;</span>
-            <span class="text-gray-700 dark:text-gray-300 font-medium">Product</span>
+            <span class="text-ink font-medium">Product</span>
         </div>
     </div>
 
     {{-- Main Form Card --}}
     <div class="card border-t-4 border-t-cyan-500 shadow-sm">
         @if ($errors->any())
-            <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <div class="px-5 py-3 border-b border-line text-sm font-medium text-ink">
                 Please Enter Valid Data
             </div>
         @endif
@@ -41,8 +41,8 @@
                 <div class="max-w-3xl space-y-4">
                     <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
                         <label for="name"
-                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
-                            Product Name<span class="text-red-500 font-bold">*</span>
+                            class="text-sm font-semibold text-ink sm:text-right">
+                            Product Name<span class="text-danger font-bold">*</span>
                         </label>
                         <div class="sm:col-span-2">
                             <input type="text" id="name" name="name" value="{{ old('name') }}" required
@@ -56,7 +56,7 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
                         <label for="brand_id"
-                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
+                            class="text-sm font-semibold text-ink sm:text-right">
                             Brand
                         </label>
                         <div class="sm:col-span-2">
@@ -74,7 +74,7 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
                         <label for="category_id"
-                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
+                            class="text-sm font-semibold text-ink sm:text-right">
                             Category
                         </label>
                         <div class="sm:col-span-2">
@@ -92,7 +92,7 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
                         <label for="model"
-                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
+                            class="text-sm font-semibold text-ink sm:text-right">
                             Model
                         </label>
                         <div class="sm:col-span-2">
@@ -108,7 +108,7 @@
                     {{-- Barcode scanner field --}}
                     <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
                         <label for="barcode"
-                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
+                            class="text-sm font-semibold text-ink sm:text-right">
                             Barcode / IMEI
                         </label>
                         <div class="sm:col-span-2" x-data="barcodeField()" @barcode-scanned.window="applyScan($event.detail.code)">
@@ -119,18 +119,18 @@
                                     @keydown.enter.prevent
                                     class="form-control @error('barcode') is-invalid @enderror font-mono">
                                 <button type="button" @click="startScan()"
-                                        class="px-3 py-2.5 rounded-md text-white text-sm font-medium flex items-center gap-1.5 shrink-0 shadow-sm transition hover:opacity-90"
-                                        :style="scanning ? 'background-color: #f39c12;' : 'background-color: #00c0ef;'">
+                                        class="px-3 py-2.5 rounded-md text-on-brand text-sm font-medium flex items-center gap-1.5 shrink-0 shadow-sm transition hover:opacity-90"
+                                        :style="scanning ? 'background-color: var(--warning);' : 'background-color: var(--brand-500);'">
                                     <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                                         <path d="M4 5v14M8 5v14M12 5v14M16 5v14M20 5v14"/>
                                     </svg>
                                     <span x-text="scanning ? 'Scanning…' : 'Scan'"></span>
                                 </button>
                             </div>
-                            <p x-show="scanning &amp;&amp; !lastScan" x-cloak class="mt-1.5 text-xs text-cyan-600 dark:text-cyan-400">
+                            <p x-show="scanning &amp;&amp; !lastScan" x-cloak class="mt-1.5 text-xs text-brand-500">
                                 Listening for barcode — scan with your USB/Bluetooth scanner…
                             </p>
-                            <p x-show="lastScan" x-cloak class="mt-1.5 text-xs text-green-600 dark:text-green-400">
+                            <p x-show="lastScan" x-cloak class="mt-1.5 text-xs text-success">
                                 Last scanned: <span x-text="lastScan" class="font-mono font-semibold"></span>
                             </p>
                             @error('barcode')
@@ -141,7 +141,7 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
                         <label for="storage"
-                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
+                            class="text-sm font-semibold text-ink sm:text-right">
                             Storage
                         </label>
                         <div class="sm:col-span-2">
@@ -156,7 +156,7 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
                         <label for="color"
-                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
+                            class="text-sm font-semibold text-ink sm:text-right">
                             Color
                         </label>
                         <div class="sm:col-span-2">
@@ -171,7 +171,7 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
                         <label for="purchase_price"
-                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
+                            class="text-sm font-semibold text-ink sm:text-right">
                             Purchase Price (৳)
                         </label>
                         <div class="sm:col-span-2">
@@ -187,7 +187,7 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
                         <label for="sale_price"
-                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
+                            class="text-sm font-semibold text-ink sm:text-right">
                             Sale Price (৳)
                         </label>
                         <div class="sm:col-span-2">
@@ -203,7 +203,7 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
                         <label for="status"
-                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
+                            class="text-sm font-semibold text-ink sm:text-right">
                             Status
                         </label>
                         <div class="sm:col-span-2">
@@ -219,7 +219,7 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-3 items-start gap-2">
                         <label for="note"
-                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right pt-2">
+                            class="text-sm font-semibold text-ink sm:text-right pt-2">
                             Note
                         </label>
                         <div class="sm:col-span-2">
@@ -235,18 +235,18 @@
 
                 {{-- Action Buttons --}}
                 <div
-                    class="mt-8 pt-4 border-t border-gray-100 dark:border-gray-800 flex justify-center items-center gap-4">
+                    class="mt-8 pt-4 border-t border-line flex justify-center items-center gap-4">
                     <button type="submit"
-                        class="px-8 py-2.5 rounded-md text-white font-medium text-sm transition-all shadow-sm flex items-center gap-2"
-                        style="background-color: #00a65a;">
+                        class="px-8 py-2.5 rounded-md text-on-brand font-medium text-sm transition-all shadow-sm flex items-center gap-2"
+                        style="background-color: var(--success);">
                         <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                         </svg>
                         Save
                     </button>
                     <a href="{{ route('products.index') }}"
-                        class="px-8 py-2.5 rounded-md text-white font-medium text-sm transition-all shadow-sm flex items-center gap-2"
-                        style="background-color: #f39c12;">
+                        class="px-8 py-2.5 rounded-md text-on-brand font-medium text-sm transition-all shadow-sm flex items-center gap-2"
+                        style="background-color: var(--warning);">
                         Close
                     </a>
                 </div>

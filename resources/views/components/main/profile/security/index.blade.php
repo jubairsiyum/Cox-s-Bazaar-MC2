@@ -4,9 +4,9 @@
 
 <x-ui.card
     x-data="{ twoFactorEnabled: {{ $data['defaultSecuritySettings']['twoFactorEnabled'] ? 'true' : 'false' }} }"
-    {{ $attributes->merge(['class' => 'rounded-2xl border border-gray-200 bg-white p-5 lg:p-6 dark:border-gray-700 dark:bg-white/3']) }}
+    {{ $attributes->merge(['class' => 'rounded-2xl border border-line bg-surface p-5 lg:p-6  ']) }}
 >
-    <h4 class="text-lg font-semibold text-gray-800 dark:text-white/90">Security</h4>
+    <h4 class="text-lg font-semibold text-ink">Security</h4>
 
     <div class="mt-1">
         <x-main.profile.security.security-item

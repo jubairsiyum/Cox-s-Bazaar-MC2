@@ -3,11 +3,11 @@
   <div class="flex items-center justify-end gap-5">
     <div class="flex items-center gap-1.5">
       <span class="size-2.5 rounded-full bg-brand-600"></span>
-      <span class="text-sm font-normal text-gray-700 dark:text-gray-300"> Income </span>
+      <span class="text-sm font-normal text-ink"> Income </span>
     </div>
     <div class="flex items-center gap-1.5">
-      <span class="size-2.5 rounded-full bg-[#7CD4FD]"></span>
-      <span class="text-sm font-normal text-gray-700 dark:text-gray-300"> Expense </span>
+      <span class="size-2.5 rounded-full bg-brand-500"></span>
+      <span class="text-sm font-normal text-ink"> Expense </span>
     </div>
   </div>
 

@@ -12,20 +12,20 @@
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            background: #f4f6f8;
-            color: #0b0d12;
+            background: var(--canvas);
+            color: var(--ink);
             margin: 0;
             padding: 24px;
             text-align: center;
         }
         h1 { font-size: 1.4rem; margin-bottom: 8px; }
-        p  { color: #667085; font-size: .88rem; max-width: 320px; line-height: 1.6; }
+        p  { color: var(--muted); font-size: .88rem; max-width: 320px; line-height: 1.6; }
         .icon { font-size: 3rem; margin-bottom: 16px; }
         button {
             margin-top: 16px;
             padding: 10px 22px;
-            background: #004EFC;
-            color: #fff;
+            background: var(--brand-500);
+            color: var(--on-brand);
             border: none;
             border-radius: 8px;
             font-size: .85rem;

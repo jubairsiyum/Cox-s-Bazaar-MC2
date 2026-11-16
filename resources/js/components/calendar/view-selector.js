@@ -13,7 +13,7 @@ export function renderViewSelector(containerEl, currentView, onViewChange) {
         <div class="calendar-view-dropdown relative">
             <button
                 type="button"
-                class="calendar-view-btn flex h-9 w-full min-w-18 items-center justify-center gap-1 rounded-lg border border-gray-300 ps-2.5 pe-1.5 text-xs font-medium text-gray-700 shadow-xs sm:min-w-20 sm:gap-1.5 sm:ps-3 sm:pe-2 sm:text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
+                class="calendar-view-btn flex h-9 w-full min-w-18 items-center justify-center gap-1 rounded-lg border border-line ps-2.5 pe-1.5 text-xs font-medium text-ink shadow-xs sm:min-w-20 sm:gap-1.5 sm:ps-3 sm:pe-2 sm:text-sm   "
                 aria-expanded="false"
                 aria-haspopup="listbox"
             >
@@ -22,13 +22,13 @@ export function renderViewSelector(containerEl, currentView, onViewChange) {
                     <path d="m6 9 6 6 6-6" />
                 </svg>
             </button>
-            <div class="calendar-view-menu absolute end-0 z-50 mt-1.5 hidden w-36 max-w-[calc(100vw-32px)] space-y-0.5 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg sm:w-38 dark:border-gray-700 dark:bg-gray-900">
+            <div class="calendar-view-menu absolute end-0 z-50 mt-1.5 hidden w-36 max-w-[calc(100vw-32px)] space-y-0.5 rounded-xl border border-line bg-surface p-1.5 shadow-lg sm:w-38  ">
                 ${CALENDAR_VIEW_OPTIONS.map(
                     (view) => `
                     <button
                         type="button"
                         data-view-key="${view.key}"
-                        class="calendar-view-option w-full rounded-lg px-2.5 py-1.5 text-start text-xs text-gray-700 hover:bg-gray-100 sm:text-sm dark:text-gray-300 dark:hover:bg-white/5 ${currentView === view.key ? 'bg-gray-100 font-medium dark:bg-white/5' : 'font-normal'}"
+                        class="calendar-view-option w-full rounded-lg px-2.5 py-1.5 text-start text-xs text-ink hover:bg-soft sm:text-sm   ${currentView === view.key ? 'bg-soft font-medium ' : 'font-normal'}"
                     >
                         ${view.label}
                     </button>`,

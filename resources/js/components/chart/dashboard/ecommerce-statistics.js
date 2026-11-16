@@ -1,3 +1,4 @@
+import { getToken } from '../helpers';
 import { areaTooltip, mountChart, readConfig } from '../helpers';
 
 export default (el) => {
@@ -14,7 +15,7 @@ export default (el) => {
             { name: labels.revenue, data: scale(revenue) },
         ];
     };
-    const colorsFor = () => (state.tab === 'sales' ? ['#465FFF'] : state.tab === 'revenue' ? ['#9CB9FF'] : ['#465FFF', '#9CB9FF']);
+    const colorsFor = () => (state.tab === 'sales' ? [getToken('--chart-1')] : state.tab === 'revenue' ? [getToken('--brand-400')] : [getToken('--chart-1'), getToken('--brand-400')]);
 
     const build = (dark) => ({
         series: seriesFor(),
@@ -23,8 +24,8 @@ export default (el) => {
         chart: { fontFamily: 'Outfit, sans-serif', height: 310, type: 'area', toolbar: { show: false } },
         stroke: { curve: 'straight', width: state.tab === 'overview' ? [2, 2] : [2] },
         fill: { type: 'gradient', gradient: { opacityFrom: 0.55, opacityTo: 0 } },
-        markers: { size: 0, strokeColors: '#fff', strokeWidth: 2, hover: { size: 6 } },
-        grid: { borderColor: dark ? '#1E2640' : '#F3F4F6', strokeDashArray: 0, xaxis: { lines: { show: false } }, yaxis: { lines: { show: true } } },
+        markers: { size: 0, strokeColors: getToken('--surface'), strokeWidth: 2, hover: { size: 6 } },
+        grid: { borderColor: dark ? getToken('--line') : getToken('--line'), strokeDashArray: 0, xaxis: { lines: { show: false } }, yaxis: { lines: { show: true } } },
         dataLabels: { enabled: false },
         tooltip: { enabled: true, shared: true, intersect: false, custom: areaTooltip },
         xaxis: {
@@ -38,13 +39,13 @@ export default (el) => {
                 position: 'back',
                 opacity: 1,
                 stroke: { width: 0, color: 'none' },
-                fill: { type: 'gradient', gradient: { colorFrom: dark ? 'rgba(255, 255, 255, 0.1)' : '#ffffff', colorTo: '#9CB9FF', stops: [0, 100], opacityFrom: 1, opacityTo: 1 } },
+                fill: { type: 'gradient', gradient: { colorFrom: dark ? getToken('--soft') : getToken('--surface'), colorTo: getToken('--brand-400'), stops: [0, 100], opacityFrom: 1, opacityTo: 1 } },
             },
             tooltip: { enabled: false },
-            labels: { style: { fontSize: '12px', fontFamily: 'Outfit, sans-serif', colors: dark ? '#94A3B8' : '#6B7280' } },
+            labels: { style: { fontSize: '12px', fontFamily: 'Outfit, sans-serif', colors: dark ? getToken('--muted') : getToken('--muted') } },
         },
         yaxis: {
-            labels: { style: { fontSize: '12px', fontFamily: 'Outfit, sans-serif', colors: dark ? '#94A3B8' : '#6B7280' } },
+            labels: { style: { fontSize: '12px', fontFamily: 'Outfit, sans-serif', colors: dark ? getToken('--muted') : getToken('--muted') } },
             title: { text: '', style: { fontSize: '0px' } },
         },
     });

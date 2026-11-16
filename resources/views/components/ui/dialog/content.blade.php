@@ -2,12 +2,12 @@
 @props(['showCloseButton' => true, 'fullScreen' => false])
 @php
     $classes = TwMerge::merge($fullScreen
-        ? 'fixed inset-0 z-101 flex flex-col justify-between w-screen h-dvh max-w-none rounded-none border-none bg-white p-6 sm:p-10 text-sm text-gray-700 shadow-none duration-100 outline-none overflow-y-auto data-closed:animate-out data-closed:fade-out-0 data-open:animate-in data-open:fade-in-0 dark:bg-[#1E2635] dark:text-gray-300'
-        : 'fixed start-1/2 top-1/2 z-101 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border border-gray-200 bg-white p-6 text-sm text-gray-700 shadow-theme-lg duration-100 outline-none data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 sm:max-w-lg rtl:translate-x-1/2 dark:border-gray-800 dark:bg-[#1E2635] dark:text-gray-300', $attributes->get('class'));
-    $closeClass = 'rounded-full text-gray-400 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white ' . ($fullScreen
-        ? 'absolute end-4 top-4 size-11 bg-gray-100 hover:bg-gray-200 sm:end-6 sm:top-6 dark:bg-gray-800 dark:hover:bg-gray-700'
+        ? 'fixed inset-0 z-101 flex flex-col justify-between w-screen h-dvh max-w-none rounded-none border-none bg-surface p-6 sm:p-10 text-sm text-ink shadow-none duration-100 outline-none overflow-y-auto data-closed:animate-out data-closed:fade-out-0 data-open:animate-in data-open:fade-in-0  '
+        : 'fixed start-1/2 top-1/2 z-101 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border border-line bg-surface p-6 text-sm text-ink shadow-card duration-100 outline-none data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 sm:max-w-lg rtl:translate-x-1/2   ', $attributes->get('class'));
+    $closeClass = 'rounded-full text-muted hover:text-ink   ' . ($fullScreen
+        ? 'absolute end-4 top-4 size-11 bg-soft hover:bg-line sm:end-6 sm:top-6  '
         : 'absolute end-3 top-3');
-    $overlay = 'fixed inset-0 isolate z-100 bg-black/50 duration-100 data-closed:animate-out data-closed:fade-out-0 data-open:animate-in data-open:fade-in-0 supports-backdrop-filter:backdrop-blur-xs dark:bg-black/70';
+    $overlay = 'fixed inset-0 isolate z-100 bg-overlay duration-100 data-closed:animate-out data-closed:fade-out-0 data-open:animate-in data-open:fade-in-0 supports-backdrop-filter:backdrop-blur-xs ';
 @endphp
 <template x-teleport="body">
     <div x-show="open" style="display: none;" data-dialog-portal data-ui-root>

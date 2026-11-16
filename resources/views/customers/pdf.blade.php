@@ -12,17 +12,17 @@
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: #f8fafc;
-            color: #1e293b;
+            background-color: var(--canvas);
+            color: var(--ink);
             padding: 24px;
         }
         .container {
             max-width: 1100px;
             margin: 0 auto;
-            background: #ffffff;
+            background: var(--surface);
             padding: 40px;
             border-radius: 8px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 4px 6px -1px var(--overlay), 0 2px 4px -2px var(--overlay);
         }
         .action-bar {
             max-width: 1100px;
@@ -30,16 +30,16 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: #ffffff;
+            background: var(--surface);
             padding: 14px 20px;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 4px var(--overlay);
+            border: 1px solid var(--line);
         }
         .action-bar h2 {
             font-size: 16px;
             font-weight: 600;
-            color: #334155;
+            color: var(--ink);
         }
         .btn {
             display: inline-flex;
@@ -55,25 +55,25 @@
             transition: all 0.2s;
         }
         .btn-primary {
-            background-color: #00a65a;
-            color: #ffffff;
+            background-color: var(--success);
+            color: var(--surface);
         }
         .btn-primary:hover {
-            background-color: #008d4c;
+            background-color: var(--success);
         }
         .btn-secondary {
-            background-color: #f1f5f9;
-            color: #475569;
-            border: 1px solid #cbd5e1;
+            background-color: var(--soft);
+            color: var(--muted);
+            border: 1px solid var(--line);
         }
         .btn-secondary:hover {
-            background-color: #e2e8f0;
+            background-color: var(--line);
         }
         .sheet-title {
             text-align: center;
             font-size: 24px;
             font-weight: 700;
-            color: #0f172a;
+            color: var(--ink);
             margin-bottom: 28px;
             letter-spacing: -0.02em;
         }
@@ -84,8 +84,8 @@
             margin-top: 10px;
         }
         thead th {
-            background-color: #1e3a5f !important;
-            color: #ffffff !important;
+            background-color: var(--ink) !important;
+            color: var(--surface) !important;
             font-weight: 600;
             padding: 12px 14px;
             text-align: left;
@@ -96,12 +96,12 @@
         }
         tbody td {
             padding: 11px 14px;
-            border-bottom: 1px solid #e2e8f0;
-            color: #334155;
+            border-bottom: 1px solid var(--line);
+            color: var(--ink);
             vertical-align: middle;
         }
         tbody tr:nth-child(even) td {
-            background-color: #f8fafc;
+            background-color: var(--canvas);
         }
         .status-badge {
             display: inline-block;
@@ -111,16 +111,16 @@
             font-weight: 600;
         }
         .status-active {
-            background-color: #dcfce7;
-            color: #15803d;
+            background-color: var(--soft);
+            color: var(--success);
         }
         .status-inactive {
-            background-color: #fee2e2;
-            color: #b91c1c;
+            background-color: var(--soft);
+            color: var(--danger);
         }
         @media print {
             body {
-                background: #ffffff;
+                background: var(--surface);
                 padding: 0;
             }
             .action-bar {
@@ -132,8 +132,8 @@
                 max-width: 100%;
             }
             thead th {
-                background-color: #1e3a5f !important;
-                color: #ffffff !important;
+                background-color: var(--ink) !important;
+                color: var(--surface) !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
@@ -204,7 +204,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ count($columns) }}" style="text-align: center; padding: 24px; color: #64748b;">
+                        <td colspan="{{ count($columns) }}" style="text-align: center; padding: 24px; color: var(--muted);">
                             No customers found.
                         </td>
                     </tr>

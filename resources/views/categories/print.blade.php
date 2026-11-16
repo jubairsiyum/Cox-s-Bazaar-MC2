@@ -13,14 +13,14 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             padding: 30px;
-            color: #111;
-            background: #ffffff;
+            color: var(--ink);
+            background: var(--surface);
         }
         h1 {
             font-size: 26px;
             font-weight: 700;
             margin-bottom: 22px;
-            color: #000;
+            color: var(--ink);
             letter-spacing: -0.01em;
         }
         table {
@@ -29,16 +29,16 @@
             font-size: 13px;
         }
         th, td {
-            border: 1px solid #ccc;
+            border: 1px solid var(--line);
             padding: 8px 10px;
             text-align: left;
             vertical-align: middle;
-            color: #222;
+            color: var(--ink);
         }
         th {
             font-weight: 700;
-            background-color: #ffffff;
-            color: #000;
+            background-color: var(--surface);
+            color: var(--ink);
         }
         .status-text {
             font-weight: 600;
@@ -90,7 +90,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="{{ count($columns) }}" style="text-align: center; padding: 20px; color: #666;">
+                    <td colspan="{{ count($columns) }}" style="text-align: center; padding: 20px; color: var(--muted);">
                         No categories found.
                     </td>
                 </tr>

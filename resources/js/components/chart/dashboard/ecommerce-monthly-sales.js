@@ -1,3 +1,4 @@
+import { getToken } from '../helpers';
 import { mountChart, readConfig } from '../helpers';
 
 export default (el) => {
@@ -5,7 +6,7 @@ export default (el) => {
 
     mountChart(el, (dark) => ({
         series: [{ name: seriesName, data }],
-        colors: ['#465FFF'],
+        colors: [getToken('--chart-1')],
         chart: { fontFamily: 'Outfit, sans-serif', type: 'bar', height: 200, toolbar: { show: false } },
         plotOptions: {
             bar: {
@@ -20,7 +21,7 @@ export default (el) => {
             enabled: true,
             formatter: (val) => `${(val / 100).toFixed(1)}%`,
             offsetY: -20,
-            style: { fontSize: '12px', fontFamily: 'Outfit, sans-serif', fontWeight: 400, colors: [dark ? '#94A3B8' : '#364153'] },
+            style: { fontSize: '12px', fontFamily: 'Outfit, sans-serif', fontWeight: 400, colors: [dark ? getToken('--muted') : getToken('--ink')] },
             dropShadow: { enabled: false },
         },
         stroke: { show: false },
@@ -28,12 +29,12 @@ export default (el) => {
             categories,
             axisBorder: { show: false },
             axisTicks: { show: false },
-            labels: { style: { colors: dark ? '#94A3B8' : '#364153', fontFamily: 'Outfit, sans-serif' } },
+            labels: { style: { colors: dark ? getToken('--muted') : getToken('--ink'), fontFamily: 'Outfit, sans-serif' } },
         },
         legend: { show: false },
         yaxis: { max: 420, min: 0, tickAmount: 4, labels: { show: false } },
         grid: {
-            borderColor: dark ? '#1E2640' : '#F3F4F6',
+            borderColor: dark ? getToken('--line') : getToken('--line'),
             strokeDashArray: 0,
             padding: { left: -10, right: 0 },
             yaxis: { lines: { show: true } },
@@ -48,8 +49,8 @@ export default (el) => {
                 opacityTo: 1,
                 stops: [0, 100],
                 colorStops: [
-                    { offset: 0, color: '#7592FF', opacity: 1 },
-                    { offset: 100, color: '#465FFF', opacity: 1 },
+                    { offset: 0, color: getToken('--chart-1'), opacity: 1 },
+                    { offset: 100, color: getToken('--chart-1'), opacity: 1 },
                 ],
             },
         },

@@ -2,10 +2,10 @@
     <x-ui.scroll-area class="max-h-[90vh]" viewport-class="max-h-[90vh]">
         <div class="p-6 sm:p-8">
             <x-ui.dialog.header class="gap-1 sm:gap-2">
-                <x-ui.dialog.title class="text-xl font-semibold text-gray-800 sm:text-2xl dark:text-white/90">
+                <x-ui.dialog.title class="text-xl font-semibold text-ink sm:text-2xl">
                     Edit Personal Information
                 </x-ui.dialog.title>
-                <x-ui.dialog.description class="text-sm text-gray-500 dark:text-gray-400">
+                <x-ui.dialog.description class="text-sm text-muted">
                     Update your details to keep your profile up-to-date.
                 </x-ui.dialog.description>
             </x-ui.dialog.header>

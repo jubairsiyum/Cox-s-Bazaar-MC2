@@ -1,3 +1,4 @@
+import { getToken } from '../helpers';
 import { mountChart } from '../helpers';
 
 export default (el) => {
@@ -12,9 +13,9 @@ export default (el) => {
     const options = computed(() => ({
         series: [{ name: 'Progress', data: Array(totalBars).fill(100) }],
         colors: [
-            ...Array(darkCount).fill('#465FFF'),
-            ...Array(lightCount).fill('#9CB9FF'),
-            ...Array(grayCount).fill('#E5E7EB'),
+            ...Array(darkCount).fill(getToken('--chart-1')),
+            ...Array(lightCount).fill(getToken('--brand-400')),
+            ...Array(grayCount).fill(getToken('--line')),
         ],
         chart: {
             fontFamily: 'Outfit, sans-serif',

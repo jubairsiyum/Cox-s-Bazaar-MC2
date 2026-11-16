@@ -99,8 +99,8 @@ export function calendarInit() {
         end: '',
       },
       headerToolbarClass:
-        'sticky top-0! z-20! bg-white dark:bg-gray-900 flex-wrap! flex-row! items-center justify-between gap-3 sm:gap-4 [padding-inline:16px]! sm:[padding-inline:24px]! pt-4 sm:pt-6 pb-3 sm:pb-4',
-      toolbarTitleClass: 'text-base! sm:text-lg! font-semibold! text-gray-800 dark:text-white/90',
+        'sticky top-0! z-20! bg-surface  flex-wrap! flex-row! items-center justify-between gap-3 sm:gap-4 [padding-inline:16px]! sm:[padding-inline:24px]! pt-4 sm:pt-6 pb-3 sm:pb-4',
+      toolbarTitleClass: 'text-base! sm:text-lg! font-semibold! text-ink ',
       toolbarSectionClass: (info) => {
         if (info.name === 'start') {
           return 'ta-toolbar-section ta-toolbar-start order-2 flex w-full items-center justify-between sm:order-1 sm:w-auto sm:justify-start gap-2'
@@ -120,20 +120,20 @@ export function calendarInit() {
             html: chevronLeftSvg,
           },
           className:
-            'flex size-9! sm:size-10! p-0! items-center justify-center! rounded-lg! border! bg-transparent! border-gray-200! text-gray-700 hover:border-gray-200 hover:bg-gray-50! focus:shadow-none active:border-gray-200! active:bg-transparent! active:shadow-none! dark:border-gray-800! dark:text-gray-400 dark:hover:border-gray-800 dark:hover:bg-gray-900! dark:active:border-gray-800!',
+            'flex size-9! sm:size-10! p-0! items-center justify-center! rounded-lg! border! bg-transparent! border-line! text-ink hover:border-line hover:bg-canvas! focus:shadow-none active:border-line! active:bg-transparent! active:shadow-none!     ',
         },
         next: {
           iconContent: {
             html: chevronRightSvg,
           },
           className:
-            'flex size-9! sm:size-10! p-0! items-center justify-center! rounded-lg! border! bg-transparent! border-gray-200! text-gray-700 hover:border-gray-200 hover:bg-gray-50! focus:shadow-none active:border-gray-200! active:bg-transparent! active:shadow-none! dark:border-gray-800! dark:text-gray-400 dark:hover:border-gray-800 dark:hover:bg-gray-900! dark:active:border-gray-800!',
+            'flex size-9! sm:size-10! p-0! items-center justify-center! rounded-lg! border! bg-transparent! border-line! text-ink hover:border-line hover:bg-canvas! focus:shadow-none active:border-line! active:bg-transparent! active:shadow-none!     ',
         },
         addEventButton: {
           text: 'Add Event +',
           click: () => handlers.openAddModal(),
           className:
-            'rounded-lg! border-0! bg-brand-500! px-3! sm:px-4! py-2! sm:py-2.5! text-xs! sm:text-sm! font-medium! text-white hover:bg-brand-600! focus:shadow-none! w-auto!',
+            'rounded-lg! border-0! bg-brand-500! px-3! sm:px-4! py-2! sm:py-2.5! text-xs! sm:text-sm! font-medium! text-on-brand hover:bg-brand-600! focus:shadow-none! w-auto!',
         },
       },
 
@@ -142,28 +142,28 @@ export function calendarInit() {
           multiMonthMaxColumns: 3,
           singleMonthClass: 'fc-multimonth',
           tableClass:
-            'overflow-visible! border-0! sm:border! sm:border-gray-200! dark:sm:border-gray-800! rounded-none! sm:rounded-lg! mt-0! bg-transparent!',
-          singleMonthHeaderClass: 'mb-0! bg-white dark:bg-gray-900 sm:bg-transparent! ',
-          tableHeaderClass: 'mb-0! rounded-none! sm:rounded-t-lg! bg-gray-50 dark:bg-gray-900!',
+            'overflow-visible! border-0! sm:border! sm:border-line!  rounded-none! sm:rounded-lg! mt-0! bg-transparent!',
+          singleMonthHeaderClass: 'mb-0! bg-surface  sm:bg-transparent! ',
+          tableHeaderClass: 'mb-0! rounded-none! sm:rounded-t-lg! bg-canvas ',
           tableBodyClass: 'mt-0!',
           singleMonthMinWidth: 280,
           showNonCurrentDates: true,
-          singleMonthHeaderInnerClass: 'text-sm font-medium! text-gray-800 dark:text-white/90',
+          singleMonthHeaderInnerClass: 'text-sm font-medium! text-ink ',
           dayHeaderRowClass: 'fc-multimonth-day-header-row',
           dayHeaderClass: (data) =>
             data.inPopover
-              ? 'relative! border-b! border-gray-200! bg-gray-50/70! px-4! py-3! text-start! dark:border-gray-800! dark:bg-gray-800/50!'
-              : 'border-0! bg-gray-50 py-2! dark:bg-gray-900 dark:sm:bg-transparent! first:rounded-none! first:sm:rounded-ss-lg! last:rounded-none! last:sm:rounded-se-lg!',
+              ? 'relative! border-b! border-line! bg-canvas! px-4! py-3! text-start!  '
+              : 'border-0! bg-canvas py-2!   first:rounded-none! first:sm:rounded-ss-lg! last:rounded-none! last:sm:rounded-se-lg!',
           dayHeaderInnerClass: (data) =>
             data.inPopover
-              ? 'text-sm! font-semibold! text-gray-800! dark:text-white/90!'
-              : 'py-1 text-[11px] sm:text-xs font-medium text-gray-400 uppercase',
+              ? 'text-sm! font-semibold! text-ink! '
+              : 'py-1 text-[11px] sm:text-xs font-medium text-muted uppercase',
           dayCellClass: (data) => {
             if (data.inPopover) return 'bg-transparent! p-3!'
             let cls = 'relative! p-0.5 sm:p-1!'
             if (data.isToday)
               cls +=
-                ' isolate rounded-sm! bg-gray-100! dark:bg-gray-800/40! font-semibold text-brand-500 dark:text-brand-400'
+                ' isolate rounded-sm! bg-soft!  font-semibold text-brand-500 '
             if (data.isOther) cls += ' bg-transparent!'
             return cls
           },
@@ -171,7 +171,7 @@ export function calendarInit() {
             data.inPopover
               ? 'flex custom-scrollbar max-h-60 flex-col gap-1.5 overflow-y-auto'
               : 'h-0 max-h-0 overflow-hidden invisible',
-          dayCellTopInnerClass: 'text-xs! sm:text-sm! text-gray-700 dark:text-gray-300',
+          dayCellTopInnerClass: 'text-xs! sm:text-sm! text-ink ',
           dayMaxEvents: 0,
           moreLinkClass: 'border-0! bg-transparent! p-0! hover:bg-transparent! focus:outline-none',
           rowMoreLinkClass:
@@ -189,19 +189,19 @@ export function calendarInit() {
           dayHeaderAlign: (data) => (data.inPopover ? 'start' : 'center'),
           dayHeaderClass: (data) =>
             data.inPopover
-              ? 'relative! border-b! border-gray-200! bg-gray-50/70! px-4! py-3! text-start! dark:border-gray-800! dark:bg-gray-800/50!'
-              : 'border-x-0! border-t border-gray-200! bg-gray-50 dark:border-gray-800! dark:bg-gray-900',
+              ? 'relative! border-b! border-line! bg-canvas! px-4! py-3! text-start!  '
+              : 'border-x-0! border-t border-line! bg-canvas  ',
           dayHeaderInnerClass: (data) =>
             data.inPopover
-              ? 'text-sm! font-semibold! text-gray-800! dark:text-white/90!'
-              : 'px-1! py-2! sm:px-3! sm:py-3! md:px-5! md:py-4! text-xs! sm:text-sm! font-medium! text-gray-400 uppercase',
+              ? 'text-sm! font-semibold! text-ink! '
+              : 'px-1! py-2! sm:px-3! sm:py-3! md:px-5! md:py-4! text-xs! sm:text-sm! font-medium! text-muted uppercase',
           dayCellClass: (data) => {
             if (data.inPopover) return 'bg-transparent! p-3!'
             return `bg-transparent! p-1! sm:p-2! ${
-              data.isToday ? 'bg-gray-100! dark:bg-gray-800/40!' : ''
+              data.isToday ? 'bg-soft! ' : ''
             }`
           },
-          dayCellTopInnerClass: 'text-xs! sm:text-sm! text-gray-700 dark:text-gray-300',
+          dayCellTopInnerClass: 'text-xs! sm:text-sm! text-ink ',
           dayCellInnerClass: (data) => {
             if (data.inPopover)
               return 'flex custom-scrollbar max-h-60 flex-col gap-1.5 overflow-y-auto'
@@ -220,7 +220,7 @@ export function calendarInit() {
               }
             }
             return {
-              html: `<span class="fc-more-link-badge inline-flex items-center rounded-sm bg-brand-50 px-1 py-0.5 text-[10px] font-medium text-brand-600 transition-colors hover:bg-brand-100 sm:px-1.5 sm:text-xs dark:bg-brand-500/15 dark:text-brand-400 dark:hover:bg-brand-500/25">+${args.num} more</span>`,
+              html: `<span class="fc-more-link-badge inline-flex items-center rounded-sm bg-brand-50 px-1 py-0.5 text-[10px] font-medium text-brand-600 transition-colors hover:bg-brand-100 sm:px-1.5 sm:text-xs   ">+${args.num} more</span>`,
             }
           },
         },
@@ -251,26 +251,26 @@ export function calendarInit() {
             return `${weekday} - ${day}`
           },
           dayHeaderClass: (data) =>
-            `border-0! bg-gray-50! dark:bg-gray-900! ${
-              data.isToday ? 'bg-gray-100/70! dark:bg-gray-800/60!' : ''
+            `border-0! bg-canvas!  ${
+              data.isToday ? 'bg-soft! ' : ''
             }`,
           dayHeaderInnerClass: (data) =>
-            `px-1.5! sm:px-3! py-2.5! sm:py-3.5! text-center! text-[11px]! sm:text-xs! font-medium! text-gray-500! uppercase! dark:text-gray-400! ${
-              data.isToday ? 'font-semibold! text-brand-500! dark:text-brand-400!' : ''
+            `px-1.5! sm:px-3! py-2.5! sm:py-3.5! text-center! text-[11px]! sm:text-xs! font-medium! text-muted! uppercase!  ${
+              data.isToday ? 'font-semibold! text-brand-500! ' : ''
             }`,
           slotHeaderDividerClass:
-            'border-e! border-s-0! border-y-0! border-gray-200! dark:border-gray-800!',
+            'border-e! border-s-0! border-y-0! border-line! ',
           slotHeaderClass:
-            'px-1.5! sm:px-3! py-1.5! sm:py-2! text-start! text-[11px]! sm:text-xs! font-medium! text-gray-400! dark:text-gray-500!',
-          slotLaneClass: 'border-gray-100! dark:border-gray-800/60!',
+            'px-1.5! sm:px-3! py-1.5! sm:py-2! text-start! text-[11px]! sm:text-xs! font-medium! text-muted! ',
+          slotLaneClass: 'border-line! ',
           dayLaneClass: (data) =>
-            `border-gray-200! dark:border-gray-800! ${
-              data.isToday ? 'bg-brand-50/15! dark:bg-brand-500/[0.03]!' : ''
+            `border-line!  ${
+              data.isToday ? 'bg-brand-50/15! ' : ''
             }`,
           allDayDividerClass:
-            'border-b! border-t-0! border-x-0! border-gray-200! p-0! bg-transparent! dark:border-gray-800!',
+            'border-b! border-t-0! border-x-0! border-line! p-0! bg-transparent! ',
           allDayHeaderClass:
-            'border-0! bg-gray-50! text-[11px]! sm:text-xs! font-medium! text-gray-500! dark:border-0! dark:bg-gray-900! dark:text-gray-400!',
+            'border-0! bg-canvas! text-[11px]! sm:text-xs! font-medium! text-muted!   ',
         },
         timeGridDay: {
           slotDuration: '00:30:00',
@@ -299,39 +299,39 @@ export function calendarInit() {
             return `${weekday} - ${day}`
           },
           dayHeaderClass: (data) =>
-            `border-0! bg-gray-50! dark:bg-gray-900! ${
-              data.isToday ? 'bg-gray-100/70! dark:bg-gray-800/60!' : ''
+            `border-0! bg-canvas!  ${
+              data.isToday ? 'bg-soft! ' : ''
             }`,
           dayHeaderInnerClass: (data) =>
-            `px-2! sm:px-4! py-2.5! sm:py-3.5! text-center! text-xs! font-medium! text-gray-500! uppercase! dark:text-gray-400! ${
-              data.isToday ? 'font-semibold! text-brand-500! dark:text-brand-400!' : ''
+            `px-2! sm:px-4! py-2.5! sm:py-3.5! text-center! text-xs! font-medium! text-muted! uppercase!  ${
+              data.isToday ? 'font-semibold! text-brand-500! ' : ''
             }`,
           slotHeaderDividerClass:
-            'border-e! border-s-0! border-y-0! border-gray-200! dark:border-gray-800!',
+            'border-e! border-s-0! border-y-0! border-line! ',
           slotHeaderClass:
-            'px-2! sm:px-3! py-1.5! sm:py-2! text-start! text-[11px]! sm:text-xs! font-medium! text-gray-400! dark:text-gray-500!',
-          slotLaneClass: 'border-gray-100! dark:border-gray-800/60!',
+            'px-2! sm:px-3! py-1.5! sm:py-2! text-start! text-[11px]! sm:text-xs! font-medium! text-muted! ',
+          slotLaneClass: 'border-line! ',
           dayLaneClass: (data) =>
-            `border-gray-200! dark:border-gray-800! ${
-              data.isToday ? 'bg-brand-50/15! dark:bg-brand-500/[0.03]!' : ''
+            `border-line!  ${
+              data.isToday ? 'bg-brand-50/15! ' : ''
             }`,
           allDayDividerClass:
-            'border-b! border-t-0! border-x-0! border-gray-200! p-0! bg-transparent! dark:border-gray-800!',
+            'border-b! border-t-0! border-x-0! border-line! p-0! bg-transparent! ',
           allDayHeaderClass:
-            'border-0! bg-gray-50! text-xs! font-medium! text-gray-500! dark:border-0! dark:bg-gray-900! dark:text-gray-400!',
+            'border-0! bg-canvas! text-xs! font-medium! text-muted!   ',
         },
       },
 
       viewClass:
-        'border-t! border-b-0! border-x-0! border-gray-200! bg-transparent! dark:border-gray-800! dark:bg-transparent!',
-      tableHeaderClass: 'border-0! bg-gray-50! dark:bg-gray-900!',
+        'border-t! border-b-0! border-x-0! border-line! bg-transparent!  ',
+      tableHeaderClass: 'border-0! bg-canvas! ',
       dayHeaderDividerClass:
-        'border-b! border-t-0! border-x-0! border-gray-200! p-0! bg-transparent! dark:border-gray-800!',
+        'border-b! border-t-0! border-x-0! border-line! p-0! bg-transparent! ',
       slotMinHeight: 56,
       slotHeaderDividerClass:
-        'border-e! border-s-0! border-y-0! border-gray-200! dark:border-gray-800!',
+        'border-e! border-s-0! border-y-0! border-line! ',
       allDayDividerClass:
-        'border-b! border-t-0! border-x-0! border-gray-200! p-0! bg-transparent! dark:border-gray-800!',
+        'border-b! border-t-0! border-x-0! border-line! p-0! bg-transparent! ',
       eventClass: 'focus:shadow-none',
       nowIndicator: false,
       columnEventClass:
@@ -344,9 +344,9 @@ export function calendarInit() {
       rowEventInnerClass: 'p-0! border-0! bg-transparent!',
       popoverFormat: { month: 'short', day: 'numeric', year: 'numeric' },
       popoverClass:
-        'z-99999! w-72 max-w-[calc(100vw-32px)] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-lg dark:border-gray-800 dark:bg-gray-900',
+        'z-99999! w-72 max-w-[calc(100vw-32px)] overflow-hidden rounded-2xl border border-line bg-surface shadow-theme-lg  ',
       popoverCloseClass:
-        'absolute end-3 top-2.5 flex size-7 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus:outline-none dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white',
+        'absolute end-3 top-2.5 flex size-7 cursor-pointer items-center justify-center rounded-lg text-muted transition-colors hover:bg-soft hover:text-muted focus:outline-none   ',
       popoverCloseContent: {
         html: closeSvg,
       },
