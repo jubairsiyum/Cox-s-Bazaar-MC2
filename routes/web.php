@@ -17,6 +17,8 @@ use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\PlaceholderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\PurchaseReturnController;
 use App\Http\Controllers\StockAdjustmentController;
 use App\Http\Controllers\StockTransferController;
 use App\Http\Controllers\SupplierController;
@@ -300,6 +302,60 @@ Route::middleware('auth')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
+    | Purchase Orders (Purchasing) — the "Add" form section
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['verified', 'permission:purchase-orders.manage'])->group(function () {
+        Route::get('purchase-orders', fn () => redirect()->route('purchase-orders.create'))->name('purchase-orders.index');
+        Route::get('purchase-orders/create', [PurchaseOrderController::class, 'create'])->name('purchase-orders.create');
+        Route::post('purchase-orders', [PurchaseOrderController::class, 'store'])->name('purchase-orders.store');
+    });
+
+    Route::get('purchase-orders/search-units', [PurchaseOrderController::class, 'searchUnits'])
+        ->name('purchase-orders.search-units')
+        ->middleware(['verified', 'permission:purchase-orders.manage|purchase-invoices.manage']);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Purchase Invoices (Purchasing) — the register of purchase records
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['verified', 'permission:purchase-invoices.view|purchase-invoices.manage|purchase-invoices.post'])->group(function () {
+        Route::get('purchase-invoices', [PurchaseOrderController::class, 'index'])->name('purchase-invoices.index');
+        Route::get('purchase-invoices/pdf-view', [PurchaseOrderController::class, 'pdfView'])->name('purchase-invoices.pdf-view');
+        Route::get('purchase-invoices/print-view', [PurchaseOrderController::class, 'printView'])->name('purchase-invoices.print-view');
+        Route::get('purchase-invoices/export/{format?}', [PurchaseOrderController::class, 'export'])->name('purchase-invoices.export');
+        Route::get('purchase-invoices/{purchaseOrder}', [PurchaseOrderController::class, 'show'])->name('purchase-invoices.show');
+    });
+
+    Route::middleware(['verified', 'permission:purchase-invoices.manage'])->group(function () {
+        Route::get('purchase-invoices/{purchaseOrder}/edit', [PurchaseOrderController::class, 'edit'])->name('purchase-invoices.edit');
+        Route::patch('purchase-invoices/{purchaseOrder}', [PurchaseOrderController::class, 'update'])->name('purchase-invoices.update');
+        Route::delete('purchase-invoices/{purchaseOrder}', [PurchaseOrderController::class, 'destroy'])->name('purchase-invoices.destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Purchase Returns (Purchasing)
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['verified', 'permission:purchase-returns.manage'])->group(function () {
+        Route::get('purchase-returns', [PurchaseReturnController::class, 'index'])->name('purchase-returns.index');
+        Route::get('purchase-returns/supplier-purchases', [PurchaseReturnController::class, 'supplierPurchases'])->name('purchase-returns.supplier-purchases');
+        Route::get('purchase-returns/purchase-details', [PurchaseReturnController::class, 'purchaseDetails'])->name('purchase-returns.purchase-details');
+        Route::get('purchase-returns/create', [PurchaseReturnController::class, 'create'])->name('purchase-returns.create');
+        Route::post('purchase-returns', [PurchaseReturnController::class, 'store'])->name('purchase-returns.store');
+        Route::get('purchase-returns/pdf-view', [PurchaseReturnController::class, 'pdfView'])->name('purchase-returns.pdf-view');
+        Route::get('purchase-returns/print-view', [PurchaseReturnController::class, 'printView'])->name('purchase-returns.print-view');
+        Route::get('purchase-returns/export/{format?}', [PurchaseReturnController::class, 'export'])->name('purchase-returns.export');
+        Route::get('purchase-returns/{purchaseReturn}/edit', [PurchaseReturnController::class, 'edit'])->name('purchase-returns.edit');
+        Route::patch('purchase-returns/{purchaseReturn}', [PurchaseReturnController::class, 'update'])->name('purchase-returns.update');
+        Route::delete('purchase-returns/{purchaseReturn}', [PurchaseReturnController::class, 'destroy'])->name('purchase-returns.destroy');
+        Route::get('purchase-returns/{purchaseReturn}', [PurchaseReturnController::class, 'show'])->name('purchase-returns.show');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
     | TailAdmin Showcase & Demos
     |--------------------------------------------------------------------------
     */
@@ -327,9 +383,6 @@ Route::middleware('auth')->group(function () {
 */
 Route::middleware(['auth', 'verified'])->group(function () {
     $placeholders = [
-        'purchase-orders.index' => 'Purchase Orders',
-        'purchase-invoices.index' => 'Purchase Invoices',
-        'purchase-returns.index' => 'Purchase Returns',
         'sales-orders.index' => 'Sales Orders',
         'sales-invoices.index' => 'Sales Invoices',
         'sales-returns.index' => 'Sales Returns',
@@ -346,9 +399,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Permission guards for placeholders whose module permissions are already seeded.
     $placeholderPermissions = [
-        'purchase-orders.index' => 'permission:purchase-orders.manage',
-        'purchase-invoices.index' => 'permission:purchase-invoices.view|purchase-invoices.manage|purchase-invoices.post',
-        'purchase-returns.index' => 'permission:purchase-returns.manage',
         'sales-orders.index' => 'permission:sales-orders.manage',
         'sales-invoices.index' => 'permission:sales-invoices.view|sales-invoices.manage|sales-invoices.post',
         'sales-returns.index' => 'permission:sales-returns.manage',

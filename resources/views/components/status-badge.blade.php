@@ -4,9 +4,9 @@
 $classes = match($status) {
     'active', 'posted', 'paid', 'delivered', 'completed', 'received' => 'badge-success',
     'draft', 'pending' => 'badge-neutral',
-    'confirmed', 'partially_paid', 'partial', 'in-transit' => 'badge-info',
+    'confirmed', 'partially_paid', 'partial', 'in-transit', 'ordered' => 'badge-info',
     'cancelled', 'voided', 'inactive' => 'badge-danger',
-    'returned', 'reversed' => 'badge-warning',
+    'returned', 'reversed', 'due' => 'badge-warning',
     default => 'badge-neutral',
 };
 $label = $label ?? ucfirst(str_replace('_', ' ', $status));
