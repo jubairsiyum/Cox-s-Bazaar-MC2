@@ -8,7 +8,7 @@
 
   <script>
     (function () {
-      var root = document.documentElement, allowed = ['swift'], theme = 'swift';
+      var root = document.documentElement, allowed = ['swift', 'ocean', 'aurora', 'ember', 'emerald', 'graphite'], theme = 'swift';
       try {
         var c = localStorage.getItem('color-theme');
         if (c && allowed.indexOf(c) > -1) theme = c;

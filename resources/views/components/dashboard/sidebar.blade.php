@@ -275,10 +275,17 @@
 
   {{-- Bottom Utilities --}}
   <div class="mt-auto shrink-0 space-y-1 border-t border-line pt-4">
-    @if (Route::has('admin.settings.index'))
-      <a href="{{ route('admin.settings.index') }}"
+    @php
+      $sidebarSettingsUrl = Route::has('settings.index') ? route('settings.index') : (Route::has('admin.settings.index') ? route('admin.settings.index') : null);
+    @endphp
+    @if ($sidebarSettingsUrl)
+      <a href="{{ $sidebarSettingsUrl }}"
          class="flex items-center gap-3 rounded-full px-3 py-2 text-sm font-medium text-muted transition hover:bg-soft/60 hover:text-ink">
         <x-icon name="settings" class="size-4.5" /> Settings
+      </a>
+      <a href="{{ $sidebarSettingsUrl }}?tab=theme"
+         class="flex items-center gap-3 rounded-full px-3 py-2 text-sm font-medium text-muted transition hover:bg-soft/60 hover:text-ink">
+        <x-icon name="palette" class="size-4.5 text-brand-500" /> Themes
       </a>
     @endif
 

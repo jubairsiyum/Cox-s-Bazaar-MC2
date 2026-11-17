@@ -2,7 +2,12 @@
 @import "prismjs/themes/prism.min.css";
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "./themes/swift.css";   /* add one line per future theme */
+@import "./themes/swift.css";
+@import "./themes/ocean.css";
+@import "./themes/aurora.css";
+@import "./themes/ember.css";
+@import "./themes/emerald.css";
+@import "./themes/graphite.css";
 @import "./motion.css";
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';

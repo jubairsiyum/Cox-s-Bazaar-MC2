@@ -98,10 +98,20 @@
           <x-icon name="drivers" class="size-4" /> Profile
         </a>
 
-        @if (Route::has('admin.settings.index'))
-          <a href="{{ route('admin.settings.index') }}"
+        @php
+          $settingsRoute = Route::has('settings.index') ? route('settings.index') : (Route::has('admin.settings.index') ? route('admin.settings.index') : null);
+        @endphp
+
+        @if ($settingsRoute)
+          <a href="{{ $settingsRoute }}"
              class="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-muted transition-colors hover:bg-soft hover:text-ink">
             <x-icon name="settings" class="size-4" /> Settings
+          </a>
+          <a href="{{ $settingsRoute }}?tab=theme"
+             class="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-muted transition-colors hover:bg-soft hover:text-ink">
+            <x-icon name="palette" class="size-4 text-brand-500" />
+            <span class="flex-1">Choose Theme</span>
+            <span class="size-2 rounded-full bg-brand-500"></span>
           </a>
         @endif
 

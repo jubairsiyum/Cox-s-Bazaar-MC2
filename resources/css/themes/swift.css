@@ -5,6 +5,7 @@
 
 :root,
 :root:not([data-theme]),
+:root[data-theme="swift"],
 [data-theme="swift"] {
     /* Surfaces */
     --canvas: #e2eaf7; /* page background behind the app */
@@ -43,6 +44,7 @@
 
 :root.dark,
 :root:not([data-theme]).dark,
+:root[data-theme="swift"].dark,
 [data-theme="swift"].dark {
     --canvas: #0a0d1a;
     --shell: #10142a;

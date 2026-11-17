@@ -148,7 +148,7 @@ Alpine.data("barcodeField", () => ({
 }));
 
 // Theme store (Multi-theme + Dark mode)
-const THEMES = ['swift'];            // add new theme names here
+const THEMES = ['swift', 'ocean', 'aurora', 'ember', 'emerald', 'graphite'];
 const DEFAULT_THEME = 'swift';
 const read  = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const write = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
@@ -161,6 +161,15 @@ Alpine.store('theme', {
       this.dark = !this.dark;
       document.documentElement.classList.toggle('dark', this.dark);
       write('theme', this.dark ? 'dark' : 'light');
+      notify();
+    });
+  },
+  setDark(isDark) {
+    if (this.dark === isDark) return;
+    themeSwitch(() => {
+      this.dark = isDark;
+      document.documentElement.classList.toggle('dark', isDark);
+      write('theme', isDark ? 'dark' : 'light');
       notify();
     });
   },

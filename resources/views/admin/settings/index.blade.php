@@ -11,13 +11,26 @@
     </div>
 </div>
 
-<div x-data="{ tab: 'company' }">
+<div x-data="{
+    tab: new URLSearchParams(window.location.search).get('tab') || (window.location.hash ? window.location.hash.substring(1) : 'company'),
+    setTab(t) {
+        this.tab = t;
+        const url = new URL(window.location);
+        url.searchParams.set('tab', t);
+        window.history.replaceState({}, '', url);
+    }
+}">
     {{-- Tabs --}}
     <div class="tabs">
         @foreach($tabs as $key => $label)
             <button type="button" class="tab" :class="{ 'active': tab === '{{ $key }}' }"
-                    @click="tab = '{{ $key }}'" x-text="'{{ $label }}'"></button>
+                    @click="setTab('{{ $key }}')" x-text="'{{ $label }}'"></button>
         @endforeach
+        <button type="button" class="tab" :class="{ 'active': tab === 'theme' }"
+                @click="setTab('theme')">
+            <x-icon name="palette" class="size-4" />
+            <span>Theme & Appearance</span>
+        </button>
     </div>
 
     <form method="POST" action="{{ route('settings.update') }}">
@@ -98,6 +111,11 @@
             </div>
         @endforeach
     </form>
+
+    {{-- Theme & Appearance Tab --}}
+    <div x-show="tab === 'theme'" x-cloak class="mt-4">
+        @include('admin.settings.partials.theme-tab')
+    </div>
 </div>
 
 @push('head')
