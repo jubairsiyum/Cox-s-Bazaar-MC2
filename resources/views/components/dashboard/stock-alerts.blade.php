@@ -67,9 +67,7 @@
       @forelse ($items as $item)
         <div style="--item-i: {{ $loop->index }}" class="flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-3.5 transition-colors hover:border-line/80 hover:bg-soft/20">
           <div class="flex items-center gap-3 min-w-0 flex-1">
-            <span class="grid size-9 shrink-0 place-items-center rounded-xl bg-soft text-brand-500 font-bold text-xs">
-              {{ substr($item['brand'], 0, 2) }}
-            </span>
+            <x-brand-logo :name="$item['brand']" size="sm" />
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2 min-w-0">
                 <p class="truncate text-sm font-bold text-ink" title="{{ $item['brand'] }} {{ $item['model'] }}">{{ $item['brand'] }} {{ $item['model'] }}</p>
