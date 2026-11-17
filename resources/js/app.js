@@ -6,6 +6,7 @@ import "flatpickr/dist/flatpickr.min.css";
 import "./bootstrap";
 import initCharts from "./components/chart";
 import registerUi from "./ui";
+import { registerMotion, startMotion, themeSwitch } from "./motion";
 
 Alpine.plugin(persist);
 
@@ -156,21 +157,28 @@ const notify = () => window.dispatchEvent(new CustomEvent('theme-changed'));
 Alpine.store('theme', {
   dark: document.documentElement.classList.contains('dark'),
   toggle() {
-    this.dark = !this.dark;
-    document.documentElement.classList.toggle('dark', this.dark);
-    write('theme', this.dark ? 'dark' : 'light');
-    notify();
+    themeSwitch(() => {
+      this.dark = !this.dark;
+      document.documentElement.classList.toggle('dark', this.dark);
+      write('theme', this.dark ? 'dark' : 'light');
+      notify();
+    });
   },
   themes: THEMES,
   name: document.documentElement.dataset.theme || DEFAULT_THEME,
   setTheme(n) {
     if (!THEMES.includes(n)) return;
-    this.name = n;
-    document.documentElement.dataset.theme = n;
-    write('color-theme', n);
-    notify();
+    themeSwitch(() => {
+      this.name = n;
+      document.documentElement.dataset.theme = n;
+      write('color-theme', n);
+      notify();
+    });
   },
 });
+
+registerMotion(Alpine);
+startMotion();
 
 // Start Alpine
 Alpine.start();

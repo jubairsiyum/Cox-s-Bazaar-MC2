@@ -58,7 +58,7 @@ $chartConfig = [
 ];
 @endphp
 
-<section class="h-full rounded-3xl bg-surface p-6 shadow-card flex flex-col justify-between"
+<section {{ $attributes->merge(['class' => 'h-full rounded-3xl bg-surface p-6 shadow-card flex flex-col justify-between']) }}
   x-data="{
     mode: 'share',
     selectedBrand: 'all',

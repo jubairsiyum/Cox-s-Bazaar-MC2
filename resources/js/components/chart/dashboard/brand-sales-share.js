@@ -83,10 +83,10 @@ export default (el) => {
                 animations: {
                     enabled: true,
                     easing: 'easeinout',
-                    speed: 350,
+                    speed: 950,
                     dynamicAnimation: {
                         enabled: true,
-                        speed: 300,
+                        speed: 350,
                     },
                 },
             },

@@ -12,6 +12,11 @@
           if (localStorage.getItem('dir') === 'rtl') root.setAttribute('dir', 'rtl');
         } catch (e) {}
         root.setAttribute('data-theme', theme);
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          root.classList.add('motion');
+          if ((navigator.deviceMemory && navigator.deviceMemory <= 2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2)) root.classList.add('motion-lite');
+          setTimeout(function () { if (!root.classList.contains('motion-ready')) root.classList.add('motion-failsafe'); }, 3500);
+        }
       })();
     </script>
     <meta charset="utf-8">

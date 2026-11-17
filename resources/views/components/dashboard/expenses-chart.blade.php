@@ -65,7 +65,7 @@
             {{ $currency }}<span x-text="fmt(v)"></span>
           </div>
 
-          <div class="w-full max-w-[38px] rounded-full transition-all duration-300"
+          <div class="w-full max-w-[38px] rounded-full transition-[height,background-color] duration-300"
                :class="active === i ? 'bg-brand-500' : 'bg-soft'"
                :style="`height: calc(${h(v)}% * 0.88)`"></div>
           <span class="text-xs transition" :class="active === i ? 'font-bold text-ink' : 'text-muted'" x-text="months[i]"></span>
