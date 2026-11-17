@@ -27,11 +27,12 @@
   ],
 ])
 
-<section class="h-full flex flex-col justify-between rounded-3xl bg-surface p-6 shadow-card"
+<section {{ $attributes->merge(['class' => 'h-full flex flex-col justify-between rounded-3xl bg-surface p-6 shadow-card']) }}
   x-data="{
     period: '7d',
     view: 'both',
     active: null,
+    animating: false,
     periods: @js($periods),
     open: false,
     currency: '{{ $currency }}',
@@ -72,13 +73,23 @@
       return Number(num || 0).toLocaleString('en-US');
     },
     switchView(v) {
-      this.view = v;
+      if (this.view === v) return;
       this.active = null;
+      this.animating = true;
+      this.view = v;
+      setTimeout(() => {
+        this.animating = false;
+      }, 30);
     },
     switchPeriod(k) {
+      if (this.period === k) return;
       this.period = k;
       this.open = false;
       this.active = null;
+      this.animating = true;
+      setTimeout(() => {
+        this.animating = false;
+      }, 30);
     }
   }">
 
@@ -122,8 +133,14 @@
             <span x-text="current.label"></span>
             <x-icon name="chevron" class="size-3.5" />
           </button>
-          <ul x-show="open" x-cloak x-transition 
-              class="absolute right-0 z-40 mt-1 w-32 rounded-2xl border border-line bg-surface p-1 text-xs shadow-card">
+          <ul x-show="open" x-cloak
+              x-transition:enter="transition duration-300 ease-[cubic-bezier(.16,1,.3,1)]"
+              x-transition:enter-start="opacity-0 scale-95 -translate-y-2"
+              x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+              x-transition:leave="transition duration-150 ease-in"
+              x-transition:leave-start="opacity-100 scale-100"
+              x-transition:leave-end="opacity-0 scale-95"
+              class="absolute right-0 z-40 mt-1 w-32 origin-top-right rounded-2xl border border-line bg-surface p-1 text-xs shadow-card">
             <template x-for="(item, key) in periods" :key="key">
               <li>
                 <button @click="switchPeriod(key)" 
@@ -182,35 +199,37 @@
         {{-- Column Bars --}}
         <template x-for="(cat, idx) in current.categories" :key="cat + idx">
           <div class="relative flex h-full flex-1 cursor-pointer flex-col items-center justify-end"
+               :style="`--bar-i: ${idx}`"
                @mouseenter="active = idx" 
                @focus="active = idx" 
                tabindex="0">
 
             {{-- BARS CONTAINER: Explicit height ensures percentage calculates perfectly in all browsers --}}
-            <div class="flex h-[calc(100%-1.75rem)] w-full items-end justify-center gap-1 sm:gap-2"
+            <div class="flex h-[calc(100%-1.75rem)] w-full items-end justify-center gap-1 sm:gap-2 transition-[max-width] duration-300 ease-out"
                  :class="view === 'both' ? 'max-w-[46px]' : 'max-w-[38px]'">
 
               {{-- Sales Bar --}}
               <div x-show="view === 'both' || view === 'sales'"
-                   class="relative flex h-full w-full flex-col justify-end overflow-hidden rounded-full bg-soft transition-all duration-300"
+                   class="relative flex h-full w-full flex-col justify-end overflow-hidden rounded-full bg-soft transition-[max-width,background-color] duration-300 ease-out"
                    :class="view === 'both' ? 'max-w-[18px]' : 'max-w-[38px]'">
-                <div class="w-full rounded-full transition-all duration-300"
+                <div class="bar w-full rounded-full transition-[height,background-color] duration-300 ease-out"
                      :class="active === idx ? 'bg-brand-500 shadow-md ring-2 ring-brand-500/30' : 'bg-brand-500/85'"
-                     :style="`height: ${h(current.sales[idx])}%`"></div>
+                     :style="`height: ${animating ? 0 : h(current.sales[idx])}%`"></div>
               </div>
 
               {{-- Collections Bar --}}
               <div x-show="view === 'both' || view === 'collections'"
-                   class="relative flex h-full w-full flex-col justify-end overflow-hidden rounded-full bg-soft transition-all duration-300"
+                   class="relative flex h-full w-full flex-col justify-end overflow-hidden rounded-full bg-soft transition-[max-width,background-color] duration-300 ease-out"
                    :class="view === 'both' ? 'max-w-[18px]' : 'max-w-[38px]'">
-                <div class="w-full rounded-full transition-all duration-300"
+                <div class="bar w-full rounded-full transition-[height,background-color] duration-300 ease-out"
+                     style="--bar-offset: 40ms;"
                      :class="active === idx ? 'bg-success shadow-md ring-2 ring-success/30' : 'bg-success/85'"
-                     :style="`height: ${h(current.collections[idx])}%`"></div>
+                     :style="`height: ${animating ? 0 : h(current.collections[idx])}%; --bar-offset: 40ms;`"></div>
               </div>
             </div>
 
             {{-- X-Axis Category Label --}}
-            <span class="mt-2 text-xs truncate transition text-center select-none" 
+            <span class="bar-label mt-2 text-xs truncate transition-colors text-center select-none" 
                   :class="active === idx ? 'font-bold text-ink' : 'text-muted'" 
                   x-text="cat"></span>
           </div>

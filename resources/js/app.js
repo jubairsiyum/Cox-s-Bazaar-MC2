@@ -6,6 +6,7 @@ import "flatpickr/dist/flatpickr.min.css";
 import "./bootstrap";
 import initCharts from "./components/chart";
 import registerUi from "./ui";
+import { registerMotion, startMotion, themeSwitch } from "./motion";
 
 Alpine.plugin(persist);
 
@@ -147,7 +148,7 @@ Alpine.data("barcodeField", () => ({
 }));
 
 // Theme store (Multi-theme + Dark mode)
-const THEMES = ['swift'];            // add new theme names here
+const THEMES = ['swift', 'ocean', 'aurora', 'ember', 'emerald', 'graphite'];
 const DEFAULT_THEME = 'swift';
 const read  = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const write = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
@@ -156,21 +157,37 @@ const notify = () => window.dispatchEvent(new CustomEvent('theme-changed'));
 Alpine.store('theme', {
   dark: document.documentElement.classList.contains('dark'),
   toggle() {
-    this.dark = !this.dark;
-    document.documentElement.classList.toggle('dark', this.dark);
-    write('theme', this.dark ? 'dark' : 'light');
-    notify();
+    themeSwitch(() => {
+      this.dark = !this.dark;
+      document.documentElement.classList.toggle('dark', this.dark);
+      write('theme', this.dark ? 'dark' : 'light');
+      notify();
+    });
+  },
+  setDark(isDark) {
+    if (this.dark === isDark) return;
+    themeSwitch(() => {
+      this.dark = isDark;
+      document.documentElement.classList.toggle('dark', isDark);
+      write('theme', isDark ? 'dark' : 'light');
+      notify();
+    });
   },
   themes: THEMES,
   name: document.documentElement.dataset.theme || DEFAULT_THEME,
   setTheme(n) {
     if (!THEMES.includes(n)) return;
-    this.name = n;
-    document.documentElement.dataset.theme = n;
-    write('color-theme', n);
-    notify();
+    themeSwitch(() => {
+      this.name = n;
+      document.documentElement.dataset.theme = n;
+      write('color-theme', n);
+      notify();
+    });
   },
 });
+
+registerMotion(Alpine);
+startMotion();
 
 // Start Alpine
 Alpine.start();

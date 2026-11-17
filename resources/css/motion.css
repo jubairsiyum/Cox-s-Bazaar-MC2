@@ -1,0 +1,442 @@
+/* ===== Motion system v2 (optimized) ===== */
+:root {
+  --m-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --m-ease-io: cubic-bezier(0.65, 0, 0.35, 1);
+  --m-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --m-dur: 0.8s;
+  --m-stagger: 70ms;
+  --m-max: 10;                 /* stagger index cap: total entrance <= ~1.5s */
+  --m-accent: currentColor;    /* MAP to the project's primary color token */
+  --m-shadow-rgb: 0 0 0;       /* MAP to the project's shadow "R G B" token */
+}
+@media (max-width: 640px) { :root { --m-dur: 0.65s; --m-stagger: 45ms; } }
+
+@keyframes m-up    { from { opacity: 0; transform: translateY(24px) scale(0.985); } }
+@keyframes m-blur  { from { opacity: 0; transform: translateY(24px) scale(0.985); filter: blur(6px); } }
+@keyframes m-down  { from { opacity: 0; transform: translateY(-18px); } }
+@keyframes m-left  { from { opacity: 0; transform: translateX(-26px); } }
+@keyframes m-right { from { opacity: 0; transform: translateX(26px); } }
+@keyframes m-scale { from { opacity: 0; transform: scale(0.95); } }
+@keyframes m-fade  { from { opacity: 0; } }
+@keyframes m-shell { from { opacity: 0; transform: scale(0.98); } }
+@keyframes m-bar   {
+  0% { transform: scaleY(0); opacity: 0; }
+  35% { opacity: 1; }
+  100% { transform: scaleY(1); opacity: 1; }
+}
+@keyframes m-wipe  { from { clip-path: inset(-20% 100% -20% 0); } to { clip-path: inset(-20% -2% -20% 0); } }
+@keyframes m-gauge {
+  0%   { stroke-dasharray: 0 100; }
+  42%  { stroke-dasharray: 100 100; }
+  100% { stroke-dasharray: var(--target-pct, 50) 100; }
+}
+@keyframes m-drive { from { opacity: 0; transform: translateX(80px); } }
+@keyframes m-pop   { from { opacity: 0; transform: translateY(6px) scale(0.88); } }
+@keyframes m-sheen { to { transform: translateX(120%); } }
+
+.rv, .enter { --rv: m-up; }
+.mv-blur  { --rv: m-blur; }   /* small tiles only (KPI cards) */
+.mv-down  { --rv: m-down; }
+.mv-left  { --rv: m-left; }
+.mv-right { --rv: m-right; }
+.mv-scale { --rv: m-scale; }
+.mv-fade  { --rv: m-fade; }
+.mv-shell { --rv: m-shell; }
+
+html.motion .rv:not(.in) { opacity: 0; }
+html.motion .rv.in,
+html.motion .enter {
+  animation: var(--rv) var(--m-dur) var(--m-ease) backwards;   /* backwards, never forwards/both */
+  animation-delay: calc(min(var(--i, 0), var(--m-max)) * var(--m-stagger) + var(--d, 0ms));
+}
+html.motion-failsafe .rv:not(.in) { opacity: 1; }
+
+html.motion .rv.in .bar {
+  transform-origin: bottom;
+  animation: m-bar 0.75s var(--m-ease) backwards;
+  animation-delay: calc(0.3s + var(--bar-i, 0) * 85ms + var(--bar-offset, 0ms));
+}
+html.motion .rv.in .bar-label {
+  animation: m-fade 0.45s ease backwards;
+  animation-delay: calc(0.4s + var(--bar-i, 0) * 85ms);
+}
+html.motion .rv.in .wipe  { animation: m-wipe 1.3s var(--m-ease-io) 0.3s backwards; }
+html.motion .rv.in .dot   { animation: m-pop 0.5s var(--m-spring) 1.4s backwards; }
+html.motion .rv.in .gauge { animation: m-gauge 1.5s var(--m-ease-io) 0.35s backwards; }
+html.motion .rv.in .gauge-label { animation: m-fade 0.5s ease 1.2s backwards; }
+html.motion .rv.in .drive { animation: m-drive 1.1s var(--m-ease) 0.3s backwards; }
+html.motion .rv.in .step  { animation: m-up 0.6s var(--m-ease) backwards;
+  animation-delay: calc(0.35s + min(var(--i, 0), 8) * 90ms); }
+
+.pop { animation: m-pop 0.28s var(--m-spring); }
+
+.lift { transition: transform 0.4s var(--m-ease), box-shadow 0.4s var(--m-ease); }
+@media (hover: hover) {
+  .lift:hover { transform: translateY(-3px);
+    box-shadow: 0 2px 4px rgb(var(--m-shadow-rgb) / 0.05), 0 18px 44px rgb(var(--m-shadow-rgb) / 0.12); }
+}
+
+.sheen { position: relative; overflow: hidden; }
+.sheen::after { content: ""; position: absolute; inset: 0; pointer-events: none; transform: translateX(-120%);
+  background: linear-gradient(105deg, transparent 38%, color-mix(in srgb, var(--m-accent) 12%, transparent) 50%, transparent 62%); }
+html.motion .rv.in.sheen::after { animation: m-sheen 1.5s var(--m-ease-io) 0.7s backwards; }
+
+/* Theme switch: View Transition (GPU crossfade); fallback class for old browsers */
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.4s; }
+html.theme-fade, html.theme-fade *, html.theme-fade *::before, html.theme-fade *::after {
+  transition: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease, fill 0.4s ease, stroke 0.4s ease !important; }
+
+/* ===== Section Title Wipe Animation ===== */
+/* Clean left-to-right clip-path wipe with subtle drift */
+@keyframes m-wipe-title {
+  0% {
+    clip-path: inset(0 100% 0 0);
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.title-wipe,
+html.motion main h1:not(aside *):not(nav *),
+html.motion main h2:not(aside *):not(nav *),
+html.motion main h3:not(aside *):not(nav *),
+html.motion .card-header h2,
+html.motion .card-header h3 {
+  animation-name: m-wipe-title;
+  animation-duration: 0.62s;
+  animation-timing-function: var(--m-ease);
+  animation-fill-mode: backwards;
+  animation-delay: 90ms;
+}
+
+/* On unrevealed scroll-cards, hold title wipe until revealed */
+html.motion .rv:not(.in) h1,
+html.motion .rv:not(.in) h2,
+html.motion .rv:not(.in) h3 {
+  opacity: 0;
+  animation-name: none !important;
+}
+
+html.motion .rv.in h2:not(aside *):not(nav *),
+html.motion .rv.in h3:not(aside *):not(nav *) {
+  animation-name: m-wipe-title;
+  animation-duration: 0.62s;
+  animation-timing-function: var(--m-ease);
+  animation-fill-mode: backwards;
+  animation-delay: calc(var(--d, 0ms) + 90ms);
+}
+
+/* Section subtitle smooth fade */
+html.motion main h1 + p,
+html.motion main h2 + p,
+html.motion main h3 + p,
+html.motion .card-header p {
+  animation: m-fade 0.5s var(--m-ease) backwards;
+  animation-delay: 150ms;
+}
+html.motion .rv:not(.in) h2 + p,
+html.motion .rv:not(.in) h3 + p {
+  opacity: 0;
+  animation: none !important;
+}
+html.motion .rv.in h2 + p,
+html.motion .rv.in h3 + p {
+  animation: m-fade 0.5s var(--m-ease) backwards;
+  animation-delay: calc(var(--d, 0ms) + 150ms);
+}
+
+/* ===== Table Data & List Stagger Entrance ===== */
+/* Rows and list items enter one after another from top to bottom, sliding left-to-right */
+@keyframes m-row-enter {
+  0% {
+    opacity: 0;
+    transform: translateX(-26px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+html.motion tbody tr,
+html.motion [data-stagger] > *,
+html.motion [data-stagger-list] > *,
+html.motion .stagger-list > * {
+  animation-name: m-row-enter;
+  animation-duration: 0.44s;
+  animation-timing-function: var(--m-ease);
+  animation-fill-mode: backwards;
+}
+
+/* Guard: If a table/list is inside a scroll-reveal card (.rv) that hasn't entered yet, hold animation until .in */
+html.motion .rv:not(.in) tbody tr,
+html.motion .rv:not(.in) [data-stagger] > *,
+html.motion .rv:not(.in) [data-stagger-list] > *,
+html.motion .rv:not(.in) .stagger-list > * {
+  animation-name: none !important;
+  opacity: 0;
+}
+html.motion .rv.in tbody tr,
+html.motion .rv.in [data-stagger] > *,
+html.motion .rv.in [data-stagger-list] > *,
+html.motion .rv.in .stagger-list > * {
+  animation-name: m-row-enter;
+  animation-duration: 0.44s;
+  animation-timing-function: var(--m-ease);
+  animation-fill-mode: backwards;
+}
+
+/* Calendar & datepicker exclusions: Never animate internal datepicker grid rows */
+html.motion .flatpickr-calendar tbody tr,
+html.motion .fc tbody tr,
+html.motion tr.no-stagger,
+html.motion .no-stagger > * {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+/* 1-by-1 stagger cascade from top down (distinct steps for smooth cascade) */
+html.motion tbody tr:nth-child(1),
+html.motion [data-stagger] > *:nth-child(1),
+html.motion [data-stagger-list] > *:nth-child(1),
+html.motion .stagger-list > *:nth-child(1) {
+  animation-delay: 50ms !important;
+}
+
+html.motion tbody tr:nth-child(2),
+html.motion [data-stagger] > *:nth-child(2),
+html.motion [data-stagger-list] > *:nth-child(2),
+html.motion .stagger-list > *:nth-child(2) {
+  animation-delay: 105ms !important;
+}
+
+html.motion tbody tr:nth-child(3),
+html.motion [data-stagger] > *:nth-child(3),
+html.motion [data-stagger-list] > *:nth-child(3),
+html.motion .stagger-list > *:nth-child(3) {
+  animation-delay: 160ms !important;
+}
+
+html.motion tbody tr:nth-child(4),
+html.motion [data-stagger] > *:nth-child(4),
+html.motion [data-stagger-list] > *:nth-child(4),
+html.motion .stagger-list > *:nth-child(4) {
+  animation-delay: 215ms !important;
+}
+
+html.motion tbody tr:nth-child(5),
+html.motion [data-stagger] > *:nth-child(5),
+html.motion [data-stagger-list] > *:nth-child(5),
+html.motion .stagger-list > *:nth-child(5) {
+  animation-delay: 270ms !important;
+}
+
+html.motion tbody tr:nth-child(6),
+html.motion [data-stagger] > *:nth-child(6),
+html.motion [data-stagger-list] > *:nth-child(6),
+html.motion .stagger-list > *:nth-child(6) {
+  animation-delay: 325ms !important;
+}
+
+html.motion tbody tr:nth-child(7),
+html.motion [data-stagger] > *:nth-child(7),
+html.motion [data-stagger-list] > *:nth-child(7),
+html.motion .stagger-list > *:nth-child(7) {
+  animation-delay: 380ms !important;
+}
+
+html.motion tbody tr:nth-child(8),
+html.motion [data-stagger] > *:nth-child(8),
+html.motion [data-stagger-list] > *:nth-child(8),
+html.motion .stagger-list > *:nth-child(8) {
+  animation-delay: 435ms !important;
+}
+
+html.motion tbody tr:nth-child(9),
+html.motion [data-stagger] > *:nth-child(9),
+html.motion [data-stagger-list] > *:nth-child(9),
+html.motion .stagger-list > *:nth-child(9) {
+  animation-delay: 490ms !important;
+}
+
+html.motion tbody tr:nth-child(10),
+html.motion [data-stagger] > *:nth-child(10),
+html.motion [data-stagger-list] > *:nth-child(10),
+html.motion .stagger-list > *:nth-child(10) {
+  animation-delay: 545ms !important;
+}
+
+html.motion tbody tr:nth-child(11),
+html.motion [data-stagger] > *:nth-child(11),
+html.motion [data-stagger-list] > *:nth-child(11),
+html.motion .stagger-list > *:nth-child(11) {
+  animation-delay: 600ms !important;
+}
+
+html.motion tbody tr:nth-child(12),
+html.motion [data-stagger] > *:nth-child(12),
+html.motion [data-stagger-list] > *:nth-child(12),
+html.motion .stagger-list > *:nth-child(12) {
+  animation-delay: 655ms !important;
+}
+
+/* Card inner items inside .rv.in: cascade starts once the parent card is visible */
+html.motion .rv.in [data-stagger] > *,
+html.motion .rv.in [data-stagger-list] > *,
+html.motion .rv.in .stagger-list > *,
+html.motion .rv.in tbody tr {
+  animation-delay: calc(0.18s + var(--item-i, var(--row-i, 0)) * 70ms) !important;
+}
+
+html.motion .rv.in [data-stagger] > *:nth-child(1),
+html.motion .rv.in [data-stagger-list] > *:nth-child(1),
+html.motion .rv.in .stagger-list > *:nth-child(1),
+html.motion .rv.in tbody tr:nth-child(1) {
+  animation-delay: 0.18s !important;
+}
+
+html.motion .rv.in [data-stagger] > *:nth-child(2),
+html.motion .rv.in [data-stagger-list] > *:nth-child(2),
+html.motion .rv.in .stagger-list > *:nth-child(2),
+html.motion .rv.in tbody tr:nth-child(2) {
+  animation-delay: 0.25s !important;
+}
+
+html.motion .rv.in [data-stagger] > *:nth-child(3),
+html.motion .rv.in [data-stagger-list] > *:nth-child(3),
+html.motion .rv.in .stagger-list > *:nth-child(3),
+html.motion .rv.in tbody tr:nth-child(3) {
+  animation-delay: 0.32s !important;
+}
+
+html.motion .rv.in [data-stagger] > *:nth-child(4),
+html.motion .rv.in [data-stagger-list] > *:nth-child(4),
+html.motion .rv.in .stagger-list > *:nth-child(4),
+html.motion .rv.in tbody tr:nth-child(4) {
+  animation-delay: 0.39s !important;
+}
+
+html.motion .rv.in [data-stagger] > *:nth-child(5),
+html.motion .rv.in [data-stagger-list] > *:nth-child(5),
+html.motion .rv.in .stagger-list > *:nth-child(5),
+html.motion .rv.in tbody tr:nth-child(5) {
+  animation-delay: 0.46s !important;
+}
+
+html.motion .rv.in [data-stagger] > *:nth-child(6),
+html.motion .rv.in [data-stagger-list] > *:nth-child(6),
+html.motion .rv.in .stagger-list > *:nth-child(6),
+html.motion .rv.in tbody tr:nth-child(6) {
+  animation-delay: 0.53s !important;
+}
+
+html.motion .rv.in [data-stagger] > *:nth-child(7),
+html.motion .rv.in [data-stagger-list] > *:nth-child(7),
+html.motion .rv.in .stagger-list > *:nth-child(7),
+html.motion .rv.in tbody tr:nth-child(7) {
+  animation-delay: 0.60s !important;
+}
+
+html.motion .rv.in [data-stagger] > *:nth-child(8),
+html.motion .rv.in [data-stagger-list] > *:nth-child(8),
+html.motion .rv.in .stagger-list > *:nth-child(8),
+html.motion .rv.in tbody tr:nth-child(8) {
+  animation-delay: 0.67s !important;
+}
+
+/* Performance budget: rows beyond 12 render immediately without delay */
+html.motion tbody tr:nth-child(n+13),
+html.motion [data-stagger] > *:nth-child(n+13),
+html.motion [data-stagger-list] > *:nth-child(n+13),
+html.motion .stagger-list > *:nth-child(n+13) {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+/* ===== Button Interactions (Crisp Text, No Hover Blur) ===== */
+.btn-scale,
+button:not([disabled]):not([aria-disabled="true"]):not(.no-scale),
+a[role="button"]:not([aria-disabled="true"]):not(.no-scale),
+[data-slot="button"] {
+  transform: none;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, color 0.2s ease;
+}
+
+@media (hover: hover) {
+  .btn-scale:hover,
+  button:not([disabled]):not([aria-disabled="true"]):not(.no-scale):hover,
+  a[role="button"]:not([aria-disabled="true"]):not(.no-scale):hover,
+  [data-slot="button"]:hover {
+    transform: none !important;
+  }
+}
+
+.btn-scale:active,
+button:not([disabled]):not([aria-disabled="true"]):not(.no-scale):active,
+a[role="button"]:not([aria-disabled="true"]):not(.no-scale):active,
+[data-slot="button"]:active {
+  transform: scale(0.97);
+  transition: transform 0.1s ease;
+}
+
+/* Nav & menu button exceptions: Keep sidebar links and dropdown menus cleanly anchored */
+aside button,
+nav button,
+[role="navigation"] button,
+[role="menu"] button,
+[role="menuitem"],
+.flatpickr-day,
+.fc-button {
+  transform: none !important;
+}
+aside button:active,
+nav button:active {
+  transform: scale(0.98) !important;
+}
+
+/* Low-end devices (head script adds .motion-lite): drop decorative effects */
+html.motion-lite .sheen::after, html.motion-lite .mv-blur { animation: none !important; filter: none !important; }
+html.motion-lite { --m-max: 6; }
+
+/* Mobile drawer safety: off-canvas drawer is hidden via -translate-x-full, do not animate on page entrance */
+@media (max-width: 1023px) {
+  aside.enter {
+    animation: none !important;
+  }
+}
+
+@media print { .rv, .enter { opacity: 1 !important; animation: none !important; } }
+@media (prefers-reduced-motion: reduce) {
+  html .rv:not(.in),
+  html.motion h1,
+  html.motion h2,
+  html.motion h3,
+  html.motion p,
+  html.motion tbody tr,
+  html.motion [data-stagger] > *,
+  html.motion [data-stagger-list] > *,
+  html.motion .stagger-list > * {
+    opacity: 1 !important;
+    transform: none !important;
+    clip-path: none !important;
+    animation: none !important;
+  }
+  .btn-scale,
+  button,
+  [data-slot="button"] {
+    transform: none !important;
+    transition: none !important;
+  }
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-delay: 0ms !important; transition-duration: 0.001ms !important; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}

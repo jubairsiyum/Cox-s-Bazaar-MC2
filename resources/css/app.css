@@ -2,7 +2,13 @@
 @import "prismjs/themes/prism.min.css";
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "./themes/swift.css";   /* add one line per future theme */
+@import "./themes/swift.css";
+@import "./themes/ocean.css";
+@import "./themes/aurora.css";
+@import "./themes/ember.css";
+@import "./themes/emerald.css";
+@import "./themes/graphite.css";
+@import "./motion.css";
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
@@ -13,6 +19,10 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  /* Motion Bridge Tokens */
+  --m-accent: var(--brand-500);
+  --m-shadow-rgb: var(--shadow-rgb);
+
   /* Dashboard Layout, Radius & Spacing Tokens */
   --dash-radius-shell: 40px;
   --dash-radius-card: 24px;
@@ -1758,6 +1768,11 @@ table.data-table tfoot td {
 /* Misc ERP classes */
 .text-bdt::before {
     content: "৳";
+}
+.font-bengali,
+.taka-sign {
+    font-family: "Hind Siliguri", "Noto Sans Bengali", system-ui, sans-serif;
+    font-feature-settings: "tnum";
 }
 .money {
     font-variant-numeric: tabular-nums;

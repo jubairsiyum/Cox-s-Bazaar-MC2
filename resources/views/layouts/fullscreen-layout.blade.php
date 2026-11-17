@@ -4,7 +4,7 @@
 <head>
     <script>
       (function () {
-        var root = document.documentElement, allowed = ['swift'], theme = 'swift';
+        var root = document.documentElement, allowed = ['swift', 'ocean', 'aurora', 'ember', 'emerald', 'graphite'], theme = 'swift';
         try {
           var c = localStorage.getItem('color-theme');
           if (c && allowed.indexOf(c) > -1) theme = c;
@@ -13,6 +13,11 @@
           if (localStorage.getItem('dir') === 'rtl') root.setAttribute('dir', 'rtl');
         } catch (e) {}
         root.setAttribute('data-theme', theme);
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          root.classList.add('motion');
+          if ((navigator.deviceMemory && navigator.deviceMemory <= 2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2)) root.classList.add('motion-lite');
+          setTimeout(function () { if (!root.classList.contains('motion-ready')) root.classList.add('motion-failsafe'); }, 3500);
+        }
       })();
     </script>
     <meta charset="utf-8">
