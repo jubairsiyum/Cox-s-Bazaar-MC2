@@ -167,7 +167,7 @@ $chartConfig = [
                       : 'border-line bg-surface hover:bg-soft/40 opacity-100 ring-1 ring-line/70')
                   : 'border-line/60 bg-surface/50 opacity-40 hover:opacity-75 grayscale'">
         <div class="flex items-center gap-2 min-w-0">
-          <span class="size-2.5 shrink-0 rounded-full {{ $b['bgClass'] }}" style="background-color: {{ $b['colorHex'] }}"></span>
+          <x-brand-logo :name="$b['name']" size="xs" :showContainer="true" containerClass="!size-6 !rounded-md !p-0.5" />
           <div class="truncate">
             <p class="truncate text-xs font-semibold text-ink">{{ $b['name'] }}</p>
             <p class="text-[11px] text-muted">{{ $b['amount'] }}</p>
