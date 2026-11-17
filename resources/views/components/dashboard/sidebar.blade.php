@@ -2,6 +2,7 @@
     use App\Helpers\MenuHelper;
     $menuGroups = MenuHelper::getMenuGroups();
     $currentPath = request()->path();
+    $isDashboard = request()->routeIs('dashboard') || request()->is('dashboard') || $currentPath === 'dashboard' || $currentPath === '';
 
     $allMenuPaths = [];
     $isTailAdminActive = false;
@@ -46,12 +47,14 @@
      class="fixed inset-0 z-30 bg-overlay lg:hidden"></div>
 
 <aside
-  class="fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 -translate-x-full flex-col rounded-r-3xl bg-surface p-5 shadow-card transition-transform duration-200 lg:sticky lg:top-5 lg:z-30 lg:h-[calc(100vh-2.5rem)] lg:max-h-[calc(100vh-2.5rem)] lg:w-64 lg:translate-x-0 lg:rounded-3xl self-start overflow-hidden"
+  class="{{ $isDashboard ? 'enter mv-left ' : '' }}fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 -translate-x-full flex-col rounded-r-3xl bg-surface p-5 shadow-card transition-transform duration-200 lg:sticky lg:top-5 lg:z-30 lg:h-[calc(100vh-2.5rem)] lg:max-h-[calc(100vh-2.5rem)] lg:w-64 lg:translate-x-0 lg:rounded-3xl self-start overflow-hidden"
+  @if($isDashboard) style="--i:1" @endif
   :class="{ 'translate-x-0': typeof sidebar !== 'undefined' ? sidebar : $store.sidebar.isMobileOpen }"
   x-data="{
     openSubmenus: {},
     openChildSubmenus: {},
     showTailAdmin: {{ $isTailAdminActive ? 'true' : 'false' }},
+    allPaths: {{ \Illuminate\Support\Js::from(array_values(array_unique(array_filter($allMenuPaths)))) }},
     init() {
       const current = window.location.pathname.replace(/\/+$/, '') || '/';
       @if ($isTailAdminActive)
@@ -107,9 +110,18 @@
       const current = window.location.pathname.replace(/\/+$/, '') || '/';
       const target = path.replace(/\/+$/, '') || '/';
       if (current === target) return true;
+
       if (current.startsWith(target + '/')) {
-        return true;
+        const hasBetterMatch = this.allPaths.some(p => {
+          const normalized = p.replace(/\/+$/, '') || '/';
+          if (normalized === target) return false;
+          if (current === normalized) return true;
+          if (current.startsWith(normalized + '/') && normalized.length > target.length) return true;
+          return false;
+        });
+        return !hasBetterMatch;
       }
+
       return false;
     }
   }">
@@ -127,6 +139,7 @@
 
   {{-- Navigation with Existing Menu Groups --}}
   <nav class="mt-6 flex-1 space-y-6 overflow-y-auto no-scrollbar pr-1 min-h-0">
+    @php $navItemCount = 0; @endphp
     @foreach ($menuGroups as $groupIndex => $menuGroup)
       @php
         $isTailAdmin = ($menuGroup['title'] === 'TailAdmin Components');
@@ -160,12 +173,12 @@
                 }
               @endphp
 
-              <li>
+              <li @if($isDashboard) class="enter mv-left" style="--i:{{ min($navItemCount++, 10) }};--d:250ms;--stagger:45ms" @endif>
                 @if (isset($item['subItems']))
                   {{-- Menu Item with Submenu --}}
                   <button type="button"
                           @click="toggleSub({{ $groupIndex }}, {{ $itemIndex }})"
-                          class="flex w-full items-center justify-between gap-3 rounded-full px-3 py-2.5 text-sm font-medium transition cursor-pointer"
+                          class="flex w-full items-center justify-between gap-3 rounded-full px-3 py-2.5 text-sm font-medium transition-colors duration-200 cursor-pointer"
                           :class="isSubOpen({{ $groupIndex }}, {{ $itemIndex }}) ? 'bg-soft text-brand-500 font-semibold' : 'text-muted hover:bg-soft/60 hover:text-ink'">
                     <span class="flex items-center gap-3 truncate">
                       <span class="size-5 shrink-0 flex items-center justify-center">
@@ -239,7 +252,7 @@
                 @else
                   {{-- Single Nav Item --}}
                   <a href="{{ $item['path'] }}"
-                     class="flex items-center justify-between gap-3 rounded-full px-3 py-2.5 text-sm font-medium transition"
+                     class="flex items-center justify-between gap-3 rounded-full px-3 py-2.5 text-sm font-medium transition-colors duration-200"
                      :class="isActive('{{ $item['path'] }}') ? 'bg-soft text-brand-500 font-semibold' : 'text-muted hover:bg-soft/60 hover:text-ink'">
                     <span class="flex items-center gap-3 truncate">
                       <span class="size-5 shrink-0 flex items-center justify-center">
@@ -262,10 +275,17 @@
 
   {{-- Bottom Utilities --}}
   <div class="mt-auto shrink-0 space-y-1 border-t border-line pt-4">
-    @if (Route::has('admin.settings.index'))
-      <a href="{{ route('admin.settings.index') }}"
+    @php
+      $sidebarSettingsUrl = Route::has('settings.index') ? route('settings.index') : (Route::has('admin.settings.index') ? route('admin.settings.index') : null);
+    @endphp
+    @if ($sidebarSettingsUrl)
+      <a href="{{ $sidebarSettingsUrl }}"
          class="flex items-center gap-3 rounded-full px-3 py-2 text-sm font-medium text-muted transition hover:bg-soft/60 hover:text-ink">
         <x-icon name="settings" class="size-4.5" /> Settings
+      </a>
+      <a href="{{ $sidebarSettingsUrl }}?tab=theme"
+         class="flex items-center gap-3 rounded-full px-3 py-2 text-sm font-medium text-muted transition hover:bg-soft/60 hover:text-ink">
+        <x-icon name="palette" class="size-4.5 text-brand-500" /> Themes
       </a>
     @endif
 

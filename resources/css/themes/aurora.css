@@ -1,0 +1,76 @@
+/* Theme: "aurora" — Aurora — violet, modern SaaS
+   Light -> :root[data-theme="aurora"]        Dark -> :root[data-theme="aurora"].dark
+   Selectors include :root so they always beat the default theme's bare :root,
+   regardless of @import order. Same tokens as swift.css; only values differ. */
+
+:root[data-theme="aurora"] {
+  /* Surfaces */
+  --canvas: #e9e6f7; /* page background behind the app */
+  --shell: #f7f6fc; /* big outer app container */
+  --surface: #ffffff; /* cards, sidebar, dropdowns */
+  --soft: #efe9fe; /* soft highlight: active nav, inactive bars, badges */
+  --line: #ece9f6; /* borders, dividers, tracks */
+
+  /* Text */
+  --ink: #1b1440; /* primary text */
+  --muted: #625c8a; /* secondary text, icons */
+  --on-brand: #ffffff; /* text/icon on brand-colored backgrounds */
+
+  /* Brand */
+  --brand-50: #f7f4ff;
+  --brand-100: #efe9fe;
+  --brand-400: #9b78f7;
+  --brand-500: #6334e0; /* primary action color */
+  --brand-600: #5224c4; /* hover / pressed */
+
+  /* Status */
+  --danger: #d92d4a;
+  --success: #0f8a4f;
+  --warning: #b7791f;
+
+  /* Effects */
+  --overlay: rgb(27 20 64 / 0.45); /* modal / mobile backdrop */
+  --shadow-rgb: 27 20 64; /* R G B for card shadows */
+
+  /* Chart palette */
+  --chart-1: #6334e0;
+  --chart-2: #ef5a3c;
+  --chart-3: #12a594;
+  --chart-4: #b7791f;
+}
+
+:root[data-theme="aurora"].dark {
+  /* Surfaces */
+  --canvas: #0b0818; /* page background behind the app */
+  --shell: #110d24; /* big outer app container */
+  --surface: #1a1535; /* cards, sidebar, dropdowns */
+  --soft: #2a2260; /* soft highlight: active nav, inactive bars, badges */
+  --line: #2b2552; /* borders, dividers, tracks */
+
+  /* Text */
+  --ink: #f1eeff; /* primary text */
+  --muted: #a49fc9; /* secondary text, icons */
+  --on-brand: #120a33; /* text/icon on brand-colored backgrounds */
+
+  /* Brand */
+  --brand-50: #1b1540;
+  --brand-100: #2a2260;
+  --brand-400: #b9a0ff;
+  --brand-500: #a184ff; /* primary action color */
+  --brand-600: #8f6cf7; /* hover / pressed */
+
+  /* Status */
+  --danger: #ff7a90;
+  --success: #4ade80;
+  --warning: #fbbf24;
+
+  /* Effects */
+  --overlay: rgb(0 0 0 / 0.6); /* modal / mobile backdrop */
+  --shadow-rgb: 0 0 0; /* R G B for card shadows */
+
+  /* Chart palette */
+  --chart-1: #a184ff;
+  --chart-2: #ff8a6b;
+  --chart-3: #2dd4bf;
+  --chart-4: #fbbf24;
+}

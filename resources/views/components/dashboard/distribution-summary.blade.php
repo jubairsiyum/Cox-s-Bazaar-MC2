@@ -14,7 +14,7 @@
   $pct = min(max(round(($placedUnits / max($dispatchedUnits, 1)) * 100), 0), 100);
 @endphp
 
-<section class="relative overflow-hidden rounded-3xl bg-surface p-6 shadow-card flex flex-col justify-between h-full">
+<section {{ $attributes->merge(['class' => 'relative overflow-hidden rounded-3xl bg-surface p-6 shadow-card flex flex-col justify-between h-full']) }} x-data>
   <div>
     {{-- Header --}}
     <div class="flex items-start justify-between">
@@ -30,7 +30,7 @@
     {{-- Main Metric with Semi-circle Gauge matching Top Stat Cards --}}
     <div class="mt-6 flex items-end justify-between gap-4">
       <div>
-        <p class="text-3xl sm:text-4xl font-extrabold tracking-tight text-ink">{{ $dispatchedUnits }} <span class="text-base sm:text-lg font-medium text-muted">Pcs</span></p>
+        <p class="text-3xl sm:text-4xl font-extrabold tracking-tight text-ink"><span class="tabular-nums" x-count="{{ $dispatchedUnits }}">{{ $dispatchedUnits }}</span> <span class="text-base sm:text-lg font-medium text-muted">Pcs</span></p>
         <p class="mt-1 text-xs text-muted">Total Handsets Dispatched Today</p>
       </div>
 
@@ -40,10 +40,11 @@
           <path d="M10 60 A50 50 0 0 1 110 60" pathLength="100" fill="none" stroke="currentColor"
                 class="text-line" stroke-width="12" stroke-linecap="round"/>
           <path d="M10 60 A50 50 0 0 1 110 60" pathLength="100" fill="none" stroke="currentColor"
-                class="text-brand-500" stroke-width="12" stroke-linecap="round"
+                class="gauge text-brand-500" stroke-width="12" stroke-linecap="round"
+                style="--target-pct: {{ $pct }}; stroke-dasharray: {{ $pct }} 100;"
                 stroke-dasharray="{{ $pct }} 100"/>
         </svg>
-        <span class="absolute inset-x-0 bottom-0 text-center text-[11px] font-semibold text-brand-500">
+        <span class="gauge-label absolute inset-x-0 bottom-0 text-center text-[11px] font-semibold text-brand-500">
           {{ $pct }}% Placed
         </span>
       </div>
@@ -52,8 +53,8 @@
     {{-- Progress bar breakdown --}}
     <div class="mt-6 space-y-2.5">
       <div class="h-3 w-full overflow-hidden rounded-full bg-line flex">
-        <div class="h-full bg-brand-500 transition-all duration-500" style="width: {{ ($placedUnits / max($dispatchedUnits, 1)) * 100 }}%"></div>
-        <div class="h-full bg-warning transition-all duration-500" style="width: {{ ($returnsCount / max($dispatchedUnits, 1)) * 100 }}%"></div>
+        <div class="h-full bg-brand-500 transition-[width] duration-500" style="width: {{ ($placedUnits / max($dispatchedUnits, 1)) * 100 }}%"></div>
+        <div class="h-full bg-warning transition-[width] duration-500" style="width: {{ ($returnsCount / max($dispatchedUnits, 1)) * 100 }}%"></div>
       </div>
       <div class="flex items-center justify-between text-xs text-muted pt-1">
         <span class="flex items-center gap-1.5 font-medium text-ink">

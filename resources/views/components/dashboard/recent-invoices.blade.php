@@ -58,7 +58,7 @@
   ],
 ])
 
-<section class="overflow-hidden rounded-3xl bg-surface p-6 shadow-card">
+<section {{ $attributes->merge(['class' => 'overflow-hidden rounded-3xl bg-surface p-6 shadow-card']) }}>
   {{-- Header --}}
   <div class="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-line">
     <div>
@@ -67,7 +67,7 @@
     </div>
     <div class="flex items-center gap-3">
       <a href="{{ url('/sales') }}" 
-         class="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3.5 py-1.5 text-xs font-semibold text-ink transition hover:bg-soft hover:text-brand-500 shadow-2xs">
+         class="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3.5 py-1.5 text-xs font-semibold text-ink transition-[transform,background-color] duration-200 hover:bg-soft hover:text-brand-500 active:scale-[0.97] shadow-2xs">
         <span>All Invoices</span>
         <x-icon name="arrow-up-right" class="size-3.5" />
       </a>
@@ -90,7 +90,7 @@
       </thead>
       <tbody class="divide-y divide-line">
         @foreach ($invoices as $inv)
-          <tr class="transition-colors hover:bg-soft/25">
+          <tr style="--row-i: {{ $loop->index }}" class="transition-colors hover:bg-soft/25">
             {{-- Invoice No & Date --}}
             <td class="py-3.5 pr-4 whitespace-nowrap">
               <span class="font-bold text-ink">{{ $inv['invoice_no'] }}</span>

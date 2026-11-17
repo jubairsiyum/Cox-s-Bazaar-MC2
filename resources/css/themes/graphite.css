@@ -1,0 +1,76 @@
+/* Theme: "graphite" — Graphite — monochrome minimal, luxury / Linear-style
+   Light -> :root[data-theme="graphite"]        Dark -> :root[data-theme="graphite"].dark
+   Selectors include :root so they always beat the default theme's bare :root,
+   regardless of @import order. Same tokens as swift.css; only values differ. */
+
+:root[data-theme="graphite"] {
+  /* Surfaces */
+  --canvas: #e6e6e9; /* page background behind the app */
+  --shell: #f5f5f6; /* big outer app container */
+  --surface: #ffffff; /* cards, sidebar, dropdowns */
+  --soft: #ececee; /* soft highlight: active nav, inactive bars, badges */
+  --line: #ececef; /* borders, dividers, tracks */
+
+  /* Text */
+  --ink: #111113; /* primary text */
+  --muted: #5f5f68; /* secondary text, icons */
+  --on-brand: #ffffff; /* text/icon on brand-colored backgrounds */
+
+  /* Brand */
+  --brand-50: #f7f7f8;
+  --brand-100: #ececee;
+  --brand-400: #52525b;
+  --brand-500: #18181b; /* primary action color */
+  --brand-600: #000000; /* hover / pressed */
+
+  /* Status */
+  --danger: #d92d20;
+  --success: #15803d;
+  --warning: #b45309;
+
+  /* Effects */
+  --overlay: rgb(17 17 19 / 0.5); /* modal / mobile backdrop */
+  --shadow-rgb: 17 17 19; /* R G B for card shadows */
+
+  /* Chart palette */
+  --chart-1: #27272a;
+  --chart-2: #c2410c;
+  --chart-3: #0f766e;
+  --chart-4: #8b8b94;
+}
+
+:root[data-theme="graphite"].dark {
+  /* Surfaces */
+  --canvas: #09090b; /* page background behind the app */
+  --shell: #0f0f12; /* big outer app container */
+  --surface: #18181b; /* cards, sidebar, dropdowns */
+  --soft: #27272a; /* soft highlight: active nav, inactive bars, badges */
+  --line: #2a2a2f; /* borders, dividers, tracks */
+
+  /* Text */
+  --ink: #fafafa; /* primary text */
+  --muted: #a1a1aa; /* secondary text, icons */
+  --on-brand: #09090b; /* text/icon on brand-colored backgrounds */
+
+  /* Brand */
+  --brand-50: #1c1c20;
+  --brand-100: #27272a;
+  --brand-400: #d4d4d8;
+  --brand-500: #fafafa; /* primary action color */
+  --brand-600: #e4e4e7; /* hover / pressed */
+
+  /* Status */
+  --danger: #ff7b6b;
+  --success: #4ade80;
+  --warning: #fbbf24;
+
+  /* Effects */
+  --overlay: rgb(0 0 0 / 0.65); /* modal / mobile backdrop */
+  --shadow-rgb: 0 0 0; /* R G B for card shadows */
+
+  /* Chart palette */
+  --chart-1: #fafafa;
+  --chart-2: #fbbf24;
+  --chart-3: #2dd4bf;
+  --chart-4: #a1a1aa;
+}

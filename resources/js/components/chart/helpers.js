@@ -3,6 +3,7 @@ import ApexCharts from 'apexcharts';
 window.ApexCharts = ApexCharts;
 
 export const isDark = () => document.documentElement.classList.contains('dark');
+export const isReducedMotion = () => typeof window !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export const getToken = (token, fallback = '') => {
     if (typeof window === 'undefined') return fallback;
@@ -22,13 +23,46 @@ export const readConfig = (el) => JSON.parse(el.dataset.config || '{}');
 /**
  * Renders an ApexCharts instance and rebuilds its options when the light / dark theme or color theme is toggled.
  * `build(dark)` must return the full options object.
+ * Delays initial render until the parent card is revealed (`.in`), and disables animation on reduced motion.
  */
 export function mountChart(el, build) {
-    const chart = new ApexCharts(el, build(isDark()));
-    chart.render();
+    let chart = null;
+    let rendered = false;
+
+    const renderChart = () => {
+        if (rendered) return;
+        rendered = true;
+        const dark = isDark();
+        const opts = build(dark);
+        if (isReducedMotion() && opts.chart) {
+            opts.chart.animations = { enabled: false };
+        }
+        chart = new ApexCharts(el, opts);
+        chart.render();
+    };
+
+    const host = el.closest('.rv');
+    if (!host || host.classList.contains('in') || isReducedMotion()) {
+        renderChart();
+    } else {
+        const obs = new MutationObserver(() => {
+            if (host.classList.contains('in')) {
+                obs.disconnect();
+                renderChart();
+            }
+        });
+        obs.observe(host, { attributes: true, attributeFilter: ['class'] });
+    }
 
     const update = () => {
-        chart.updateOptions(build(isDark()));
+        if (chart) {
+            const dark = isDark();
+            const opts = build(dark);
+            if (isReducedMotion() && opts.chart) {
+                opts.chart.animations = { enabled: false };
+            }
+            chart.updateOptions(opts);
+        }
     };
 
     new MutationObserver(update).observe(document.documentElement, {
@@ -38,7 +72,14 @@ export function mountChart(el, build) {
 
     window.addEventListener('theme-changed', update);
 
-    return chart;
+    return {
+        updateOptions: (opts, redraw, animate) => {
+            if (chart) chart.updateOptions(opts, redraw, animate);
+        },
+        highlightSeries: (name) => {
+            if (chart && typeof chart.highlightSeries === 'function') chart.highlightSeries(name);
+        },
+    };
 }
 
 /** Shared "area chart" tooltip used by the statistics / employee growth style charts. */

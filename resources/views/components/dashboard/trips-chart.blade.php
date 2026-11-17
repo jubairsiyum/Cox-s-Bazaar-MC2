@@ -46,7 +46,7 @@
   </div>
 
   <div class="relative mt-6">
-    <svg :viewBox="`0 0 ${w} ${h}`" class="h-32 w-full overflow-visible" preserveAspectRatio="none">
+    <svg :viewBox="`0 0 ${w} ${h}`" class="wipe h-32 w-full overflow-visible" preserveAspectRatio="none">
       <defs>
         <linearGradient id="trips-fill" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stop-color="var(--color-brand-500)" stop-opacity=".18"/>
@@ -60,7 +60,7 @@
 
     {{-- Interactive marker dot + pill badge --}}
     <div class="pointer-events-none absolute inset-0">
-      <div class="absolute -translate-x-1/2 -translate-y-1/2 transition-all duration-200" :style="`left:${x(active)/w*100}%; top:${y(pts[active])/h*100}%`">
+      <div class="dot absolute -translate-x-1/2 -translate-y-1/2 transition-[left,top] duration-200" :style="`left:${x(active)/w*100}%; top:${y(pts[active])/h*100}%`">
         <span class="block size-2.5 rounded-full bg-brand-500 ring-4 ring-surface shadow-sm"></span>
         <span class="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-soft px-2 py-0.5 text-[10px] font-semibold text-brand-500 shadow-xs" x-text="pts[active] + '%'"></span>
       </div>

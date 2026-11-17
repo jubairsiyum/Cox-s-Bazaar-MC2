@@ -44,7 +44,7 @@
   ],
 ])
 
-<section class="h-full rounded-3xl bg-surface p-6 shadow-card flex flex-col justify-between">
+<section {{ $attributes->merge(['class' => 'h-full rounded-3xl bg-surface p-6 shadow-card flex flex-col justify-between']) }}>
   <div>
     {{-- Header --}}
     <div class="flex items-center justify-between">
@@ -63,25 +63,25 @@
     </div>
 
     {{-- Alert List --}}
-    <div class="mt-5 space-y-3">
+    <div class="mt-5 space-y-3" data-stagger>
       @forelse ($items as $item)
-        <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-3.5 transition hover:border-line/80 hover:bg-soft/20">
-          <div class="flex items-center gap-3 min-w-0">
+        <div style="--item-i: {{ $loop->index }}" class="flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-3.5 transition-colors hover:border-line/80 hover:bg-soft/20">
+          <div class="flex items-center gap-3 min-w-0 flex-1">
             <span class="grid size-9 shrink-0 place-items-center rounded-xl bg-soft text-brand-500 font-bold text-xs">
               {{ substr($item['brand'], 0, 2) }}
             </span>
-            <div class="min-w-0">
-              <div class="flex items-center gap-2">
-                <p class="truncate text-sm font-bold text-ink">{{ $item['brand'] }} {{ $item['model'] }}</p>
-                <span class="text-[10px] text-muted">{{ $item['sku'] }}</span>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2 min-w-0">
+                <p class="truncate text-sm font-bold text-ink" title="{{ $item['brand'] }} {{ $item['model'] }}">{{ $item['brand'] }} {{ $item['model'] }}</p>
+                <span class="shrink-0 text-[10px] text-muted">{{ $item['sku'] }}</span>
               </div>
-              <p class="text-xs text-muted">
+              <p class="truncate text-xs text-muted">
                 Color: {{ $item['color'] }} &bull; Min required: <strong class="text-ink">{{ $item['min'] }} pcs</strong>
               </p>
             </div>
           </div>
 
-          <div class="flex items-center gap-4 shrink-0">
+          <div class="flex items-center gap-3 sm:gap-4 shrink-0">
             <div class="text-right">
               <p class="text-sm font-extrabold {{ $item['status'] === 'critical' ? 'text-danger' : 'text-warning' }}">
                 {{ $item['stock'] }} left
@@ -92,7 +92,7 @@
             </div>
 
             <a href="{{ url('/products') }}" 
-               class="rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-soft hover:text-brand-500 shadow-2xs">
+               class="rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink transition-[transform,background-color] duration-200 hover:bg-soft hover:text-brand-500 active:scale-[0.97] shadow-2xs">
               Reorder
             </a>
           </div>
