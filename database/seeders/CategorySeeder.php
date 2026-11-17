@@ -36,10 +36,14 @@ class CategorySeeder extends Seeder
     public function run(): void
     {
         foreach (self::CATEGORIES as $name => $description) {
-            Category::firstOrCreate(
+            $category = Category::withTrashed()->firstOrCreate(
                 ['name' => $name],
                 ['description' => $description, 'status' => 'active']
             );
+
+            if ($category->trashed()) {
+                $category->restore();
+            }
         }
     }
 }

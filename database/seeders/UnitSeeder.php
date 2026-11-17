@@ -41,10 +41,14 @@ class UnitSeeder extends Seeder
                 ['status' => 'active']
             );
 
-            Unit::firstOrCreate(
+            $unit = Unit::withTrashed()->firstOrCreate(
                 ['product_id' => $product->id],
                 ['quantity' => $entry['quantity'], 'unit' => $entry['unit'], 'note' => $entry['note']]
             );
+
+            if ($unit->trashed()) {
+                $unit->restore();
+            }
         }
     }
 }

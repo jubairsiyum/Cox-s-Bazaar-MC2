@@ -39,7 +39,7 @@ class LocationSeeder extends Seeder
     public function run(): void
     {
         foreach (self::LOCATIONS as $name => $attributes) {
-            Location::firstOrCreate(
+            $location = Location::withTrashed()->firstOrCreate(
                 ['name' => $name],
                 [
                     'code' => $attributes['code'],
@@ -48,6 +48,10 @@ class LocationSeeder extends Seeder
                     'note' => $attributes['note'],
                 ]
             );
+
+            if ($location->trashed()) {
+                $location->restore();
+            }
         }
     }
 }
