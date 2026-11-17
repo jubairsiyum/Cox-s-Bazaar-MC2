@@ -1,3 +1,4 @@
+import { getToken } from '../helpers';
 import { mountChart } from '../helpers';
 
 export default (el) => {
@@ -6,7 +7,7 @@ export default (el) => {
     const computed = (fn) => fn;
 
     const options = computed(() => ({
-        colors: ['#7592FF', '#7CD4FD'],
+        colors: [getToken('--chart-1'), getToken('--chart-3')],
         chart: {
             fontFamily: 'Outfit, sans-serif',
             type: 'bar',
@@ -57,7 +58,7 @@ export default (el) => {
             },
             labels: {
                 style: {
-                    colors: isDarkMode.value ? '#94A3B8' : '#364153',
+                    colors: isDarkMode.value ? getToken('--muted') : getToken('--ink'),
                     fontFamily: 'Outfit, sans-serif',
                     fontSize: '12px',
                 },
@@ -72,7 +73,7 @@ export default (el) => {
             tickAmount: 5,
             labels: {
                 style: {
-                    colors: isDarkMode.value ? '#94A3B8' : '#364153',
+                    colors: isDarkMode.value ? getToken('--muted') : getToken('--ink'),
                     fontFamily: 'Outfit, sans-serif',
                     fontSize: '12px',
                 },
@@ -86,7 +87,7 @@ export default (el) => {
             },
         },
         grid: {
-            borderColor: isDarkMode.value ? '#1E2640' : '#F3F4F6',
+            borderColor: isDarkMode.value ? getToken('--line') : getToken('--line'),
             strokeDashArray: 0,
             yaxis: {
                 lines: {

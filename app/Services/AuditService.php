@@ -14,29 +14,29 @@ class AuditService
     /**
      * Record an audit event.
      *
-     * @param  string      $event    e.g. 'created', 'updated', 'deleted', 'posted', 'voided'
-     * @param  Model|null  $model    The entity being acted on
-     * @param  array       $old      Previous values (for updates)
-     * @param  array       $new      New values
-     * @param  string|null $description  Human-readable summary
+     * @param  string  $event  e.g. 'created', 'updated', 'deleted', 'posted', 'voided'
+     * @param  Model|null  $model  The entity being acted on
+     * @param  array  $old  Previous values (for updates)
+     * @param  array  $new  New values
+     * @param  string|null  $description  Human-readable summary
      */
     public static function log(
-        string  $event,
-        ?Model  $model       = null,
-        array   $old         = [],
-        array   $new         = [],
+        string $event,
+        ?Model $model = null,
+        array $old = [],
+        array $new = [],
         ?string $description = null,
     ): AuditLog {
         return AuditLog::create([
-            'user_id'         => Auth::id(),
-            'event'           => $event,
-            'auditable_type'  => $model ? get_class($model) : null,
-            'auditable_id'    => $model?->getKey(),
-            'old_values'      => $old  ?: null,
-            'new_values'      => $new  ?: null,
-            'ip_address'      => Request::ip(),
-            'user_agent'      => Request::userAgent(),
-            'description'     => $description,
+            'user_id' => Auth::id(),
+            'event' => $event,
+            'auditable_type' => $model ? get_class($model) : null,
+            'auditable_id' => $model?->getKey(),
+            'old_values' => $old ?: null,
+            'new_values' => $new ?: null,
+            'ip_address' => Request::ip(),
+            'user_agent' => Request::userAgent(),
+            'description' => $description,
         ]);
     }
 

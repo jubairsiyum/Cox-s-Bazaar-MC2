@@ -2,16 +2,16 @@
   <!-- Legend Indicators -->
   <div class="flex items-center gap-5">
     <div class="flex items-center gap-1.5">
-      <span class="size-2.5 rounded-full bg-[#7592FF]"></span>
-      <span class="text-sm font-normal text-gray-700 dark:text-gray-300"> Shipment </span>
+      <span class="size-2.5 rounded-full bg-brand-500"></span>
+      <span class="text-sm font-normal text-ink"> Shipment </span>
     </div>
     <div class="flex items-center gap-1.5">
-      <span class="size-2.5 rounded-full bg-[#BDB4FE]"></span>
-      <span class="text-sm font-normal text-gray-700 dark:text-gray-300"> In Transit </span>
+      <span class="size-2.5 rounded-full bg-brand-500"></span>
+      <span class="text-sm font-normal text-ink"> In Transit </span>
     </div>
     <div class="flex items-center gap-1.5">
-      <span class="size-2.5 rounded-full bg-[#7CD4FD]"></span>
-      <span class="text-sm font-normal text-gray-700 dark:text-gray-300"> Delivery </span>
+      <span class="size-2.5 rounded-full bg-brand-500"></span>
+      <span class="text-sm font-normal text-ink"> Delivery </span>
     </div>
   </div>
 

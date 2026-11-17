@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Policies\RolePolicy;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Spatie\Permission\Models\Role;
@@ -30,6 +31,17 @@ class AppServiceProvider extends ServiceProvider
         $this->registerPasswordDefaults();
         $this->registerPolicies();
         $this->registerTailAdminComponents();
+        $this->enforceHttpsInProduction();
+    }
+
+    /**
+     * Force HTTPS in production so all generated URLs and assets are secure.
+     */
+    private function enforceHttpsInProduction(): void
+    {
+        if ($this->app->environment('production')) {
+            URL::forceScheme('https');
+        }
     }
 
     /**

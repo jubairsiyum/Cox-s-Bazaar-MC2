@@ -8,16 +8,16 @@
   <!-- Legend Indicators -->
   <div class="flex items-center gap-6.5 py-3 ps-4">
     <div class="flex items-center gap-1.5">
-      <span class="size-2 rounded-full bg-brand-500"></span>
-      <span class="text-sm font-normal text-gray-700 dark:text-gray-300"> Website </span>
+      <span class="size-2 rounded-full bg-soft"></span>
+      <span class="text-sm font-normal text-ink"> Website </span>
     </div>
     <div class="flex items-center gap-1.5">
-      <span class="size-2 rounded-full bg-brand-300"></span>
-      <span class="text-sm font-normal text-gray-700 dark:text-gray-300"> Email </span>
+      <span class="size-2 rounded-full bg-soft"></span>
+      <span class="text-sm font-normal text-ink"> Email </span>
     </div>
     <div class="flex items-center gap-1.5">
-      <span class="size-2 rounded-full bg-gray-300 dark:bg-gray-700"></span>
-      <span class="text-sm font-normal text-gray-700 dark:text-gray-300"> Social Media </span>
+      <span class="size-2 rounded-full bg-soft"></span>
+      <span class="text-sm font-normal text-ink"> Social Media </span>
     </div>
   </div>
 </div>

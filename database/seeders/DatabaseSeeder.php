@@ -19,6 +19,10 @@ class DatabaseSeeder extends Seeder
             SettingsSeeder::class,
             SuperAdminSeeder::class,
             DemoUsersSeeder::class,
+            CategorySeeder::class,
+            BrandSeeder::class,
+            UnitSeeder::class,
+            LocationSeeder::class,
         ]);
     }
 }

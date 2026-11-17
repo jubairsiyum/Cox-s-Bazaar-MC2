@@ -1,16 +1,17 @@
+import { getToken } from '../helpers';
 import jsVectorMap from 'jsvectormap';
 import 'jsvectormap/dist/jsvectormap.min.css';
 import 'jsvectormap/dist/maps/world';
 import { readConfig } from '../helpers';
 
 export default (el) => {
-    const { markers = [], mapColor = '#D0D5DD' } = readConfig(el);
+    const { markers = [], mapColor = getToken('--line') } = readConfig(el);
 
     new jsVectorMap({
         selector: el,
         map: 'world',
         backgroundColor: 'transparent',
-        markerStyle: { initial: { fill: '#465FFF', r: 4 } },
+        markerStyle: { initial: { fill: getToken('--chart-1'), r: 4 } },
         markersSelectable: true,
         markers: markers.map((marker) => ({
             name: marker.name,
@@ -32,8 +33,8 @@ export default (el) => {
         zoomStep: 1.5,
         regionStyle: {
             initial: { fill: mapColor, fillOpacity: 1, fontFamily: 'Outfit', stroke: 'none', strokeWidth: 0, strokeOpacity: 0 },
-            hover: { fillOpacity: 0.7, cursor: 'pointer', fill: '#465fff', stroke: 'none' },
-            selected: { fill: '#465FFF' },
+            hover: { fillOpacity: 0.7, cursor: 'pointer', fill: getToken('--chart-1'), stroke: 'none' },
+            selected: { fill: getToken('--chart-1') },
             selectedHover: {},
         },
     });

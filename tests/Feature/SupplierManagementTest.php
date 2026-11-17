@@ -1,0 +1,459 @@
+<?php
+
+use App\Models\Supplier;
+use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
+use Database\Seeders\SettingsSeeder;
+use Illuminate\Http\UploadedFile;
+
+beforeEach(function () {
+    $this->seed(RolesAndPermissionsSeeder::class);
+    $this->seed(SettingsSeeder::class);
+});
+
+it('forbids guests from viewing the suppliers list', function () {
+    $this->get(route('suppliers.index'))->assertRedirect(route('login'));
+});
+
+it('forbids users without permission from viewing suppliers', function () {
+    $user = User::factory()->create(['email_verified_at' => now()]);
+
+    $this->actingAs($user)->get(route('suppliers.index'))->assertForbidden();
+});
+
+it('lists suppliers for a Super Admin', function () {
+    actingAsSuperAdmin();
+
+    $supplier = Supplier::factory()->create([
+        'name' => 'Subhramaniam',
+        'supplier_id' => 'SP0008',
+    ]);
+
+    $this->get(route('suppliers.index'))
+        ->assertOk()
+        ->assertSee('Suppliers List')
+        ->assertSee('Subhramaniam')
+        ->assertSee('SP0008');
+});
+
+it('shows the supplier create page', function () {
+    actingAsSuperAdmin();
+
+    $this->get(route('suppliers.create'))
+        ->assertOk()
+        ->assertSee('Suppliers')
+        ->assertSee('Add/Update Suppliers')
+        ->assertSee('Opening Balance Payments');
+});
+
+it('creates a supplier and automatically assigns an SP code', function () {
+    actingAsSuperAdmin();
+
+    $response = $this->post(route('suppliers.store'), [
+        'name' => 'Krishna Patil',
+        'mobile' => '9844545544',
+        'email' => 'krishnapatil@gmail.com',
+        'tel_no' => '02987654',
+        'tax_number' => 'TAX5544',
+        'opening_balance' => 5894.00,
+        'country' => 'Bangladesh',
+        'city' => "Cox's Bazar",
+        'address' => 'Station Road',
+    ]);
+
+    $response->assertRedirect(route('suppliers.index'));
+
+    $supplier = Supplier::where('name', 'Krishna Patil')->first();
+
+    expect($supplier)->not->toBeNull()
+        ->and($supplier->supplier_id)->toStartWith('SP')
+        ->and($supplier->tel_no)->toBe('02987654')
+        ->and((float) $supplier->opening_balance)->toBe(5894.00)
+        ->and((float) $supplier->purchase_due)->toBe(5894.00);
+
+    $this->assertDatabaseHas('audit_logs', [
+        'event' => 'created',
+        'auditable_type' => Supplier::class,
+        'auditable_id' => $supplier->id,
+    ]);
+});
+
+it('fails validation when supplier name is missing', function () {
+    actingAsSuperAdmin();
+
+    $this->post(route('suppliers.store'), [
+        'name' => '',
+        'mobile' => '01700000000',
+    ])->assertSessionHasErrors('name');
+});
+
+it('fails validation when supplier mobile is missing', function () {
+    actingAsSuperAdmin();
+
+    $this->post(route('suppliers.store'), [
+        'name' => 'Valid Supplier Name',
+        'mobile' => '',
+    ])->assertSessionHasErrors('mobile');
+});
+
+it('updates an existing supplier', function () {
+    actingAsSuperAdmin();
+
+    $supplier = Supplier::factory()->create([
+        'name' => 'Old Supplier Name',
+        'city' => 'Chittagong',
+    ]);
+
+    $response = $this->patch(route('suppliers.update', $supplier), [
+        'name' => 'Updated Supplier Name',
+        'city' => "Cox's Bazar",
+        'mobile' => '01899999999',
+    ]);
+
+    $response->assertRedirect(route('suppliers.index'));
+
+    expect($supplier->fresh()->name)->toBe('Updated Supplier Name')
+        ->and($supplier->fresh()->city)->toBe("Cox's Bazar");
+
+    $this->assertDatabaseHas('audit_logs', [
+        'event' => 'updated',
+        'auditable_type' => Supplier::class,
+        'auditable_id' => $supplier->id,
+    ]);
+});
+
+it('soft deletes a supplier', function () {
+    actingAsSuperAdmin();
+
+    $supplier = Supplier::factory()->create(['name' => 'To Delete']);
+
+    $this->delete(route('suppliers.destroy', $supplier))
+        ->assertRedirect(route('suppliers.index'));
+
+    expect(Supplier::find($supplier->id))->toBeNull()
+        ->and(Supplier::withTrashed()->find($supplier->id))->not->toBeNull();
+
+    $this->assertDatabaseHas('audit_logs', [
+        'event' => 'deleted',
+        'auditable_type' => Supplier::class,
+        'auditable_id' => $supplier->id,
+    ]);
+});
+
+it('downloads the import template CSV', function () {
+    actingAsSuperAdmin();
+
+    $response = $this->get(route('suppliers.import-template'));
+
+    $response->assertOk()
+        ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    expect($response->getContent())->toContain('Supplier Name')
+        ->and($response->getContent())->toContain('Mobile')
+        ->and($response->getContent())->toContain('Opening Balance');
+});
+
+it('imports suppliers from a CSV file', function () {
+    actingAsSuperAdmin();
+
+    $csvContent = "Supplier Name,Mobile,Email,Phone,TAX Number,Country Name,State Name,City,Postcode,Address,Opening Balance\n"
+        ."Imported Company,01712345678,imported@example.com,023344,TAX22,Bangladesh,Chittagong,Cox's Bazar,4700,Main Street,2500.00\n";
+
+    $file = UploadedFile::fake()->createWithContent('suppliers.csv', $csvContent);
+
+    $this->post(route('suppliers.import.store'), [
+        'file' => $file,
+    ])->assertRedirect(route('suppliers.index'));
+
+    $supplier = Supplier::where('email', 'imported@example.com')->first();
+
+    expect($supplier)->not->toBeNull()
+        ->and($supplier->name)->toBe('Imported Company')
+        ->and((float) $supplier->opening_balance)->toBe(2500.00);
+});
+
+it('records a due payment and reduces supplier purchase due', function () {
+    actingAsSuperAdmin();
+
+    $supplier = Supplier::factory()->create([
+        'purchase_due' => 5000.00,
+        'opening_balance' => 5000.00,
+    ]);
+
+    $this->post(route('suppliers.pay-due', $supplier), [
+        'payment_date' => now()->toDateString(),
+        'amount' => 2000.00,
+        'payment_type' => 'Cash',
+        'payment_note' => 'Partial cash payment',
+    ])->assertRedirect();
+
+    expect((float) $supplier->fresh()->purchase_due)->toBe(3000.00);
+
+    $this->assertDatabaseHas('supplier_opening_payments', [
+        'supplier_id' => $supplier->id,
+        'amount' => 2000.00,
+        'payment_type' => 'Cash',
+    ]);
+});
+
+it('records a return due payment and reduces return due', function () {
+    actingAsSuperAdmin();
+
+    $supplier = Supplier::factory()->create([
+        'purchase_return_due' => 1500.00,
+    ]);
+
+    $this->post(route('suppliers.pay-return-due', $supplier), [
+        'payment_date' => now()->toDateString(),
+        'amount' => 500.00,
+        'payment_type' => 'Bank Transfer',
+        'payment_note' => 'Return adjustment',
+    ])->assertRedirect();
+
+    expect((float) $supplier->fresh()->purchase_return_due)->toBe(1000.00);
+
+    $this->assertDatabaseHas('supplier_opening_payments', [
+        'supplier_id' => $supplier->id,
+        'amount' => 500.00,
+        'payment_type' => 'Bank Transfer',
+    ]);
+});
+
+it('deletes an opening payment and reverts supplier due', function () {
+    actingAsSuperAdmin();
+
+    $supplier = Supplier::factory()->create([
+        'purchase_due' => 3000.00,
+    ]);
+
+    $payment = $supplier->openingPayments()->create([
+        'payment_date' => now()->toDateString(),
+        'amount' => 2000.00,
+        'payment_type' => 'Cash',
+        'payment_note' => 'Payment to delete',
+    ]);
+
+    $this->delete(route('suppliers.payments.destroy', $payment))
+        ->assertRedirect();
+
+    expect((float) $supplier->fresh()->purchase_due)->toBe(5000.00);
+
+    $this->assertDatabaseMissing('supplier_opening_payments', [
+        'id' => $payment->id,
+    ]);
+});
+
+it('toggles supplier status between active and inactive', function () {
+    actingAsSuperAdmin();
+
+    $supplier = Supplier::factory()->create([
+        'status' => 'active',
+    ]);
+
+    expect($supplier->isActive())->toBeTrue();
+
+    // Toggle active -> inactive
+    $this->patch(route('suppliers.toggle-status', $supplier))
+        ->assertRedirect();
+
+    expect($supplier->fresh()->status)->toBe('inactive')
+        ->and($supplier->fresh()->isActive())->toBeFalse();
+
+    // Toggle inactive -> active
+    $this->patch(route('suppliers.toggle-status', $supplier))
+        ->assertRedirect();
+
+    expect($supplier->fresh()->status)->toBe('active')
+        ->and($supplier->fresh()->isActive())->toBeTrue();
+});
+
+it('forbids unauthorized users from toggling supplier status', function () {
+    $user = User::factory()->create(['email_verified_at' => now()]);
+    $supplier = Supplier::factory()->create(['status' => 'active']);
+
+    $this->actingAs($user)
+        ->patch(route('suppliers.toggle-status', $supplier))
+        ->assertForbidden();
+
+    expect($supplier->fresh()->status)->toBe('active');
+});
+
+it('renders the pdf preview page with suppliers and headers', function () {
+    actingAsSuperAdmin();
+
+    $supplier = Supplier::factory()->create([
+        'name' => 'John Evans',
+        'supplier_id' => 'SP0009',
+    ]);
+
+    $this->get(route('suppliers.pdf-view', ['columns' => 'supplier_id,name,purchase_due,status']))
+        ->assertOk()
+        ->assertSee('Suppliers List')
+        ->assertSee('John Evans')
+        ->assertSee('SP0009')
+        ->assertSee('Download / Save as PDF');
+});
+
+it('renders the print preview page with suppliers and grid table', function () {
+    actingAsSuperAdmin();
+
+    $supplier = Supplier::factory()->create([
+        'name' => 'John Evans',
+        'supplier_id' => 'SP0009',
+    ]);
+
+    $this->get(route('suppliers.print-view', ['columns' => 'supplier_id,name,purchase_due,status']))
+        ->assertOk()
+        ->assertSee('Suppliers List')
+        ->assertSee('John Evans')
+        ->assertSee('SP0009')
+        ->assertSee('window.print()', false);
+});
+
+it('exports suppliers with selected columns to excel or csv', function () {
+    actingAsSuperAdmin();
+
+    Supplier::factory()->create(['name' => 'Export Supplier']);
+
+    $response = $this->get(route('suppliers.export', [
+        'format' => 'csv',
+        'columns' => 'supplier_id,name,status',
+    ]));
+
+    $response->assertOk();
+    $response->assertHeader('content-disposition');
+});
+
+it('downloads the supplier import CSV template', function () {
+    actingAsSuperAdmin();
+
+    $response = $this->get(route('suppliers.import-template'));
+
+    $response->assertOk()
+        ->assertHeader('Content-Disposition', 'attachment; filename="supplier_import_template.csv"')
+        ->assertSee('Supplier Name')
+        ->assertSee('Mobile No')
+        ->assertSee('Tel No')
+        ->assertSee('Subhramaniam');
+});
+
+it('imports suppliers from a valid CSV file with Mobile No and Tel No', function () {
+    actingAsSuperAdmin();
+
+    $csvContent = implode("\n", [
+        'Supplier Name,Mobile No,Email,Tel No,TAX Number,Country Name,State Name,City,Postcode,Address,Opening Balance',
+        'Imported Supplier 1,01811223344,imp_supp1@distributor.com,029876543,TAX-101,Bangladesh,Chittagong,Cox\'s Bazar,4700,"Main Road",15000.00',
+        'Imported Supplier 2,01711998877,imp_supp2@distributor.com,034164101,TAX-202,Bangladesh,Chittagong,Cox\'s Bazar,4700,"Ocean City",0.00',
+    ]);
+
+    $file = UploadedFile::fake()->createWithContent('suppliers.csv', $csvContent);
+
+    $response = $this->post(route('suppliers.import.store'), [
+        'file' => $file,
+    ]);
+
+    $response->assertRedirect(route('suppliers.index'));
+    $response->assertSessionHas('success', 'Successfully imported 2 supplier(s).');
+
+    expect(Supplier::where('name', 'Imported Supplier 1')->exists())->toBeTrue()
+        ->and(Supplier::where('name', 'Imported Supplier 2')->exists())->toBeTrue();
+});
+
+it('rejects creating a supplier whose name matches an existing supplier', function () {
+    actingAsSuperAdmin();
+
+    Supplier::factory()->create(['name' => 'Samsung Electronics BD']);
+
+    $this->post(route('suppliers.store'), [
+        'name' => '  samsung   electronics   bd ',
+        'mobile' => '01811223344',
+    ])->assertSessionHasErrors('name');
+
+    expect(Supplier::count())->toBe(1);
+});
+
+it('rejects creating a supplier whose tax number or contact details match an existing supplier', function () {
+    actingAsSuperAdmin();
+
+    Supplier::factory()->create([
+        'mobile' => '01811223344',
+        'email' => 'samsung.bd@distributor.com',
+        'tax_number' => 'TAX-SMSG-101',
+    ]);
+
+    $this->post(route('suppliers.store'), [
+        'name' => 'Different Supplier',
+        'mobile' => '01811223344',
+    ])->assertSessionHasErrors('mobile');
+
+    $this->post(route('suppliers.store'), [
+        'name' => 'Another Supplier',
+        'mobile' => '01800000000',
+        'tax_number' => 'tax-smsg-101',
+    ])->assertSessionHasErrors('tax_number');
+
+    $this->post(route('suppliers.store'), [
+        'name' => 'Third Supplier',
+        'mobile' => '01800000001',
+        'email' => 'Samsung.BD@Distributor.com',
+    ])->assertSessionHasErrors('email');
+
+    expect(Supplier::count())->toBe(1);
+});
+
+it('restores a soft-deleted supplier when the same details are submitted again', function () {
+    actingAsSuperAdmin();
+
+    $this->post(route('suppliers.store'), [
+        'name' => 'Samsung Electronics BD',
+        'mobile' => '01811223344',
+        'email' => 'samsung.bd@distributor.com',
+        'tax_number' => 'TAX-SMSG-101',
+    ])->assertRedirect(route('suppliers.index'));
+
+    $supplier = Supplier::where('name', 'Samsung Electronics BD')->firstOrFail();
+    $originalCode = $supplier->supplier_id;
+
+    $this->delete(route('suppliers.destroy', $supplier))->assertRedirect(route('suppliers.index'));
+
+    $this->post(route('suppliers.store'), [
+        'name' => 'Samsung Electronics BD',
+        'mobile' => '01811223344',
+        'email' => 'samsung.bd@distributor.com',
+        'tax_number' => 'TAX-SMSG-101',
+        'opening_balance' => '25000',
+    ])->assertRedirect(route('suppliers.index'));
+
+    expect(Supplier::withTrashed()->count())->toBe(1);
+
+    $restored = Supplier::withTrashed()->firstOrFail();
+    expect($restored->deleted_at)->toBeNull()
+        ->and($restored->supplier_id)->toBe($originalCode)
+        ->and((float) $restored->opening_balance)->toBe(25000.0);
+});
+
+it('skips duplicate rows when importing suppliers', function () {
+    actingAsSuperAdmin();
+
+    Supplier::factory()->create([
+        'name' => 'Existing Supplier',
+        'mobile' => '01800000001',
+    ]);
+
+    $csvContent = implode("\n", [
+        'Supplier Name,Mobile No,Email,Tel No,TAX Number,Country Name,State Name,City,Postcode,Address,Opening Balance',
+        'Existing Supplier,01800000001,,,,,,,,,',
+        'Fresh Supplier,01800000002,fresh@distributor.com,029876543,TAX-303,Bangladesh,Chittagong,Cox\'s Bazar,4700,"Main Road",0.00',
+        'Fresh Supplier,01800000002,fresh@distributor.com,029876543,TAX-303,Bangladesh,Chittagong,Cox\'s Bazar,4700,"Main Road",0.00',
+    ]);
+
+    $file = UploadedFile::fake()->createWithContent('suppliers.csv', $csvContent);
+
+    $this->post(route('suppliers.import.store'), [
+        'file' => $file,
+    ])->assertRedirect(route('suppliers.index'))
+        ->assertSessionHas('success', 'Successfully imported 1 supplier(s). Skipped 2 duplicate row(s).');
+
+    expect(Supplier::count())->toBe(2)
+        ->and(Supplier::where('name', 'Fresh Supplier')->count())->toBe(1);
+});

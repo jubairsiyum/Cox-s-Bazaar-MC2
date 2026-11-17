@@ -89,21 +89,152 @@ Alpine.store("direction", {
     },
 });
 
+// Toast notification store
+Alpine.store("toast", {
+    items: [],
+    show(message, type = "success", duration = 4000) {
+        const id = Date.now() + Math.random();
+        this.items.push({ id, message, type });
+
+        if (duration) {
+            setTimeout(() => this.remove(id), duration);
+        }
+    },
+    remove(id) {
+        this.items = this.items.filter((toast) => toast.id !== id);
+    },
+});
+
+// Toast host component: seeds the store from server flash data.
+Alpine.data("toastHost", () => ({
+    init() {
+        (window.flashToasts || []).forEach((toast) => {
+            Alpine.store("toast").show(toast.message, toast.type, toast.duration);
+        });
+    },
+}));
+
+// Barcode field: receives scans from hardware scanners and fills the input.
+Alpine.data("barcodeField", () => ({
+    lastScan: "",
+    scanning: false,
+
+    init() {
+        // Focus the input so a USB/Bluetooth keyboard-wedge scanner types into it.
+        this.$nextTick(() => this.focus());
+    },
+
+    startScan() {
+        this.scanning = true;
+        this.focus();
+    },
+
+    applyScan(code) {
+        if (!code) {
+            return;
+        }
+        if (this.$refs.input) {
+            this.$refs.input.value = code;
+        }
+        this.lastScan = code;
+        this.scanning = false;
+        Alpine.store("toast")?.show("Barcode scanned: " + code, "success", 2500);
+    },
+
+    focus() {
+        this.$nextTick(() => this.$refs.input && this.$refs.input.focus());
+    },
+}));
+
+// Theme store (Multi-theme + Dark mode)
+const THEMES = ['swift'];            // add new theme names here
+const DEFAULT_THEME = 'swift';
+const read  = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const write = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+const notify = () => window.dispatchEvent(new CustomEvent('theme-changed'));
+
+Alpine.store('theme', {
+  dark: document.documentElement.classList.contains('dark'),
+  toggle() {
+    this.dark = !this.dark;
+    document.documentElement.classList.toggle('dark', this.dark);
+    write('theme', this.dark ? 'dark' : 'light');
+    notify();
+  },
+  themes: THEMES,
+  name: document.documentElement.dataset.theme || DEFAULT_THEME,
+  setTheme(n) {
+    if (!THEMES.includes(n)) return;
+    this.name = n;
+    document.documentElement.dataset.theme = n;
+    write('color-theme', n);
+    notify();
+  },
+});
+
 // Start Alpine
 Alpine.start();
 
+// Global keyboard-wedge barcode scanner capture. USB and Bluetooth scanners
+// used in Bangladesh behave like a keyboard: they type the code in a fast burst
+// and end with Enter. This listener detects that burst and routes it to the
+// product barcode field regardless of focus.
+function initBarcodeScanner() {
+    let buffer = "";
+    let lastKeyTime = 0;
+    let flushTimer = null;
+
+    const flush = () => {
+        const code = buffer;
+        buffer = "";
+        if (code.length >= 4) {
+            window.dispatchEvent(new CustomEvent("barcode-scanned", { detail: { code } }));
+        }
+    };
+
+    document.addEventListener("keydown", (event) => {
+        const isBarcodeInput = event.target && event.target.id === "barcode";
+
+        if (event.key === "Enter") {
+            if (buffer.length >= 4) {
+                event.preventDefault();
+                event.stopPropagation();
+                flush();
+            }
+            return;
+        }
+
+        // Only printable characters without modifier keys.
+        if (event.key.length !== 1 || event.ctrlKey || event.altKey || event.metaKey) {
+            buffer = "";
+            return;
+        }
+
+        const now = Date.now();
+        const rapid = now - lastKeyTime <= 40;
+
+        if (!rapid) {
+            buffer = "";
+        }
+
+        buffer += event.key;
+        lastKeyTime = now;
+
+        // Keep a detected scan from leaking into a non-barcode field. When the
+        // barcode input itself is focused, let the keys flow through naturally.
+        if (buffer.length >= 2 && !isBarcodeInput) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
+        clearTimeout(flushTimer);
+        flushTimer = setTimeout(flush, 100);
+    }, true);
+}
+
 // Initialize components on DOM ready
 document.addEventListener("DOMContentLoaded", () => {
-    // ── Flash message auto-dismiss ──────────────────────────
-    const flashes = document.querySelectorAll('[data-flash-dismiss]');
-    flashes.forEach(el => {
-        const delay = parseInt(el.dataset.flashDismiss) || 4000;
-        setTimeout(() => {
-            el.style.transition = 'opacity .4s';
-            el.style.opacity = '0';
-            setTimeout(() => el.remove(), 400);
-        }, delay);
-    });
+    initBarcodeScanner();
 
     // ── Offline / Online detection ──────────────────────────
     const offlineBanner = document.getElementById('offline-banner');

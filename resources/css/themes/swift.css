@@ -1,0 +1,72 @@
+/* Theme: "swift" (default). One theme = one file like this.
+   Light  -> [data-theme="swift"]
+   Dark   -> [data-theme="swift"].dark
+   Default when <html> has no data-theme -> :root:not([data-theme]) */
+
+:root:not([data-theme]),
+[data-theme="swift"] {
+  /* Surfaces */
+  --canvas:  #e4e4ea;   /* page background behind the app */
+  --shell:   #f6f7fb;   /* big outer app container */
+  --surface: #ffffff;   /* cards, sidebar, dropdowns */
+  --soft:    #e8f0fe;   /* soft highlight: active nav, inactive bars, badges */
+  --line:    #eef0f6;   /* borders, dividers, tracks */
+
+  /* Text */
+  --ink:      #0f1b4d;  /* primary text */
+  --muted:    #64708a;  /* secondary text, icons */
+  --on-brand: #ffffff;  /* text/icon on brand-colored backgrounds */
+
+  /* Brand */
+  --brand-50:  #f1f6ff;
+  --brand-100: #e8f0fe;
+  --brand-400: #4c86f5;
+  --brand-500: #2166ee; /* primary action color */
+  --brand-600: #1a56d6; /* hover / pressed */
+
+  /* Status */
+  --danger:  #ff5a36;
+  --success: #16a34a;
+  --warning: #f59e0b;
+
+  /* Effects */
+  --overlay:    rgb(15 27 77 / 0.45);
+  --shadow-rgb: 15 27 77;   /* R G B for card shadows */
+
+  /* Chart palette */
+  --chart-1: #2166ee;
+  --chart-2: #ff5a36;
+  --chart-3: #16a34a;
+  --chart-4: #f59e0b;
+}
+
+:root:not([data-theme]).dark,
+[data-theme="swift"].dark {
+  --canvas:  #0a0d1a;
+  --shell:   #10142a;
+  --surface: #171c36;
+  --soft:    #1f2b5c;
+  --line:    #252b4d;
+
+  --ink:      #eef1ff;
+  --muted:    #9aa3c7;
+  --on-brand: #0b1230;
+
+  --brand-50:  #141d3d;
+  --brand-100: #1f2b5c;
+  --brand-400: #7aa2ff;
+  --brand-500: #5b8dff;
+  --brand-600: #4a7df0;
+
+  --danger:  #ff7a5c;
+  --success: #34d399;
+  --warning: #fbbf24;
+
+  --overlay:    rgb(0 0 0 / 0.6);
+  --shadow-rgb: 0 0 0;
+
+  --chart-1: #5b8dff;
+  --chart-2: #ff7a5c;
+  --chart-3: #34d399;
+  --chart-4: #fbbf24;
+}

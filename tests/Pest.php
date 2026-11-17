@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Product;
+use App\Models\Unit;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -61,4 +63,30 @@ function actingAsSuperAdmin(): User
     test()->actingAs($admin);
 
     return $admin;
+}
+
+/**
+ * Create a stock row for a named product variant (the product is created on the fly).
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function stockRowFor(string $productName, array $attributes = []): Unit
+{
+    $product = Product::factory()->create([
+        'name' => $productName,
+        'storage' => null,
+        'color' => null,
+    ]);
+
+    return Unit::factory()->for($product)->create($attributes);
+}
+
+/**
+ * Find the stock row of a named product variant.
+ */
+function stockRowOf(string $productName): ?Unit
+{
+    return Unit::query()
+        ->whereHas('product', fn ($q) => $q->where('name', $productName))
+        ->first();
 }

@@ -16,16 +16,16 @@
     <x-ui.dropdown-menu>
         <x-ui.dropdown-menu.trigger as-child>
             <x-ui.button variant="outline" size="icon-lg" class="relative" aria-label="Toggle notifications" x-on:click.capture="notifying = false">
-                <span x-bind:class="notifying ? 'flex' : 'hidden'" class="absolute end-0 -top-0.5 z-10 h-2 w-2 translate-x-1/2 rounded-full bg-orange-400 rtl:-translate-x-1/2">
-                    <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75"></span>
+                <span x-bind:class="notifying ? 'flex' : 'hidden'" class="absolute end-0 -top-0.5 z-10 h-2 w-2 translate-x-1/2 rounded-full bg-warning rtl:-translate-x-1/2">
+                    <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-warning opacity-75"></span>
                 </span>
                 <x-svg.bell class="size-auto!" />
             </x-ui.button>
         </x-ui.dropdown-menu.trigger>
 
-        <x-ui.dropdown-menu.content align="end" :side-offset="12" class="w-87.5 overflow-hidden p-3 sm:w-90.25 dark:bg-[#1E2635]">
+        <x-ui.dropdown-menu.content align="end" :side-offset="12" class="w-87.5 overflow-hidden p-3 sm:w-90.25 ">
             <div class="flex items-center justify-between pb-3">
-                <h5 class="text-lg font-semibold text-gray-800 dark:text-gray-200">{{ __('header.notifications.title') }}</h5>
+                <h5 class="text-lg font-semibold text-ink">{{ __('header.notifications.title') }}</h5>
                 <x-ui.button variant="ghost" size="icon-xs" aria-label="Close notifications" x-on:click="close()">
                     <x-svg.x class="size-5" />
                 </x-ui.button>
@@ -36,26 +36,26 @@
             <div class="h-96 overflow-y-auto overflow-x-hidden custom-scrollbar">
                 <div class="flex flex-col pe-2">
                     @foreach ($notifications as $item)
-                        <x-ui.dropdown-menu.item class="flex items-start gap-3 rounded-lg p-3 hover:bg-gray-100 dark:hover:bg-white/5">
+                        <x-ui.dropdown-menu.item class="flex items-start gap-3 rounded-lg p-3 hover:bg-soft">
                             <x-ui.avatar size="default">
                                 <x-ui.avatar.image :src="$item['avatar']" :alt="$item['name']" />
                                 <x-ui.avatar.fallback>{{ $initials($item['name']) }}</x-ui.avatar.fallback>
                                 <x-ui.avatar.badge :variant="$item['status']" />
                             </x-ui.avatar>
                             <span class="block flex-1 text-start">
-                                <span class="mb-1.5 block space-x-1 text-sm text-gray-500 dark:text-gray-400">
-                                    <span class="font-medium text-gray-800 dark:text-white/90">{{ $item['name'] }}</span>
+                                <span class="mb-1.5 block space-x-1 text-sm text-muted">
+                                    <span class="font-medium text-ink">{{ $item['name'] }}</span>
                                     <span>{{ __('header.notifications.requestsPermission') }}</span>
-                                    <span class="font-medium text-gray-800 dark:text-white/90">Project - Nganter App</span>
+                                    <span class="font-medium text-ink">Project - Nganter App</span>
                                 </span>
-                                <span class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                <span class="flex items-center gap-2 text-xs text-muted">
                                     <span>{{ __('header.notifications.project') }}</span>
-                                    <x-svg.dot class="size-2 text-gray-400 dark:text-gray-500" />
+                                    <x-svg.dot class="size-2 text-muted" />
                                     <span>{{ str_replace('{count}', $item['timeCount'], __('header.notifications.' . $item['timeKey'])) }}</span>
                                 </span>
                             </span>
                         </x-ui.dropdown-menu.item>
-                        <x-ui.dropdown-menu.separator class="my-0.5 bg-gray-100 last-of-type:hidden dark:bg-gray-700" />
+                        <x-ui.dropdown-menu.separator class="my-0.5 bg-soft last-of-type:hidden" />
                     @endforeach
                 </div>
             </div>

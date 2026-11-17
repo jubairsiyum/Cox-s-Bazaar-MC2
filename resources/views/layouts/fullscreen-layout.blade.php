@@ -1,11 +1,19 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr" class="h-full bg-gray-50 dark:bg-gray-900">
+<html lang="en" dir="ltr" class="h-full bg-canvas">
 
 <head>
     <script>
-        (function () {
-            if (localStorage.getItem('dir') === 'rtl') document.documentElement.setAttribute('dir', 'rtl');
-        })();
+      (function () {
+        var root = document.documentElement, allowed = ['swift'], theme = 'swift';
+        try {
+          var c = localStorage.getItem('color-theme');
+          if (c && allowed.indexOf(c) > -1) theme = c;
+          var t = localStorage.getItem('theme');
+          if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) root.classList.add('dark');
+          if (localStorage.getItem('dir') === 'rtl') root.setAttribute('dir', 'rtl');
+        } catch (e) {}
+        root.setAttribute('data-theme', theme);
+      })();
     </script>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -16,53 +24,15 @@
     <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
-
-    <!-- Theme Store -->
+    <!-- Cloak Style -->
     <style>
         [x-cloak] {
             display: none !important;
         }
     </style>
-    <!-- Theme Store -->
+    <!-- Sidebar Store -->
     <script>
         document.addEventListener('alpine:init', () => {
-            Alpine.store('theme', {
-                init() {
-                    const savedTheme = localStorage.getItem('theme');
-                    this.theme = savedTheme === 'dark' ? 'dark' : 'light';
-                    this.updateTheme();
-                },
-                theme: 'light',
-                resolvedTheme: 'light',
-                set(value) {
-                    value = value === 'dark' ? 'dark' : 'light';
-                    this.theme = value;
-                    localStorage.setItem('theme', value);
-                    this.updateTheme();
-                    window.dispatchEvent(new CustomEvent('theme-changed', { detail: value }));
-                },
-                toggle() {
-                    this.set(this.resolvedTheme === 'dark' ? 'light' : 'dark');
-                },
-                updateTheme() {
-                    const html = document.documentElement;
-                    const isDark = this.theme === 'dark';
-                    if (isDark) {
-                        html.classList.add('dark');
-                    } else {
-                        html.classList.remove('dark');
-                    }
-
-                    this.resolvedTheme = isDark ? 'dark' : 'light';
-                    html.dataset['theme'] = this.resolvedTheme;
-                    html.style.colorScheme = this.resolvedTheme;
-                    if (document.body) {
-                        document.body.dataset['theme'] = this.resolvedTheme;
-                        document.body.style.colorScheme = this.resolvedTheme;
-                    }
-                }
-            });
-
             Alpine.store('sidebar', {
                 isExpanded: false,
                 isMobileOpen: false,
@@ -98,6 +68,14 @@
                     this.isExpanded = !this.isExpanded;
                     this.isMobileOpen = false;
                     
+                    if (window.innerWidth >= 1280) {
+                        localStorage.setItem('sidebarExpanded', this.isExpanded);
+                    }
+                },
+
+                setExpanded(val) {
+                    this.isExpanded = !!val;
+                    this.isMobileOpen = false;
                     if (window.innerWidth >= 1280) {
                         localStorage.setItem('sidebarExpanded', this.isExpanded);
                     }

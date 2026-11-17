@@ -19,12 +19,12 @@
             ];
         },
     }"
-    {{ $attributes->merge(['class' => 'relative overflow-hidden border border-gray-200 p-5 sm:p-6 lg:p-7 dark:border-gray-700']) }}
+    {{ $attributes->merge(['class' => 'relative overflow-hidden border border-line p-5 sm:p-6 lg:p-7 ']) }}
 >
     <x-ui.dialog>
         <!-- Top Header Row: Title & Edit Button -->
         <div class="flex items-center justify-between gap-4">
-            <h2 class="text-base font-semibold text-gray-800 sm:text-lg dark:text-white/90">
+            <h2 class="text-base font-semibold text-ink sm:text-lg">
                 Personal Information
             </h2>
 
@@ -38,17 +38,17 @@
         <div class="mt-2 flex items-center gap-4 sm:gap-6">
             <x-ui.avatar class="size-16 shrink-0 sm:size-20">
                 <x-ui.avatar.image x-bind:src="profileData.avatarUrl || '/assets/images/user/owner.png'" x-bind:alt="profileData.fullName || 'User profile'" />
-                <x-ui.avatar.fallback class="bg-brand-400 text-xl font-medium text-white sm:text-2xl dark:bg-brand-400 dark:text-white">
+                <x-ui.avatar.fallback class="bg-soft text-xl font-medium text-on-brand sm:text-2xl">
                     <span x-text="initialLetter"></span>
                 </x-ui.avatar.fallback>
             </x-ui.avatar>
 
             <div class="flex flex-col gap-1">
-                <h3 class="text-base font-semibold text-gray-800 sm:text-lg dark:text-white/90" x-text="profileData.fullName"></h3>
+                <h3 class="text-base font-semibold text-ink sm:text-lg" x-text="profileData.fullName"></h3>
 
-                <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500 sm:text-sm dark:text-gray-400">
+                <div class="flex flex-wrap items-center gap-2 text-xs text-muted sm:text-sm">
                     <span x-text="profileData.role"></span>
-                    <span class="inline-block h-3.5 w-px bg-gray-300 dark:bg-gray-700"></span>
+                    <span class="inline-block h-3.5 w-px bg-soft"></span>
                     <span x-text="profileData.location"></span>
                 </div>
             </div>

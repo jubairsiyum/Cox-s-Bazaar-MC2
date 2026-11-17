@@ -1,9 +1,9 @@
 <x-ui.dialog.content class="max-w-[calc(100%-2rem)] rounded-3xl p-6 sm:max-w-146 sm:p-10">
     <x-ui.dialog.header class="gap-2 pe-14 text-start">
-        <x-ui.dialog.title class="text-2xl font-semibold text-gray-800 dark:text-white/90">
+        <x-ui.dialog.title class="text-2xl font-semibold text-ink">
             Edit Address
         </x-ui.dialog.title>
-        <x-ui.dialog.description class="text-sm text-gray-500 dark:text-gray-400">
+        <x-ui.dialog.description class="text-sm text-muted">
             Update your details to keep your profile up-to-date.
         </x-ui.dialog.description>
     </x-ui.dialog.header>
@@ -46,25 +46,25 @@
             <x-ui.field class="gap-1.5" x-bind:data-invalid="Boolean(errorOf('country'))">
                 <x-ui.field.label>Country</x-ui.field.label>
                 <x-ui.input type="text" x-model="form.country" placeholder="Country" x-bind:aria-invalid="errorOf('country') ? 'true' : null" @blur="touch('country')" />
-                <p class="text-sm font-normal text-red-500 dark:text-red-400" x-show="errorOf('country')" style="display: none;" x-text="errorOf('country')"></p>
+                <p class="text-sm font-normal text-danger" x-show="errorOf('country')" style="display: none;" x-text="errorOf('country')"></p>
             </x-ui.field>
 
             <x-ui.field class="gap-1.5" x-bind:data-invalid="Boolean(errorOf('cityState'))">
                 <x-ui.field.label>City/State</x-ui.field.label>
                 <x-ui.input type="text" x-model="form.cityState" placeholder="City/State" x-bind:aria-invalid="errorOf('cityState') ? 'true' : null" @blur="touch('cityState')" />
-                <p class="text-sm font-normal text-red-500 dark:text-red-400" x-show="errorOf('cityState')" style="display: none;" x-text="errorOf('cityState')"></p>
+                <p class="text-sm font-normal text-danger" x-show="errorOf('cityState')" style="display: none;" x-text="errorOf('cityState')"></p>
             </x-ui.field>
 
             <x-ui.field class="gap-1.5" x-bind:data-invalid="Boolean(errorOf('postalCode'))">
                 <x-ui.field.label>Postal Code</x-ui.field.label>
                 <x-ui.input type="text" x-model="form.postalCode" placeholder="Postal Code" x-bind:aria-invalid="errorOf('postalCode') ? 'true' : null" @blur="touch('postalCode')" />
-                <p class="text-sm font-normal text-red-500 dark:text-red-400" x-show="errorOf('postalCode')" style="display: none;" x-text="errorOf('postalCode')"></p>
+                <p class="text-sm font-normal text-danger" x-show="errorOf('postalCode')" style="display: none;" x-text="errorOf('postalCode')"></p>
             </x-ui.field>
 
             <x-ui.field class="gap-1.5" x-bind:data-invalid="Boolean(errorOf('taxId'))">
                 <x-ui.field.label>TAX ID</x-ui.field.label>
                 <x-ui.input type="text" x-model="form.taxId" placeholder="TAX ID" x-bind:aria-invalid="errorOf('taxId') ? 'true' : null" @blur="touch('taxId')" />
-                <p class="text-sm font-normal text-red-500 dark:text-red-400" x-show="errorOf('taxId')" style="display: none;" x-text="errorOf('taxId')"></p>
+                <p class="text-sm font-normal text-danger" x-show="errorOf('taxId')" style="display: none;" x-text="errorOf('taxId')"></p>
             </x-ui.field>
         </div>
 

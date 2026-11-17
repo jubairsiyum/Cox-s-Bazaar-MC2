@@ -1,7 +1,7 @@
 @use('App\Support\TwMerge')
 @php
     $classes = TwMerge::merge(
-        'flex size-8 items-center justify-center dark:text-white/90 [&_svg:not([class*=size-])]:size-4',
+        'flex size-8 items-center justify-center  [&_svg:not([class*=size-])]:size-4',
         $attributes->get('class')
     );
 @endphp

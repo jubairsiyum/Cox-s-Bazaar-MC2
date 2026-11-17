@@ -7,12 +7,12 @@
     <x-ui.input-group.addon align="inline-end">
         @if ($showTrigger)
             <button type="button" tabindex="-1" data-slot="combobox-trigger" x-bind:data-popup-open="open ? '' : null" x-on:click="toggle()"
-                class="group/combobox-trigger flex items-center justify-center text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 [&_svg:not([class*='size-'])]:size-4 group-has-data-[slot=combobox-clear]/input-group:hidden">
-                <x-svg.chevron-down class="pointer-events-none size-4 text-gray-500 transition-transform duration-200 group-hover/combobox-trigger:text-gray-700 group-data-popup-open/combobox-trigger:rotate-180 dark:text-gray-400 dark:group-hover/combobox-trigger:text-gray-300" />
+                class="group/combobox-trigger flex items-center justify-center text-muted transition-colors hover:text-ink [&_svg:not([class*='size-'])]:size-4 group-has-data-[slot=combobox-clear]/input-group:hidden">
+                <x-svg.chevron-down class="pointer-events-none size-4 text-muted transition-transform duration-200 group-hover/combobox-trigger:text-ink group-data-popup-open/combobox-trigger:rotate-180 dark:group-hover/combobox-trigger:text-muted" />
             </button>
         @endif
         @if ($showClear)
-            <x-ui.button variant="ghost" size="icon-xs" data-slot="combobox-clear" class="text-gray-400 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" @click="clear()">
+            <x-ui.button variant="ghost" size="icon-xs" data-slot="combobox-clear" class="text-muted hover:text-ink" @click="clear()">
                 <x-svg.x class="pointer-events-none size-4" />
             </x-ui.button>
         @endif

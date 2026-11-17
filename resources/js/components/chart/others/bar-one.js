@@ -1,3 +1,4 @@
+import { getToken } from '../helpers';
 import { mountChart } from '../helpers';
 
 export default (el) => {
@@ -6,7 +7,7 @@ export default (el) => {
     const computed = (fn) => fn;
 
     const options = computed(() => ({
-        colors: ['#465FFF'],
+        colors: [getToken('--chart-1')],
         chart: {
             fontFamily: 'Outfit, sans-serif',
             type: 'bar',
@@ -34,7 +35,7 @@ export default (el) => {
                 fontSize: '12px',
                 fontFamily: 'Outfit, sans-serif',
                 fontWeight: 400,
-                colors: [isDarkMode.value ? '#94A3B8' : '#364153'],
+                colors: [isDarkMode.value ? getToken('--muted') : getToken('--ink')],
             },
             dropShadow: {
                 enabled: false,
@@ -66,7 +67,7 @@ export default (el) => {
             },
             labels: {
                 style: {
-                    colors: isDarkMode.value ? '#94A3B8' : '#364153',
+                    colors: isDarkMode.value ? getToken('--muted') : getToken('--ink'),
                     fontFamily: 'Outfit, sans-serif',
                 },
             },
@@ -83,7 +84,7 @@ export default (el) => {
             },
         },
         grid: {
-            borderColor: isDarkMode.value ? '#1E2640' : '#F3F4F6',
+            borderColor: isDarkMode.value ? getToken('--line') : getToken('--line'),
             strokeDashArray: 0,
             padding: {
                 left: -10,
@@ -111,12 +112,12 @@ export default (el) => {
                 colorStops: [
                     {
                         offset: 0,
-                        color: '#7592FF',
+                        color: getToken('--chart-1'),
                         opacity: 1,
                     },
                     {
                         offset: 100,
-                        color: '#465FFF',
+                        color: getToken('--chart-1'),
                         opacity: 1,
                     },
                 ],

@@ -32,5 +32,7 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <env name="AUTH_GATE_USERNAME" value=""/>
+        <env name="AUTH_GATE_PASSWORD" value=""/>
     </php>
 </phpunit>

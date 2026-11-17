@@ -15,7 +15,7 @@ class Money
         $value = round((float) ($amount ?? 0), 2);
         $formatted = number_format($value, 2);
 
-        return $withSymbol ? '৳' . $formatted : $formatted;
+        return $withSymbol ? '৳'.$formatted : $formatted;
     }
 
     /**

@@ -5,10 +5,10 @@
         <x-ui.select.trigger class="h-auto min-h-11 cursor-pointer py-1.5 ps-3 pe-3.5">
             <div x-show="value.length > 0" class="flex flex-wrap items-center gap-2">
                 <template x-for="val in value" :key="val">
-                    <span class="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-100 py-1 ps-2.5 pe-1.5 text-sm font-normal text-gray-800 dark:border-gray-800 dark:bg-white/5 dark:text-white/90">
+                    <span class="inline-flex items-center gap-1.5 rounded-full border border-line bg-soft py-1 ps-2.5 pe-1.5 text-sm font-normal text-ink">
                         <span x-text="val"></span>
                         <span role="button" tabindex="0" x-bind:aria-label="`Remove ${val}`"
-                            class="inline-flex size-3.5 cursor-pointer items-center justify-center rounded-full text-gray-400 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                            class="inline-flex size-3.5 cursor-pointer items-center justify-center rounded-full text-muted transition-colors hover:text-ink"
                             @click.stop.prevent="value = value.filter((v) => v !== val); $dispatch('change', { value })"
                             @pointerdown.stop.prevent
                             @keydown.enter.stop.prevent="value = value.filter((v) => v !== val)"
@@ -18,7 +18,7 @@
                     </span>
                 </template>
             </div>
-            <span x-show="value.length === 0" style="display: none;" class="flex flex-1 items-center gap-2 truncate text-start text-gray-400 dark:text-gray-500">Select Option</span>
+            <span x-show="value.length === 0" style="display: none;" class="flex flex-1 items-center gap-2 truncate text-start text-muted">Select Option</span>
         </x-ui.select.trigger>
         <x-ui.select.content>
             @foreach ($colorOptions as $option)

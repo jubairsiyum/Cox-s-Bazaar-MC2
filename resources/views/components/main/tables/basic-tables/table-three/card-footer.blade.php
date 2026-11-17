@@ -32,7 +32,7 @@
 >
     <!-- Mobile Pagination (< sm) -->
     <div class="flex w-full items-center justify-between sm:hidden">
-        <span class="text-sm font-medium text-gray-700 dark:text-gray-400">
+        <span class="text-sm font-medium text-ink">
             <span x-text="currentPage"></span>/<span x-text="totalPages"></span>
         </span>
 

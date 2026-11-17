@@ -8,17 +8,17 @@
                     <img width="32" height="32" src="{{ $country['flag'] }}" alt="{{ __('ecommerce.demographic.' . $country['nameKey']) }}" class="size-full object-cover" />
                 </div>
                 <div>
-                    <p class="text-sm font-semibold text-gray-800 dark:text-white/90">
+                    <p class="text-sm font-semibold text-ink">
                         {{ __('ecommerce.demographic.' . $country['nameKey']) }}
                     </p>
-                    <span class="block text-xs font-normal text-gray-500 dark:text-gray-400">
+                    <span class="block text-xs font-normal text-muted">
                         {{ \App\Support\I18n::t('ecommerce.demographic.customers', ['count' => $country['customerCount']]) }}
                     </span>
                 </div>
             </div>
 
             <div class="flex items-center justify-center">
-                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <p class="text-sm font-medium text-ink">
                     {{ $country['percentage'] }}
                 </p>
             </div>

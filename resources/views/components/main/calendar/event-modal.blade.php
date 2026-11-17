@@ -44,13 +44,13 @@
         "
     >
         <x-ui.dialog.content :show-close-button="false" class="overflow-visible border-none bg-transparent p-0 shadow-none sm:max-w-175">
-            <x-ui.card class="relative w-full rounded-3xl border border-gray-200 bg-white p-6 shadow-theme-lg sm:p-11 dark:border-gray-800 dark:bg-[#1E2635]">
+            <x-ui.card class="relative w-full rounded-3xl border border-line bg-surface p-6 shadow-card sm:p-11 ">
                 <!-- Top-end circular close button -->
                 <x-ui.dialog.close as-child>
                     <x-ui.button
                         variant="ghost"
                         size="icon-lg"
-                        class="absolute end-6 top-6 hidden size-11 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-800 sm:flex dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
+                        class="absolute end-6 top-6 hidden size-11 rounded-full bg-soft text-muted hover:bg-line hover:text-ink sm:flex"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-6"><path d="M18 6L6 18M6 6l12 12" /></svg>
                         <span class="sr-only">Close</span>
@@ -59,10 +59,10 @@
 
                 <!-- Title and subtitle -->
                 <div class="flex flex-col gap-2">
-                    <x-ui.dialog.title class="text-title-lg leading-8 font-semibold text-gray-800 sm:text-2xl dark:text-white/90">
+                    <x-ui.dialog.title class="text-title-lg leading-8 font-semibold text-ink sm:text-2xl">
                         Add / Edit Event
                     </x-ui.dialog.title>
-                    <x-ui.dialog.description class="text-sm leading-5 font-normal text-gray-500 dark:text-gray-400">
+                    <x-ui.dialog.description class="text-sm leading-5 font-normal text-muted">
                         Plan your next big moment: schedule or edit an event to stay on track
                     </x-ui.dialog.description>
                 </div>
@@ -71,7 +71,7 @@
                 <form class="mt-6 space-y-5 sm:mt-8 sm:space-y-6" @submit.prevent="save(); close()">
                     <!-- Event Title -->
                     <div>
-                        <x-ui.label for="event-title" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <x-ui.label for="event-title" class="mb-1.5 block text-sm font-medium text-ink">
                             Event Title
                         </x-ui.label>
                         <x-ui.input id="event-title" x-model="eventTitle" class="h-11 rounded-[10px]" />
@@ -79,7 +79,7 @@
 
                     <!-- Event Color -->
                     <div>
-                        <x-ui.label class="mb-3 block text-sm font-medium text-gray-700 sm:mb-4 dark:text-gray-300">
+                        <x-ui.label class="mb-3 block text-sm font-medium text-ink sm:mb-4">
                             Event Color
                         </x-ui.label>
                         <x-ui.radio-group
@@ -90,7 +90,7 @@
                             @foreach ($eventColors as $color)
                                 <div class="flex items-center gap-2">
                                     <x-ui.radio-group.item value="{{ $color }}" id="modal-color-{{ strtolower($color) }}" />
-                                    <x-ui.label for="modal-color-{{ strtolower($color) }}" class="cursor-pointer text-sm font-normal text-gray-700 dark:text-gray-400">
+                                    <x-ui.label for="modal-color-{{ strtolower($color) }}" class="cursor-pointer text-sm font-normal text-ink">
                                         {{ $color }}
                                     </x-ui.label>
                                 </div>
@@ -100,7 +100,7 @@
 
                     <!-- Enter Start Date -->
                     <div>
-                        <x-ui.label for="event-start-date" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <x-ui.label for="event-start-date" class="mb-1.5 block text-sm font-medium text-ink">
                             Enter Start Date
                         </x-ui.label>
                         <x-ui.input x-ref="startInput" id="event-start-date" placeholder="dd/mm/yyyy" x-model="eventStartDate" class="h-11 rounded-[10px]" />
@@ -108,7 +108,7 @@
 
                     <!-- Enter End Date -->
                     <div>
-                        <x-ui.label for="event-end-date" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <x-ui.label for="event-end-date" class="mb-1.5 block text-sm font-medium text-ink">
                             Enter End Date
                         </x-ui.label>
                         <x-ui.input x-ref="endInput" id="event-end-date" placeholder="dd/mm/yyyy" x-model="eventEndDate" class="h-11 rounded-[10px]" />

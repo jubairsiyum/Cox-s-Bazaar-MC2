@@ -4,8 +4,8 @@
     $items = $data['defaultDangerActions'];
 @endphp
 
-<x-ui.card {{ $attributes->merge(['class' => 'rounded-2xl border border-gray-200 bg-white p-5 lg:p-6 dark:border-gray-700 dark:bg-white/3']) }}>
-    <h4 class="text-lg font-semibold text-gray-800 dark:text-white/90">
+<x-ui.card {{ $attributes->merge(['class' => 'rounded-2xl border border-line bg-surface p-5 lg:p-6  ']) }}>
+    <h4 class="text-lg font-semibold text-ink">
         {{ $title }}
     </h4>
 

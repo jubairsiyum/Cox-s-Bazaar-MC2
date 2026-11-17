@@ -1,3 +1,4 @@
+import { getToken } from '../helpers';
 import { mountChart } from '../helpers';
 
 export default (el) => {
@@ -6,7 +7,7 @@ export default (el) => {
     const computed = (fn) => fn;
 
     const options = computed(() => ({
-        colors: ['#465FFF', isDarkMode.value ? '#344054' : '#E4E7EC'],
+        colors: [getToken('--chart-1'), isDarkMode.value ? getToken('--muted') : getToken('--line')],
         chart: {
             fontFamily: 'Outfit, sans-serif',
             type: 'bar',
@@ -42,7 +43,7 @@ export default (el) => {
             },
             labels: {
                 style: {
-                    colors: isDarkMode.value ? '#94A3B8' : '#364153',
+                    colors: isDarkMode.value ? getToken('--muted') : getToken('--ink'),
                     fontFamily: 'Outfit, sans-serif',
                     fontSize: '12px',
                 },
@@ -51,7 +52,7 @@ export default (el) => {
         yaxis: {
             labels: {
                 style: {
-                    colors: isDarkMode.value ? '#94A3B8' : '#364153',
+                    colors: isDarkMode.value ? getToken('--muted') : getToken('--ink'),
                     fontFamily: 'Outfit, sans-serif',
                     fontSize: '12px',
                 },
@@ -61,7 +62,7 @@ export default (el) => {
             show: false,
         },
         grid: {
-            borderColor: isDarkMode.value ? '#1E2640' : '#F3F4F6',
+            borderColor: isDarkMode.value ? getToken('--line') : getToken('--line'),
             strokeDashArray: 0,
             xaxis: {
                 lines: {

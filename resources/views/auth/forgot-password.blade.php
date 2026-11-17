@@ -1,43 +1,63 @@
-@extends('layouts.guest')
+@extends('layouts.auth')
 
-@section('title', 'Reset Password')
+@section('title', 'Forgot Password')
 
 @section('content')
-<div class="card">
-    <div class="card-body" style="padding:28px;">
-        <h1 style="font-size:1.1rem;font-weight:700;margin:0 0 4px;">Forgot Password</h1>
-        <p style="font-size:.8rem;color:var(--color-text-muted);margin:0 0 20px;">
-            Enter your email and we'll send a reset link.
+    <div class="mb-6">
+        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-ink">
+            Forgot password?
+        </h1>
+        <p class="mt-1.5 text-sm text-muted">
+            Enter your email and we'll send you a password reset link.
         </p>
-
-        @if(session('status'))
-            <div class="alert alert-success">{{ session('status') }}</div>
-        @endif
-
-        <form method="POST" action="{{ route('password.email') }}">
-            @csrf
-
-            <div class="form-group">
-                <label for="email" class="form-label">Email Address <span class="required">*</span></label>
-                <input type="email" id="email" name="email" value="{{ old('email') }}"
-                       required autofocus
-                       class="form-control @error('email') is-invalid @enderror"
-                       placeholder="you@example.com">
-                @error('email')
-                    <div class="form-error">{{ $message }}</div>
-                @enderror
-            </div>
-
-            <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:10px;">
-                Send Reset Link
-            </button>
-        </form>
-
-        <div style="text-align:center;margin-top:16px;">
-            <a href="{{ route('login') }}" style="font-size:.8rem;color:var(--color-text-muted);text-decoration:none;">
-                ← Back to Sign In
-            </a>
-        </div>
     </div>
-</div>
+
+    @if(session('status'))
+        <div class="mb-5 flex items-start gap-3 rounded-xl border border-success/30 bg-soft p-4 text-sm text-success /20 /10" role="alert">
+            <svg class="mt-0.5 size-5 shrink-0 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>{{ session('status') }}</div>
+        </div>
+    @endif
+
+    <form method="POST" action="{{ route('password.email') }}" class="space-y-5">
+        @csrf
+
+        <div>
+            <label for="email" class="block text-sm font-medium text-ink">
+                Email address
+            </label>
+            <div class="mt-1.5">
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value="{{ old('email') }}"
+                    autocomplete="email"
+                    autofocus
+                    required
+                    placeholder="name@company.com"
+                    class="block w-full rounded-xl border border-line bg-surface px-4 py-2.5 text-sm text-ink placeholder-muted transition focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10 dark:placeholder-muted @error('email') border-danger focus:border-danger focus:ring-danger/10 @enderror"
+                >
+            </div>
+            @error('email')
+                <p class="mt-1.5 text-xs text-danger">{{ $message }}</p>
+            @enderror
+        </div>
+
+        <button
+            type="submit"
+            class="w-full inline-flex items-center justify-center rounded-xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 px-4 py-3 text-sm font-semibold text-on-brand shadow-card transition-colors focus:outline-none focus:ring-4 focus:ring-brand-500/20"
+        >
+            Email password reset link
+        </button>
+    </form>
+
+    <div class="mt-6 border-t border-line pt-5 text-center text-xs text-muted">
+        Remember your password?
+        <a href="{{ route('login') }}" class="font-medium text-brand-600 hover:text-brand-700">
+            Back to sign in
+        </a>
+    </div>
 @endsection
