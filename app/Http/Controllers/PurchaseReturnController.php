@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\ApprovalStatus;
 use App\Enums\PurchaseStatus;
 use App\Exceptions\InsufficientStockException;
 use App\Exports\PurchaseReturnExport;
@@ -13,13 +14,16 @@ use App\Models\Location;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseReturn;
 use App\Models\Supplier;
+use App\Models\User;
 use App\Services\AuditService;
+use App\Services\LocationScope;
 use App\Services\PurchaseReturnService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -81,7 +85,7 @@ class PurchaseReturnController extends Controller
         return view('purchase-returns.create', [
             'suppliers' => Supplier::query()->orderBy('name')->get(),
             'parentOrder' => $parent,
-            'purchases' => $this->supplierPurchasesList((int) (old('supplier_id') ?: $parent?->supplier_id) ?: null),
+            'purchases' => $this->supplierPurchasesList((int) (old('supplier_id') ?: $parent?->supplier_id) ?: null, Auth::user()),
             'rows' => $this->returnRows($parent, $this->oldQuantities()),
         ]);
     }
@@ -104,6 +108,7 @@ class PurchaseReturnController extends Controller
                     'supplier_id' => $validated['supplier_id'],
                     'location_id' => $order->location_id,
                     'reason' => $validated['reason'],
+                    'approval_status' => ApprovalStatus::Pending,
                     'subtotal' => 0,
                     'tax_rate' => 0,
                     'tax_amount' => 0,
@@ -116,9 +121,7 @@ class PurchaseReturnController extends Controller
                 $this->saveItems($return, $order, $items);
                 $this->recalculate($return);
 
-                PurchaseReturnService::syncStock($return, []);
-                PurchaseReturnService::applySupplierDue($return);
-
+                // Stock and supplier dues only move once the return is approved.
                 return $return;
             });
         } catch (InsufficientStockException $e) {
@@ -128,7 +131,7 @@ class PurchaseReturnController extends Controller
         AuditService::created($return, "Purchase return '{$return->reference_no}' created.");
 
         return redirect()->route('purchase-returns.index')
-            ->with('success', "Purchase return '{$return->reference_no}' created successfully.");
+            ->with('success', "Purchase return '{$return->reference_no}' submitted for approval.");
     }
 
     /**
@@ -166,7 +169,7 @@ class PurchaseReturnController extends Controller
             'purchaseReturn' => $purchaseReturn,
             'suppliers' => Supplier::query()->orderBy('name')->get(),
             'parentOrder' => $order,
-            'purchases' => $this->supplierPurchasesList((int) (old('supplier_id') ?: $purchaseReturn->supplier_id) ?: null),
+            'purchases' => $this->supplierPurchasesList((int) (old('supplier_id') ?: $purchaseReturn->supplier_id) ?: null, Auth::user()),
             'rows' => $this->returnRows($order, $quantities),
         ]);
     }
@@ -178,12 +181,13 @@ class PurchaseReturnController extends Controller
     {
         $original = $purchaseReturn->getOriginal();
         $originalQuantities = $purchaseReturn->items->pluck('quantity', 'unit_id')->all();
+        $wasApproved = $purchaseReturn->approval_status === ApprovalStatus::Approved;
         $validated = $request->validated();
         $order = PurchaseOrder::query()->with('items')->findOrFail($validated['purchase_order_id']);
         $items = $this->returnableItems($validated['items']);
 
         try {
-            DB::transaction(function () use ($purchaseReturn, $validated, $order, $items, $request, $original, $originalQuantities) {
+            DB::transaction(function () use ($purchaseReturn, $validated, $order, $items, $request, $original, $originalQuantities, $wasApproved) {
                 $purchaseReturn->items()->delete();
                 $this->saveItems($purchaseReturn, $order, $items);
 
@@ -194,13 +198,20 @@ class PurchaseReturnController extends Controller
                     'supplier_id' => $validated['supplier_id'],
                     'location_id' => $order->location_id,
                     'reason' => $validated['reason'],
+                    // Editing a rejected return puts it back in the approval queue.
+                    'approval_status' => $purchaseReturn->approval_status === ApprovalStatus::Rejected
+                        ? ApprovalStatus::Pending
+                        : $purchaseReturn->approval_status,
                     'document' => $this->storeDocument($request) ?? $purchaseReturn->document,
                 ]);
 
                 $this->recalculate($purchaseReturn);
 
-                PurchaseReturnService::syncStock($purchaseReturn, $originalQuantities);
-                PurchaseReturnService::applySupplierDue($purchaseReturn, $original);
+                // Stock and supplier dues only move for approved returns.
+                if ($wasApproved) {
+                    PurchaseReturnService::syncStock($purchaseReturn, $originalQuantities);
+                    PurchaseReturnService::applySupplierDue($purchaseReturn, $original);
+                }
             });
         } catch (InsufficientStockException $e) {
             return back()->withInput()->with('error', $e->getMessage());
@@ -222,8 +233,9 @@ class PurchaseReturnController extends Controller
         $this->authorize('delete', $purchaseReturn);
 
         $originalQuantities = $purchaseReturn->items->pluck('quantity', 'unit_id')->all();
+        $wasApproved = $purchaseReturn->approval_status === ApprovalStatus::Approved;
 
-        DB::transaction(function () use ($purchaseReturn, $originalQuantities) {
+        DB::transaction(function () use ($purchaseReturn, $originalQuantities, $wasApproved) {
             PurchaseReturnService::releaseSupplierDue($purchaseReturn);
 
             if ($purchaseReturn->document) {
@@ -233,14 +245,80 @@ class PurchaseReturnController extends Controller
             $purchaseReturn->items()->delete();
             $purchaseReturn->delete();
 
-            // Deleting the return restores the stock it had taken out.
-            PurchaseReturnService::syncStock($purchaseReturn, $originalQuantities);
+            // Deleting an approved return restores the stock it had taken out.
+            if ($wasApproved) {
+                PurchaseReturnService::syncStock($purchaseReturn, $originalQuantities);
+            }
         });
 
         AuditService::deleted($purchaseReturn, "Purchase return '{$purchaseReturn->reference_no}' deleted.");
 
         return redirect()->route('purchase-returns.index')
             ->with('success', "Purchase return '{$purchaseReturn->reference_no}' deleted successfully.");
+    }
+
+    /**
+     * Approve a return: the responsible manager signs off and the return
+     * takes effect — stock leaves and the supplier return due registers.
+     */
+    public function approve(PurchaseReturn $purchaseReturn): RedirectResponse
+    {
+        $this->authorize('approve', $purchaseReturn);
+
+        if ($purchaseReturn->approval_status === ApprovalStatus::Approved) {
+            return back()->with('error', "Purchase return '{$purchaseReturn->reference_no}' is already approved.");
+        }
+
+        $original = $purchaseReturn->getOriginal();
+
+        try {
+            DB::transaction(function () use ($purchaseReturn, $original) {
+                $purchaseReturn->update([
+                    'approval_status' => ApprovalStatus::Approved,
+                    'approved_by' => Auth::id(),
+                    'approved_at' => now(),
+                ]);
+
+                PurchaseReturnService::syncStock($purchaseReturn, []);
+                PurchaseReturnService::applySupplierDue($purchaseReturn, $original);
+            });
+        } catch (InsufficientStockException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        AuditService::updated($purchaseReturn, $original, "Purchase return '{$purchaseReturn->reference_no}' approved.");
+
+        return redirect()->route('purchase-returns.index')
+            ->with('success', "Purchase return '{$purchaseReturn->reference_no}' approved. Stock and supplier return due updated.");
+    }
+
+    /**
+     * Reject a return: it never takes effect.
+     */
+    public function reject(PurchaseReturn $purchaseReturn): RedirectResponse
+    {
+        $this->authorize('reject', $purchaseReturn);
+
+        if ($purchaseReturn->approval_status === ApprovalStatus::Approved) {
+            return back()->with('error', "Purchase return '{$purchaseReturn->reference_no}' is already approved. Delete it instead.");
+        }
+
+        $original = $purchaseReturn->getOriginal();
+
+        DB::transaction(function () use ($purchaseReturn, $original) {
+            $purchaseReturn->update([
+                'approval_status' => ApprovalStatus::Rejected,
+                'approved_by' => Auth::id(),
+                'approved_at' => now(),
+            ]);
+
+            PurchaseReturnService::applySupplierDue($purchaseReturn, $original);
+        });
+
+        AuditService::updated($purchaseReturn, $original, "Purchase return '{$purchaseReturn->reference_no}' rejected.");
+
+        return redirect()->route('purchase-returns.index')
+            ->with('success', "Purchase return '{$purchaseReturn->reference_no}' rejected.");
     }
 
     /**
@@ -254,7 +332,7 @@ class PurchaseReturnController extends Controller
 
         return response()->json([
             'success' => true,
-            'purchases' => $this->supplierPurchasesList($supplierId ?: null),
+            'purchases' => $this->supplierPurchasesList($supplierId ?: null, $request->user()),
         ]);
     }
 
@@ -267,7 +345,7 @@ class PurchaseReturnController extends Controller
 
         $order = PurchaseOrder::query()->with('items.unit')->find($request->input('purchase_order_id'));
 
-        if ($order === null) {
+        if ($order === null || ! LocationScope::canAccess($request->user(), $order->location_id)) {
             return response()->json(['success' => false, 'message' => 'Purchase not found.'], 404);
         }
 
@@ -294,22 +372,28 @@ class PurchaseReturnController extends Controller
 
     /**
      * Recent purchases of a supplier shaped for the invoice reference dropdown.
+     * Respects the viewer's location scope.
      *
      * @return array<int, array<string, mixed>>
      */
-    private function supplierPurchasesList(?int $supplierId): array
+    private function supplierPurchasesList(?int $supplierId, ?User $user = null): array
     {
         if (! $supplierId) {
             return [];
         }
 
-        return PurchaseOrder::query()
+        $query = PurchaseOrder::query()
             ->with('items')
             ->where('supplier_id', $supplierId)
             ->where('purchase_status', '!=', PurchaseStatus::Cancelled->value)
             ->orderByDesc('order_date')
-            ->limit(50)
-            ->get()
+            ->limit(50);
+
+        if ($user !== null) {
+            $query = LocationScope::scopeQuery($query, $user);
+        }
+
+        return $query->get()
             ->map(fn (PurchaseOrder $order) => [
                 'id' => $order->id,
                 'reference_no' => $order->reference_no,
@@ -419,17 +503,21 @@ class PurchaseReturnController extends Controller
 
     /**
      * Base query for the listing with all filters applied.
+     * Outlet Managers only see the returns of their assigned location.
      */
     private function filteredQuery(Request $request): Builder
     {
-        return PurchaseReturn::query()
+        $query = PurchaseReturn::query()
             ->with(['purchaseOrder', 'supplier', 'location'])
             ->when($request->filled('search'), fn ($q) => $q->search($request->string('search')->toString()))
             ->when($request->filled('supplier_id'), fn ($q) => $q->where('supplier_id', (int) $request->input('supplier_id')))
-            ->when($request->filled('location_id'), fn ($q) => $q->where('location_id', (int) $request->input('location_id')))
             ->when($request->filled('payment_status'), fn ($q) => $q->where('payment_status', $request->string('payment_status')->toString()))
             ->when($request->filled('date_from'), fn ($q) => $q->whereDate('return_date', '>=', $request->string('date_from')->toString()))
             ->when($request->filled('date_to'), fn ($q) => $q->whereDate('return_date', '<=', $request->string('date_to')->toString()));
+
+        $query = LocationScope::scopeQuery($query, $request->user());
+
+        return $query->when($request->filled('location_id'), fn ($q) => $q->where('location_id', (int) $request->input('location_id')));
     }
 
     /**

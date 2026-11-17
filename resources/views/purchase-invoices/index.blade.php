@@ -272,8 +272,36 @@
                                             <a href="{{ route('purchase-invoices.show', $order) }}?print=1" target="_blank"
                                                class="w-full flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 transition hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
                                                 <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                                                Print
+                                                Print Invoice
                                             </a>
+                                            @can('approve', $order)
+                                                @if($order->approval_status !== \App\Enums\ApprovalStatus::Approved)
+                                                    <form method="POST" action="{{ route('purchase-invoices.approve', $order) }}"
+                                                          onsubmit="return confirm('Approve and receive this purchase? Stock and supplier due will update.');">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <button type="submit"
+                                                                class="w-full flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium text-green-600 dark:text-green-400 transition hover:bg-green-50 dark:hover:bg-green-500/10 cursor-pointer">
+                                                            <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                            Approve / Receive
+                                                        </button>
+                                                    </form>
+                                                @endif
+                                            @endcan
+                                            @can('reject', $order)
+                                                @if($order->approval_status === \App\Enums\ApprovalStatus::Pending)
+                                                    <form method="POST" action="{{ route('purchase-invoices.reject', $order) }}"
+                                                          onsubmit="return confirm('Reject this purchase? It will be cancelled.');">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <button type="submit"
+                                                                class="w-full flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium text-red-500 dark:text-red-400 transition hover:bg-red-50 dark:hover:bg-red-500/10 cursor-pointer">
+                                                            <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                            Reject
+                                                        </button>
+                                                    </form>
+                                                @endif
+                                            @endcan
                                             @can('create', App\Models\PurchaseReturn::class)
                                                 <a href="{{ route('purchase-returns.create', ['purchase_order' => $order->id]) }}"
                                                    class="w-full flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 transition hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
@@ -317,6 +345,7 @@
                                 </td>
                                 <td x-show="columns.purchase_status" data-col="purchase_status" class="p-3">
                                     <x-status-badge :status="$order->purchase_status->value" :label="$order->purchase_status->label()" />
+                                    <x-status-badge :status="$order->approval_status->value" :label="$order->approval_status->label()" />
                                 </td>
                                 <td x-show="columns.payment_status" data-col="payment_status" class="p-3">
                                     <x-status-badge :status="$order->payment_status->value" :label="$order->payment_status->label()" />

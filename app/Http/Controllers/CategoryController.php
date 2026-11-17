@@ -9,6 +9,7 @@ use App\Http\Requests\Category\StoreCategoryRequest;
 use App\Http\Requests\Category\UpdateCategoryRequest;
 use App\Models\Category;
 use App\Services\AuditService;
+use App\Services\DuplicateCheckService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -63,6 +64,22 @@ class CategoryController extends Controller
         $validated = $request->validated();
         $validated['created_by'] = $request->user()->id;
 
+        // Re-using the name of an archived category restores that record
+        // instead of failing on the unique name.
+        $reusable = DuplicateCheckService::reusableRecord(Category::class, $validated);
+
+        if ($reusable instanceof Category) {
+            DuplicateCheckService::purgeTrashConflicts(Category::class, $validated, $reusable->id);
+
+            $reusable->fill($validated);
+            $reusable->restore();
+
+            AuditService::created($reusable, "Category '{$reusable->name}' ({$reusable->category_id}) restored and updated.");
+
+            return redirect()->route('categories.index')
+                ->with('success', "Category '{$reusable->name}' restored and updated successfully.");
+        }
+
         $category = Category::create($validated);
 
         AuditService::created($category, "Category '{$category->name}' ({$category->category_id}) created.");
@@ -90,6 +107,8 @@ class CategoryController extends Controller
     {
         $original = $category->getOriginal();
         $validated = $request->validated();
+
+        DuplicateCheckService::purgeTrashConflicts(Category::class, $validated, $category->id);
 
         $category->update($validated);
 

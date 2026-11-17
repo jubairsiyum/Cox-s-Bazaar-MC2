@@ -26,7 +26,7 @@ class StorePurchaseOrderRequest extends FormRequest
             'reference_no' => ['nullable', 'string', 'max:50', Rule::unique('purchase_orders', 'reference_no')->whereNull('deleted_at')],
             'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
             'location_id' => ['required', 'integer', 'exists:locations,id'],
-            'purchase_status' => ['required', Rule::enum(PurchaseStatus::class)],
+            'purchase_status' => ['required', Rule::in([PurchaseStatus::Pending->value, PurchaseStatus::Ordered->value])],
             'tax_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'paid_amount' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'document' => ['nullable', 'file', 'max:5120', 'mimes:pdf,csv,zip,doc,docx,jpeg,jpg,png'],

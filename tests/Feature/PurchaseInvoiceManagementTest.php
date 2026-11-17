@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\ApprovalStatus;
 use App\Enums\PaymentStatus;
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
@@ -18,7 +19,7 @@ beforeEach(function () {
 
 /**
  * A purchase order record with one line item, ready for the register tests.
- * Stock and supplier due effects are posted as a real creation would.
+ * Stock and supplier due effects are posted as a real approved creation would.
  */
 function registerOrder(Unit $unit, string $status = 'ordered', int $quantity = 5, float $unitPrice = 200.0, float $paid = 0.0): PurchaseOrder
 {
@@ -28,6 +29,7 @@ function registerOrder(Unit $unit, string $status = 'ordered', int $quantity = 5
         'supplier_id' => $supplier->id,
         'purchase_status' => $status,
         'paid_amount' => $paid,
+        'approval_status' => $status === 'received' ? ApprovalStatus::Approved->value : ApprovalStatus::Pending->value,
     ]);
 
     $order->items()->create([
@@ -76,7 +78,7 @@ it('shows the edit, detail, pdf and print views', function () {
     $this->get(route('purchase-invoices.print-view'))->assertOk()->assertSee('Purchase Orders List', false);
 });
 
-it('moves stock and supplier dues when a purchase is received and again when it is reversed', function () {
+it('moves stock and supplier dues when a purchase is approved and again when it is cancelled', function () {
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 50]);
@@ -84,29 +86,24 @@ it('moves stock and supplier dues when a purchase is received and again when it 
 
     expect($unit->fresh()->quantity)->toBe(50);
 
-    $this->patch(route('purchase-invoices.update', $order), [
-        'order_date' => $order->order_date->format('Y-m-d\TH:i'),
-        'supplier_id' => $order->supplier_id,
-        'location_id' => $order->location_id,
-        'purchase_status' => 'received',
-        'paid_amount' => 0,
-        'items' => [
-            ['unit_id' => $unit->id, 'quantity' => 5, 'unit_price' => 200],
-        ],
-    ])->assertRedirect(route('purchase-invoices.index'));
+    // Approval receives the goods and registers the payable.
+    $this->patch(route('purchase-invoices.approve', $order))
+        ->assertRedirect(route('purchase-invoices.index'));
 
     expect($unit->fresh()->quantity)->toBe(55)
         ->and((float) $order->supplier->fresh()->purchase_due)->toBe(1000.0);
 
+    // Cancelling afterwards reverses both.
     $this->patch(route('purchase-invoices.update', $order), [
         'order_date' => $order->order_date->format('Y-m-d\TH:i'),
         'supplier_id' => $order->supplier_id,
         'location_id' => $order->location_id,
-        'purchase_status' => 'ordered',
+        'purchase_status' => 'cancelled',
         'paid_amount' => 0,
     ])->assertRedirect(route('purchase-invoices.index'));
 
-    expect($unit->fresh()->quantity)->toBe(50);
+    expect($unit->fresh()->quantity)->toBe(50)
+        ->and((float) $order->supplier->fresh()->purchase_due)->toBe(0.0);
 });
 
 it('keeps line items frozen once the purchase is received', function () {

@@ -192,7 +192,8 @@
                                     {{ $transfer->toLocation?->name ?? '—' }}
                                 </td>
                                 <td x-show="columns.status" data-col="status" class="p-3">
-                                    <x-status-badge :status="$transfer->status->value" :label="$transfer->status->label()" />
+                                    @php($transferStatus = $transfer->displayStatusFor(auth()->user()))
+                                    <x-status-badge :status="$transferStatus['value']" :label="$transferStatus['label']" />
                                 </td>
                                 <td x-show="columns.shipping_charges" data-col="shipping_charges" class="p-3 text-sm text-gray-600 dark:text-gray-300">
                                     {{ \App\Helpers\Money::format($transfer->shipping_charges) }}
@@ -204,31 +205,75 @@
                                     {{ $transfer->additional_notes ?: '—' }}
                                 </td>
                                 @can('stock-transfers.manage')
-                                    <td class="p-3 text-xs whitespace-nowrap">
-                                        <div class="flex items-center gap-2">
-                                            @can('update', $transfer)
-                                                <a href="{{ route('stock-transfers.edit', $transfer) }}"
-                                                   class="inline-flex items-center gap-1 rounded-full border border-indigo-500/60 px-3 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 transition hover:bg-indigo-50 dark:hover:bg-indigo-500/10 cursor-pointer">
-                                                    <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                                    </svg>
-                                                    Edit
+                                    <td class="p-3 text-xs whitespace-nowrap" x-data="{ open: false }">
+                                        <div class="relative inline-block text-left">
+                                            <button type="button" @click.stop="open = !open"
+                                                    class="inline-flex items-center gap-1 rounded-full border border-indigo-500/60 px-3 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 transition hover:bg-indigo-50 dark:hover:bg-indigo-500/10 cursor-pointer">
+                                                Actions
+                                                <svg class="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                                </svg>
+                                            </button>
+                                            <div x-show="open" x-cloak @click.outside="open = false"
+                                                 class="absolute left-0 mt-1 w-48 rounded-lg shadow-2xl py-1 z-40 text-left border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                                                <a href="{{ route('stock-transfers.show', $transfer) }}"
+                                                   class="w-full flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 transition hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
+                                                    <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                                    View Invoice
                                                 </a>
-                                            @endcan
-                                            @can('delete', $transfer)
-                                                <form method="POST" action="{{ route('stock-transfers.destroy', $transfer) }}"
-                                                      onsubmit="return confirm('Are you sure you want to delete this stock transfer?');">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit"
-                                                            class="inline-flex items-center gap-1 rounded-full border border-red-400/70 px-3 py-1 text-xs font-medium text-red-500 dark:text-red-400 transition hover:bg-red-50 dark:hover:bg-red-500/10 cursor-pointer">
-                                                        <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                                        </svg>
-                                                        Delete
-                                                    </button>
-                                                </form>
-                                            @endcan
+                                                <a href="{{ route('stock-transfers.show', $transfer) }}?print=1" target="_blank"
+                                                   class="w-full flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 transition hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
+                                                    <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                                                    Print Invoice
+                                                </a>
+                                                @can('approve', $transfer)
+                                                    @if($transfer->status === \App\Enums\StockTransferStatus::InTransit)
+                                                        <form method="POST" action="{{ route('stock-transfers.approve', $transfer) }}"
+                                                              onsubmit="return confirm('Approve and receive this transfer?');">
+                                                            @csrf
+                                                            @method('PATCH')
+                                                            <button type="submit"
+                                                                    class="w-full flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium text-green-600 dark:text-green-400 transition hover:bg-green-50 dark:hover:bg-green-500/10 cursor-pointer">
+                                                                <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                                Approve / Receive
+                                                            </button>
+                                                        </form>
+                                                    @endif
+                                                @endcan
+                                                @can('reject', $transfer)
+                                                    @if(in_array($transfer->status, [\App\Enums\StockTransferStatus::Draft, \App\Enums\StockTransferStatus::InTransit], true))
+                                                        <form method="POST" action="{{ route('stock-transfers.reject', $transfer) }}"
+                                                              onsubmit="return confirm('Reject this transfer? Dispatched stock returns to the sender.');">
+                                                            @csrf
+                                                            @method('PATCH')
+                                                            <button type="submit"
+                                                                    class="w-full flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium text-red-500 dark:text-red-400 transition hover:bg-red-50 dark:hover:bg-red-500/10 cursor-pointer">
+                                                                <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                                Reject
+                                                            </button>
+                                                        </form>
+                                                    @endif
+                                                @endcan
+                                                @can('update', $transfer)
+                                                    <a href="{{ route('stock-transfers.edit', $transfer) }}"
+                                                       class="w-full flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 transition hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
+                                                        <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                                        Edit
+                                                    </a>
+                                                @endcan
+                                                @can('delete', $transfer)
+                                                    <form method="POST" action="{{ route('stock-transfers.destroy', $transfer) }}"
+                                                          onsubmit="return confirm('Are you sure you want to delete this stock transfer?');">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit"
+                                                                class="w-full flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium text-red-500 dark:text-red-400 transition hover:bg-red-50 dark:hover:bg-red-500/10 cursor-pointer">
+                                                            <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                                            Delete
+                                                        </button>
+                                                    </form>
+                                                @endcan
+                                            </div>
                                         </div>
                                     </td>
                                 @endcan

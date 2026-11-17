@@ -91,6 +91,20 @@
                 <div class="font-medium text-gray-900 dark:text-gray-100">{{ $purchaseReturn->reason ?: '—' }}</div>
             </div>
             <div>
+                <div class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Approval Status</div>
+                <div class="font-medium text-gray-900 dark:text-gray-100">
+                    <x-status-badge :status="$purchaseReturn->approval_status->value" :label="$purchaseReturn->approval_status->label()" />
+                </div>
+            </div>
+            <div>
+                <div class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Approved By</div>
+                <div class="font-medium text-gray-900 dark:text-gray-100">{{ $purchaseReturn->approver?->name ?? '—' }}</div>
+            </div>
+            <div>
+                <div class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Approved At</div>
+                <div class="font-medium text-gray-900 dark:text-gray-100">{{ $purchaseReturn->approved_at?->format('d/m/Y H:i') ?? '—' }}</div>
+            </div>
+            <div>
                 <div class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Attach Document</div>
                 @if($purchaseReturn->document)
                     <a href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($purchaseReturn->document) }}" target="_blank"

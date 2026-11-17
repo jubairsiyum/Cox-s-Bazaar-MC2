@@ -270,6 +270,12 @@ Route::middleware('auth')->group(function () {
         Route::get('stock-transfers/{stockTransfer}/edit', [StockTransferController::class, 'edit'])->name('stock-transfers.edit');
         Route::patch('stock-transfers/{stockTransfer}', [StockTransferController::class, 'update'])->name('stock-transfers.update');
         Route::delete('stock-transfers/{stockTransfer}', [StockTransferController::class, 'destroy'])->name('stock-transfers.destroy');
+        Route::get('stock-transfers/{stockTransfer}', [StockTransferController::class, 'show'])->name('stock-transfers.show');
+    });
+
+    Route::middleware(['verified', 'permission:stock-transfers.manage|stock-transfers.approve'])->group(function () {
+        Route::patch('stock-transfers/{stockTransfer}/approve', [StockTransferController::class, 'approve'])->name('stock-transfers.approve');
+        Route::patch('stock-transfers/{stockTransfer}/reject', [StockTransferController::class, 'reject'])->name('stock-transfers.reject');
     });
 
     /*
@@ -334,6 +340,11 @@ Route::middleware('auth')->group(function () {
         Route::delete('purchase-invoices/{purchaseOrder}', [PurchaseOrderController::class, 'destroy'])->name('purchase-invoices.destroy');
     });
 
+    Route::middleware(['verified', 'permission:purchase-invoices.approve'])->group(function () {
+        Route::patch('purchase-invoices/{purchaseOrder}/approve', [PurchaseOrderController::class, 'approve'])->name('purchase-invoices.approve');
+        Route::patch('purchase-invoices/{purchaseOrder}/reject', [PurchaseOrderController::class, 'reject'])->name('purchase-invoices.reject');
+    });
+
     /*
     |--------------------------------------------------------------------------
     | Purchase Returns (Purchasing)
@@ -351,6 +362,8 @@ Route::middleware('auth')->group(function () {
         Route::get('purchase-returns/{purchaseReturn}/edit', [PurchaseReturnController::class, 'edit'])->name('purchase-returns.edit');
         Route::patch('purchase-returns/{purchaseReturn}', [PurchaseReturnController::class, 'update'])->name('purchase-returns.update');
         Route::delete('purchase-returns/{purchaseReturn}', [PurchaseReturnController::class, 'destroy'])->name('purchase-returns.destroy');
+        Route::patch('purchase-returns/{purchaseReturn}/approve', [PurchaseReturnController::class, 'approve'])->name('purchase-returns.approve');
+        Route::patch('purchase-returns/{purchaseReturn}/reject', [PurchaseReturnController::class, 'reject'])->name('purchase-returns.reject');
         Route::get('purchase-returns/{purchaseReturn}', [PurchaseReturnController::class, 'show'])->name('purchase-returns.show');
     });
 

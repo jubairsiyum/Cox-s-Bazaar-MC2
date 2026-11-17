@@ -25,10 +25,16 @@ class UpdateStockTransferRequest extends FormRequest
         $transfer = $this->route('stockTransfer');
         $status = $transfer->status;
 
+        // "Received" is only reachable through the receiving manager's approval.
+        $allowedStatuses = collect(StockTransferStatus::transitionsFrom($status))
+            ->reject(fn (StockTransferStatus $s) => $s === StockTransferStatus::Received && $status !== StockTransferStatus::Received)
+            ->map(fn (StockTransferStatus $s) => $s->value)
+            ->all();
+
         $rules = [
             'transfer_date' => ['required', 'date'],
             'reference_no' => ['nullable', 'string', 'max:50', Rule::unique('stock_transfers', 'reference_no')->whereNull('deleted_at')->ignore($transfer->id)],
-            'status' => ['required', Rule::in(array_map(fn (StockTransferStatus $s) => $s->value, StockTransferStatus::transitionsFrom($status)))],
+            'status' => ['required', Rule::in($allowedStatuses)],
             'from_location_id' => ['required', 'integer', 'exists:locations,id'],
             'to_location_id' => ['required', 'integer', 'exists:locations,id', 'different:from_location_id'],
             'shipping_charges' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],

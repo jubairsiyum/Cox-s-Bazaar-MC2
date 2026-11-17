@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\User\StoreUserRequest;
 use App\Http\Requests\User\UpdateUserRequest;
 use App\Models\Branch;
+use App\Models\Location;
 use App\Models\User;
 use App\Services\AuditService;
 use Illuminate\Http\RedirectResponse;
@@ -63,6 +64,7 @@ class UserController extends Controller
         return view('admin.users.create', [
             'roles' => Role::orderBy('name')->get(),
             'branches' => Branch::orderBy('name')->get(),
+            'locations' => Location::orderBy('name')->get(),
         ]);
     }
 
@@ -78,8 +80,10 @@ class UserController extends Controller
             'email' => $validated['email'],
             'phone' => $validated['phone'] ?? null,
             'password' => Hash::make($validated['password']),
+            'email_verified_at' => now(),
             'status' => $validated['status'],
             'branch_id' => $validated['branch_id'] ?? null,
+            'location_id' => $validated['location_id'] ?? null,
         ]);
 
         if (! empty($validated['roles'])) {
@@ -102,6 +106,7 @@ class UserController extends Controller
             'user' => $user->load('roles'),
             'roles' => Role::orderBy('name')->get(),
             'branches' => Branch::orderBy('name')->get(),
+            'locations' => Location::orderBy('name')->get(),
         ]);
     }
 
@@ -119,6 +124,7 @@ class UserController extends Controller
             'phone' => $validated['phone'] ?? null,
             'status' => $validated['status'],
             'branch_id' => $validated['branch_id'] ?? null,
+            'location_id' => $validated['location_id'] ?? null,
         ]);
 
         if (! empty($validated['password'])) {

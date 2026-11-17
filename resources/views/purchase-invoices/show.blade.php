@@ -38,9 +38,38 @@
         <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-100">
             Purchase Order {{ $order->reference_no }}
             <x-status-badge :status="$order->purchase_status->value" :label="$order->purchase_status->label()" />
+            <x-status-badge :status="$order->approval_status->value" :label="$order->approval_status->label()" />
             <x-status-badge :status="$order->payment_status->value" :label="$order->payment_status->label()" />
         </h2>
         <div class="flex items-center gap-2 no-print">
+            @can('approve', $order)
+                @if($order->approval_status !== \App\Enums\ApprovalStatus::Approved)
+                    <form method="POST" action="{{ route('purchase-invoices.approve', $order) }}"
+                          onsubmit="return confirm('Approve and receive this purchase? Stock and supplier due will update.');">
+                        @csrf
+                        @method('PATCH')
+                        <button type="submit"
+                                class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-medium text-white shadow-sm cursor-pointer" style="background-color: #00a65a;">
+                            <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            Approve / Receive
+                        </button>
+                    </form>
+                @endif
+            @endcan
+            @can('reject', $order)
+                @if($order->approval_status === \App\Enums\ApprovalStatus::Pending)
+                    <form method="POST" action="{{ route('purchase-invoices.reject', $order) }}"
+                          onsubmit="return confirm('Reject this purchase? It will be cancelled.');">
+                        @csrf
+                        @method('PATCH')
+                        <button type="submit"
+                                class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-medium text-white shadow-sm cursor-pointer" style="background-color: #dc2626;">
+                            <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            Reject
+                        </button>
+                    </form>
+                @endif
+            @endcan
             @can('update', $order)
                 <a href="{{ route('purchase-invoices.edit', $order) }}"
                    class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/60 px-4 py-2 text-xs font-medium text-indigo-600 dark:text-indigo-400 transition hover:bg-indigo-50 dark:hover:bg-indigo-500/10 cursor-pointer">
@@ -90,6 +119,14 @@
                 @else
                     <div class="font-medium text-gray-900 dark:text-gray-100">—</div>
                 @endif
+            </div>
+            <div>
+                <div class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Approved By</div>
+                <div class="font-medium text-gray-900 dark:text-gray-100">{{ $order->approver?->name ?? '—' }}</div>
+            </div>
+            <div>
+                <div class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Approved At</div>
+                <div class="font-medium text-gray-900 dark:text-gray-100">{{ $order->approved_at?->format('d/m/Y H:i') ?? '—' }}</div>
             </div>
         </div>
 

@@ -33,6 +33,7 @@
         @include('stock-transfers._form', [
             'stockTransfer' => $stockTransfer,
             'locations' => $locations,
+            'destinationLocations' => $destinationLocations,
             'statuses' => $statuses,
             'items' => $items,
             'itemsEditable' => $itemsEditable,

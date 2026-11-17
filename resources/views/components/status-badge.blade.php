@@ -2,10 +2,10 @@
 
 @php
 $classes = match($status) {
-    'active', 'posted', 'paid', 'delivered', 'completed', 'received' => 'badge-success',
+    'active', 'posted', 'paid', 'delivered', 'completed', 'received', 'approved' => 'badge-success',
     'draft', 'pending' => 'badge-neutral',
-    'confirmed', 'partially_paid', 'partial', 'in-transit', 'ordered' => 'badge-info',
-    'cancelled', 'voided', 'inactive' => 'badge-danger',
+    'confirmed', 'partially_paid', 'partial', 'in-transit', 'ordered', 'awaiting-approval' => 'badge-info',
+    'cancelled', 'voided', 'inactive', 'rejected' => 'badge-danger',
     'returned', 'reversed', 'due' => 'badge-warning',
     default => 'badge-neutral',
 };

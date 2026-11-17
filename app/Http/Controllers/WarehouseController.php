@@ -8,6 +8,7 @@ use App\Http\Requests\Location\StoreLocationRequest;
 use App\Http\Requests\Location\UpdateLocationRequest;
 use App\Models\Location;
 use App\Services\AuditService;
+use App\Services\DuplicateCheckService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -70,6 +71,22 @@ class WarehouseController extends Controller
         $validated = $request->validated();
         $validated['created_by'] = $request->user()->id;
 
+        // Re-using the code of an archived location restores that record
+        // instead of failing on the unique code.
+        $reusable = DuplicateCheckService::reusableRecord(Location::class, $validated);
+
+        if ($reusable instanceof Location) {
+            DuplicateCheckService::purgeTrashConflicts(Location::class, $validated, $reusable->id);
+
+            $reusable->fill($validated);
+            $reusable->restore();
+
+            AuditService::created($reusable, "Location '{$reusable->name}' restored and updated.");
+
+            return redirect()->route('warehouses.index')
+                ->with('success', "Location '{$reusable->name}' restored and updated successfully.");
+        }
+
         $location = Location::create($validated);
 
         AuditService::created($location, "Location '{$location->name}' created.");
@@ -95,6 +112,8 @@ class WarehouseController extends Controller
     {
         $original = $location->getOriginal();
         $validated = $request->validated();
+
+        DuplicateCheckService::purgeTrashConflicts(Location::class, $validated, $location->id);
 
         $location->update($validated);
 

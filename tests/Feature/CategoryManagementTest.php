@@ -126,6 +126,25 @@ it('hides the category code on the category edit page', function () {
         ->assertDontSee('CT0015');
 });
 
+it('restores an archived category when the same name is used again', function () {
+    actingAsSuperAdmin();
+
+    $category = Category::factory()->create(['name' => 'Smartphones']);
+    $category->delete();
+
+    $this->post(route('categories.store'), [
+        'name' => 'Smartphones',
+        'description' => 'Handsets and tablets',
+    ])->assertRedirect(route('categories.index'));
+
+    $restored = Category::where('name', 'Smartphones')->first();
+
+    expect($restored)->not->toBeNull()
+        ->and($restored->id)->toBe($category->id)
+        ->and($restored->trashed())->toBeFalse()
+        ->and(Category::withTrashed()->where('name', 'Smartphones')->count())->toBe(1);
+});
+
 it('updates an existing category', function () {
     actingAsSuperAdmin();
 

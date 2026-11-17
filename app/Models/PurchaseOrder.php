@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\ApprovalStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\PurchaseStatus;
 use App\Services\NumberingService;
@@ -33,6 +34,9 @@ class PurchaseOrder extends Model
         'paid_amount',
         'document',
         'created_by',
+        'approval_status',
+        'approved_by',
+        'approved_at',
     ];
 
     protected function casts(): array
@@ -41,6 +45,8 @@ class PurchaseOrder extends Model
             'order_date' => 'datetime',
             'purchase_status' => PurchaseStatus::class,
             'payment_status' => PaymentStatus::class,
+            'approval_status' => ApprovalStatus::class,
+            'approved_at' => 'datetime',
             'subtotal' => 'decimal:2',
             'tax_rate' => 'decimal:2',
             'tax_amount' => 'decimal:2',
@@ -82,6 +88,11 @@ class PurchaseOrder extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
     }
 
     // ── Accessors ────────────────────────────────────────────────────

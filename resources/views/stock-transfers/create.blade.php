@@ -32,6 +32,7 @@
         @include('stock-transfers._form', [
             'stockTransfer' => $stockTransfer ?? new \App\Models\StockTransfer,
             'locations' => $locations,
+            'destinationLocations' => $destinationLocations,
             'statuses' => $statuses,
             'items' => $items,
             'itemsEditable' => true,

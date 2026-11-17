@@ -90,7 +90,7 @@
                     </label>
                     <select id="to_location_id" name="to_location_id" required class="form-control @error('to_location_id') is-invalid @enderror">
                         <option value="">Please Select</option>
-                        @foreach($locations as $location)
+                        @foreach($destinationLocations as $location)
                             <option value="{{ $location->id }}" @selected(old('to_location_id', $isEdit ? $stockTransfer->to_location_id : null) == $location->id)>{{ $location->name }}</option>
                         @endforeach
                     </select>

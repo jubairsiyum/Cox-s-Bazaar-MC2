@@ -125,7 +125,8 @@ it('moves stock out when a transfer is dispatched and back in when received', fu
         'quantity' => -5,
     ]);
 
-    $this->patch(route('stock-transfers.update', $transfer), array_merge($payload, ['status' => 'received']))
+    // The receiving side approves the transfer to receive the stock.
+    $this->patch(route('stock-transfers.approve', $transfer))
         ->assertRedirect(route('stock-transfers.index'));
 
     expect($unit->fresh()->quantity)->toBe(50);

@@ -31,11 +31,11 @@ class RolesAndPermissionsSeeder extends Seeder
             'customers.manage', 'customers.view',
             // Warehouses & Inventory
             'warehouses.manage', 'inventory.view',
-            'stock-adjustments.manage', 'stock-transfers.manage',
+            'stock-adjustments.manage', 'stock-transfers.manage', 'stock-transfers.approve',
             // Purchasing
             'purchase-orders.manage', 'purchase-invoices.manage',
-            'purchase-invoices.post', 'purchase-invoices.view',
-            'purchase-returns.manage', 'supplier-payments.manage',
+            'purchase-invoices.post', 'purchase-invoices.view', 'purchase-invoices.approve',
+            'purchase-returns.manage', 'purchase-returns.approve', 'supplier-payments.manage',
             // Sales
             'sales-orders.manage', 'sales-invoices.manage',
             'sales-invoices.post', 'sales-invoices.view',
@@ -75,10 +75,10 @@ class RolesAndPermissionsSeeder extends Seeder
             'suppliers.manage', 'suppliers.view',
             'customers.manage', 'customers.view',
             'warehouses.manage', 'inventory.view',
-            'stock-adjustments.manage', 'stock-transfers.manage',
+            'stock-adjustments.manage', 'stock-transfers.manage', 'stock-transfers.approve',
             'purchase-orders.manage', 'purchase-invoices.manage',
-            'purchase-invoices.post', 'purchase-invoices.view',
-            'purchase-returns.manage', 'supplier-payments.manage',
+            'purchase-invoices.post', 'purchase-invoices.view', 'purchase-invoices.approve',
+            'purchase-returns.manage', 'purchase-returns.approve', 'supplier-payments.manage',
             'sales-orders.manage', 'sales-invoices.manage',
             'sales-invoices.post', 'sales-invoices.view',
             'sales-returns.manage', 'customer-collections.manage',
@@ -114,6 +114,21 @@ class RolesAndPermissionsSeeder extends Seeder
             'customer-collections.manage',
             'pos.access',
             'reports.view',
+        ]);
+
+        // ── Outlet Manager (branch-scoped) ───────────────────────
+        $outletManager = Role::firstOrCreate(['name' => 'Outlet Manager', 'guard_name' => 'web']);
+        $outletManager->syncPermissions([
+            'dashboard.view',
+            'products.view', 'brands.view', 'categories.view', 'units.view',
+            'suppliers.view', 'customers.view', 'inventory.view',
+            'stock-adjustments.manage', 'stock-transfers.manage', 'stock-transfers.approve',
+            'purchase-orders.manage', 'purchase-invoices.manage',
+            'purchase-invoices.post', 'purchase-invoices.view', 'purchase-invoices.approve',
+            'purchase-returns.manage', 'purchase-returns.approve',
+            'supplier-payments.view',
+            'finance.view',
+            'reports.view', 'reports.export',
         ]);
 
         // ── Storekeeper ───────────────────────────────────────────
