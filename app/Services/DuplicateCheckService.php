@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\Brand;
+use App\Models\Category;
 use App\Models\Customer;
+use App\Models\Location;
 use App\Models\Supplier;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -21,6 +24,9 @@ class DuplicateCheckService
         return match ($modelClass) {
             Customer::class => ['name', 'mobile', 'tel_no', 'email'],
             Supplier::class => ['name', 'mobile', 'tel_no', 'email', 'tax_number'],
+            Brand::class => ['name'],
+            Category::class => ['name'],
+            Location::class => ['code'],
             default => [],
         };
     }

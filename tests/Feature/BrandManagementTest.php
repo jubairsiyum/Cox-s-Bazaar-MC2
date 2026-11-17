@@ -110,6 +110,26 @@ it('fails validation when brand name is duplicated', function () {
     ])->assertSessionHasErrors('name');
 });
 
+it('restores an archived brand when the same name is used again', function () {
+    actingAsSuperAdmin();
+
+    $brand = Brand::factory()->create(['name' => 'Nokia']);
+    $brand->delete();
+
+    $this->post(route('brands.store'), [
+        'name' => 'Nokia',
+        'note' => 'Back in the catalogue',
+    ])->assertRedirect(route('brands.index'));
+
+    $restored = Brand::where('name', 'Nokia')->first();
+
+    expect($restored)->not->toBeNull()
+        ->and($restored->id)->toBe($brand->id)
+        ->and($restored->trashed())->toBeFalse()
+        ->and($restored->note)->toBe('Back in the catalogue')
+        ->and(Brand::withTrashed()->where('name', 'Nokia')->count())->toBe(1);
+});
+
 it('updates an existing brand', function () {
     actingAsSuperAdmin();
 

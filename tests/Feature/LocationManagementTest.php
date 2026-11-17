@@ -77,6 +77,26 @@ it('rejects a duplicate location code', function () {
     ])->assertSessionHasErrors('code');
 });
 
+it('restores an archived location when the same code is used again', function () {
+    actingAsSuperAdmin();
+
+    $location = Location::factory()->create(['code' => 'WH-01']);
+    $location->delete();
+
+    $this->post(route('warehouses.store'), [
+        'name' => 'Main Warehouse',
+        'code' => 'WH-01',
+        'type' => 'warehouse',
+    ])->assertRedirect(route('warehouses.index'));
+
+    $restored = Location::where('code', 'WH-01')->first();
+
+    expect($restored)->not->toBeNull()
+        ->and($restored->id)->toBe($location->id)
+        ->and($restored->trashed())->toBeFalse()
+        ->and(Location::withTrashed()->where('code', 'WH-01')->count())->toBe(1);
+});
+
 it('updates a location', function () {
     actingAsSuperAdmin();
 

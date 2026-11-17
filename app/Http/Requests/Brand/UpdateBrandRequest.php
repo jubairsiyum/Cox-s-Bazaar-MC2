@@ -28,7 +28,7 @@ class UpdateBrandRequest extends FormRequest
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('brands', 'name')->ignore($this->route('brand')?->id),
+                Rule::unique('brands', 'name')->whereNull('deleted_at')->ignore($this->route('brand')?->id),
             ],
             'note' => ['nullable', 'string', 'max:500'],
         ];

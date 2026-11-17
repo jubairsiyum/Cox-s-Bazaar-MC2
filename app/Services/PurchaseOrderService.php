@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\ApprovalStatus;
 use App\Enums\PurchaseStatus;
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
@@ -54,17 +55,20 @@ class PurchaseOrderService
     /**
      * Move the unpaid remainder of an order between supplier due balances.
      *
-     * Cancelled orders no longer contribute to the supplier's purchase due.
-     * Pass the original attributes on update/delete, or null when the order
-     * is newly created.
+     * Only approved orders contribute to the supplier's purchase due;
+     * cancelled orders never do. Pass the original attributes on update/delete,
+     * or null when the order is newly created.
      *
-     * @param  array{supplier_id?: int|null, grand_total?: float|int|string, paid_amount?: float|int|string, purchase_status?: string}|null  $original
+     * @param  array{supplier_id?: int|null, grand_total?: float|int|string, paid_amount?: float|int|string, purchase_status?: string, approval_status?: string}|null  $original
      */
     public static function applySupplierDue(PurchaseOrder $order, ?array $original = null): void
     {
         $oldDue = 0.0;
 
-        if ($original !== null && ($original['purchase_status'] ?? null) !== PurchaseStatus::Cancelled->value) {
+        if ($original !== null
+            && self::originalStatusIs($original, 'approval_status', ApprovalStatus::Approved)
+            && ! self::originalStatusIs($original, 'purchase_status', PurchaseStatus::Cancelled)
+        ) {
             $oldDue = self::contribution($original['grand_total'] ?? 0, $original['paid_amount'] ?? 0);
             $oldSupplier = Supplier::query()->find($original['supplier_id'] ?? null);
 
@@ -73,7 +77,10 @@ class PurchaseOrderService
             }
         }
 
-        if ($order->purchase_status !== PurchaseStatus::Cancelled && $order->supplier_id) {
+        if ($order->approval_status === ApprovalStatus::Approved
+            && $order->purchase_status !== PurchaseStatus::Cancelled
+            && $order->supplier_id
+        ) {
             $newDue = self::contribution($order->grand_total, $order->paid_amount);
 
             if ($newDue > 0) {
@@ -88,7 +95,10 @@ class PurchaseOrderService
      */
     public static function releaseSupplierDue(PurchaseOrder $order): void
     {
-        if ($order->purchase_status === PurchaseStatus::Cancelled || ! $order->supplier_id) {
+        if ($order->approval_status !== ApprovalStatus::Approved
+            || $order->purchase_status === PurchaseStatus::Cancelled
+            || ! $order->supplier_id
+        ) {
             return;
         }
 
@@ -97,6 +107,21 @@ class PurchaseOrderService
         if ($due > 0) {
             self::adjustDue($order->supplier, -$due);
         }
+    }
+
+    /**
+     * Whether an original attribute equals the given status.
+     * getOriginal() hands back casted enum instances, raw arrays hand back strings.
+     *
+     * @param  array<string, mixed>  $original
+     */
+    private static function originalStatusIs(array $original, string $key, \BackedEnum $status): bool
+    {
+        $value = $original[$key] ?? null;
+
+        return $value instanceof \BackedEnum
+            ? $value->value === $status->value
+            : $value === $status->value;
     }
 
     /**

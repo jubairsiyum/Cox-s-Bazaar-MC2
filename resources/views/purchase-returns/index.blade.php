@@ -214,6 +214,7 @@
                             <th x-show="columns.parent_purchase" class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">Parent Purchase</th>
                             <th x-show="columns.location" class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">Location</th>
                             <th x-show="columns.supplier" class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">Supplier</th>
+                            <th x-show="columns.approval_status" class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">Approval Status</th>
                             <th x-show="columns.payment_status" class="p-3">
                                 <a href="{{ $sortLink('payment_status') }}" class="flex items-center gap-1 text-sm font-bold text-gray-800 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400">
                                     Payment Status
@@ -254,6 +255,9 @@
                                 <td x-show="columns.supplier" data-col="supplier" class="p-3 text-sm text-gray-600 dark:text-gray-300">
                                     {{ $return->supplier?->name ?? '—' }}
                                 </td>
+                                <td x-show="columns.approval_status" data-col="approval_status" class="p-3">
+                                    <x-status-badge :status="$return->approval_status->value" :label="$return->approval_status->label()" />
+                                </td>
                                 <td x-show="columns.payment_status" data-col="payment_status" class="p-3">
                                     <x-status-badge :status="$return->payment_status->value" :label="$return->payment_status->label()" />
                                 </td>
@@ -283,8 +287,36 @@
                                                 <a href="{{ route('purchase-returns.show', $return) }}?print=1" target="_blank"
                                                    class="w-full flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 transition hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
                                                     <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                                                    Print
+                                                    Print Invoice
                                                 </a>
+                                                @can('approve', $return)
+                                                    @if($return->approval_status !== \App\Enums\ApprovalStatus::Approved)
+                                                        <form method="POST" action="{{ route('purchase-returns.approve', $return) }}"
+                                                              onsubmit="return confirm('Approve this return? Stock and supplier return due will update.');">
+                                                            @csrf
+                                                            @method('PATCH')
+                                                            <button type="submit"
+                                                                    class="w-full flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium text-green-600 dark:text-green-400 transition hover:bg-green-50 dark:hover:bg-green-500/10 cursor-pointer">
+                                                                <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                                Approve Return
+                                                            </button>
+                                                        </form>
+                                                    @endif
+                                                @endcan
+                                                @can('reject', $return)
+                                                    @if($return->approval_status === \App\Enums\ApprovalStatus::Pending)
+                                                        <form method="POST" action="{{ route('purchase-returns.reject', $return) }}"
+                                                              onsubmit="return confirm('Reject this return? It will not take effect.');">
+                                                            @csrf
+                                                            @method('PATCH')
+                                                            <button type="submit"
+                                                                    class="w-full flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium text-red-500 dark:text-red-400 transition hover:bg-red-50 dark:hover:bg-red-500/10 cursor-pointer">
+                                                                <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                                Reject
+                                                            </button>
+                                                        </form>
+                                                    @endif
+                                                @endcan
                                                 @can('update', $return)
                                                     <a href="{{ route('purchase-returns.edit', $return) }}"
                                                        class="w-full flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 transition hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
@@ -319,7 +351,7 @@
                     </tbody>
                     <tfoot>
                         <tr class="bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-                            <td class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100" :colspan="5">Total:</td>
+                            <td class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100" :colspan="6">Total:</td>
                             <td class="p-3 text-xs text-gray-600 dark:text-gray-300">
                                 <div>Due - {{ $totals['due'] }}</div>
                                 <div>Paid - {{ $totals['paid'] }}</div>
@@ -353,6 +385,7 @@ function purchaseReturnsPage() {
             parent_purchase: true,
             location: true,
             supplier: true,
+            approval_status: true,
             payment_status: true,
             grand_total: true,
             payment_due: true
@@ -363,6 +396,7 @@ function purchaseReturnsPage() {
             { key: 'parent_purchase', label: 'Parent Purchase' },
             { key: 'location', label: 'Location' },
             { key: 'supplier', label: 'Supplier' },
+            { key: 'approval_status', label: 'Approval Status' },
             { key: 'payment_status', label: 'Payment Status' },
             { key: 'grand_total', label: 'Grand Total' },
             { key: 'payment_due', label: 'Payment Due' }

@@ -24,6 +24,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'phone',
         'status',
         'branch_id',
+        'location_id',
     ];
 
     protected $hidden = [
@@ -46,6 +47,14 @@ class User extends Authenticatable implements MustVerifyEmail
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    /**
+     * The business location (outlet / warehouse) this user manages.
+     */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(Location::class);
     }
 
     // ── Scopes ────────────────────────────────────────────

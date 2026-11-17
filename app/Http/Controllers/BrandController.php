@@ -9,6 +9,7 @@ use App\Http\Requests\Brand\StoreBrandRequest;
 use App\Http\Requests\Brand\UpdateBrandRequest;
 use App\Models\Brand;
 use App\Services\AuditService;
+use App\Services\DuplicateCheckService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -64,6 +65,22 @@ class BrandController extends Controller
         $validated = $request->validated();
         $validated['created_by'] = $request->user()->id;
 
+        // Re-using the name of an archived brand restores that record instead
+        // of failing on the unique name (products relink to it automatically).
+        $reusable = DuplicateCheckService::reusableRecord(Brand::class, $validated);
+
+        if ($reusable instanceof Brand) {
+            DuplicateCheckService::purgeTrashConflicts(Brand::class, $validated, $reusable->id);
+
+            $reusable->fill($validated);
+            $reusable->restore();
+
+            AuditService::created($reusable, "Brand '{$reusable->name}' restored and updated.");
+
+            return redirect()->route('brands.index')
+                ->with('success', "Brand '{$reusable->name}' restored and updated successfully.");
+        }
+
         $brand = Brand::create($validated);
 
         AuditService::created($brand, "Brand '{$brand->name}' created.");
@@ -79,6 +96,8 @@ class BrandController extends Controller
     {
         $original = $brand->getOriginal();
         $validated = $request->validated();
+
+        DuplicateCheckService::purgeTrashConflicts(Brand::class, $validated, $brand->id);
 
         $brand->update($validated);
 

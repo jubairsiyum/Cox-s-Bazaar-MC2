@@ -72,6 +72,17 @@
                     </select>
                     @error('branch_id')<div class="form-error">{{ $message }}</div>@enderror
                 </div>
+
+                <div class="form-group">
+                    <label for="location_id" class="form-label">Assigned Location (for Outlet Managers)</label>
+                    <select id="location_id" name="location_id" class="form-select @error('location_id') is-invalid @enderror">
+                        <option value="">— Select —</option>
+                        @foreach($locations as $location)
+                            <option value="{{ $location->id }}" @selected(old('location_id', $user->location_id) == $location->id)>{{ $location->name }}</option>
+                        @endforeach
+                    </select>
+                    @error('location_id')<div class="form-error">{{ $message }}</div>@enderror
+                </div>
             </div>
 
             <div class="form-group">

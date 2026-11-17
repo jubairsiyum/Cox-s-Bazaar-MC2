@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\ApprovalStatus;
 use App\Models\PurchaseReturn;
 use App\Models\Supplier;
 use App\Models\Unit;
@@ -61,14 +62,15 @@ class PurchaseReturnService
     /**
      * Move the unpaid remainder of a return between supplier return due balances.
      *
-     * Pass the original attributes on update/delete, or null when the return
-     * is newly created.
+     * Only approved returns contribute; a return takes effect financially
+     * when the responsible manager approves it. Pass the original attributes
+     * on update/delete, or null when the return is newly created.
      *
-     * @param  array{supplier_id?: int|null, grand_total?: float|int|string, paid_amount?: float|int|string}|null  $original
+     * @param  array{supplier_id?: int|null, grand_total?: float|int|string, paid_amount?: float|int|string, approval_status?: string}|null  $original
      */
     public static function applySupplierDue(PurchaseReturn $return, ?array $original = null): void
     {
-        if ($original !== null) {
+        if ($original !== null && self::originalStatusIs($original, ApprovalStatus::Approved)) {
             $oldDue = self::contribution($original['grand_total'] ?? 0, $original['paid_amount'] ?? 0);
             $oldSupplier = Supplier::query()->find($original['supplier_id'] ?? null);
 
@@ -77,7 +79,7 @@ class PurchaseReturnService
             }
         }
 
-        if ($return->supplier_id) {
+        if ($return->approval_status === ApprovalStatus::Approved && $return->supplier_id) {
             $newDue = self::contribution($return->grand_total, $return->paid_amount);
 
             if ($newDue > 0) {
@@ -92,7 +94,7 @@ class PurchaseReturnService
      */
     public static function releaseSupplierDue(PurchaseReturn $return): void
     {
-        if (! $return->supplier_id) {
+        if ($return->approval_status !== ApprovalStatus::Approved || ! $return->supplier_id) {
             return;
         }
 
@@ -101,6 +103,21 @@ class PurchaseReturnService
         if ($due > 0) {
             self::adjustDue($return->supplier, -$due);
         }
+    }
+
+    /**
+     * Whether the original attributes record an approved return.
+     * getOriginal() hands back casted enum instances, raw arrays hand back strings.
+     *
+     * @param  array<string, mixed>  $original
+     */
+    private static function originalStatusIs(array $original, ApprovalStatus $status): bool
+    {
+        $value = $original['approval_status'] ?? null;
+
+        return $value instanceof ApprovalStatus
+            ? $value === $status
+            : $value === $status->value;
     }
 
     /**

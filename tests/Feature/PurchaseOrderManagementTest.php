@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\ApprovalStatus;
 use App\Enums\PaymentStatus;
 use App\Models\Location;
 use App\Models\PurchaseOrder;
@@ -28,7 +29,7 @@ function purchaseOrderPayload(Unit $unit, array $overrides = []): array
         'reference_no' => null,
         'supplier_id' => Supplier::factory()->create(['opening_balance' => 0, 'purchase_due' => 0])->id,
         'location_id' => Location::factory()->create()->id,
-        'purchase_status' => 'received',
+        'purchase_status' => 'ordered',
         'tax_rate' => 5,
         'paid_amount' => 50,
         'items' => [
@@ -73,19 +74,14 @@ it('creates a purchase order with line items and an auto reference number', func
         ->and((float) $order->tax_amount)->toBe(50.0)
         ->and((float) $order->grand_total)->toBe(1050.0)
         ->and($order->payment_status)->toBe(PaymentStatus::Partial)
+        ->and($order->approval_status)->toBe(ApprovalStatus::Pending)
         ->and((float) $order->payment_due)->toBe(1000.0)
         ->and($order->items)->toHaveCount(1)
         ->and((float) $order->items->first()->subtotal)->toBe(1000.0);
 
-    // A received purchase restocks the products and feeds the supplier due.
-    expect($unit->fresh()->quantity)->toBe(55)
-        ->and((float) $order->supplier->fresh()->purchase_due)->toBe(1000.0);
-
-    $this->assertDatabaseHas('stock_movements', [
-        'unit_id' => $unit->id,
-        'type' => 'restock',
-        'quantity' => 5,
-    ]);
+    // Nothing takes effect before approval: no stock movement, no supplier due.
+    expect($unit->fresh()->quantity)->toBe(50)
+        ->and((float) $order->supplier->fresh()->purchase_due)->toBe(0.0);
 
     $this->assertDatabaseHas('audit_logs', [
         'event' => 'created',
@@ -94,18 +90,34 @@ it('creates a purchase order with line items and an auto reference number', func
     ]);
 });
 
-it('does not move stock until the purchase order is received', function () {
+it('receives stock and registers the supplier due only after approval', function () {
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 50]);
 
-    $this->post(route('purchase-orders.store'), purchaseOrderPayload($unit, ['purchase_status' => 'ordered']))
-        ->assertRedirect(route('purchase-invoices.index'));
-
+    $this->post(route('purchase-orders.store'), purchaseOrderPayload($unit))->assertRedirect();
     $order = PurchaseOrder::first();
 
     expect($unit->fresh()->quantity)->toBe(50)
+        ->and((float) $order->supplier->fresh()->purchase_due)->toBe(0.0);
+
+    $this->patch(route('purchase-invoices.approve', $order))
+        ->assertRedirect(route('purchase-invoices.index'));
+
+    $order->refresh();
+
+    expect($order->approval_status)->toBe(ApprovalStatus::Approved)
+        ->and($order->purchase_status->value)->toBe('received')
+        ->and($order->approved_by)->not->toBeNull()
+        ->and($order->approved_at)->not->toBeNull()
+        ->and($unit->fresh()->quantity)->toBe(55)
         ->and((float) $order->supplier->fresh()->purchase_due)->toBe(1000.0);
+
+    $this->assertDatabaseHas('stock_movements', [
+        'unit_id' => $unit->id,
+        'type' => 'restock',
+        'quantity' => 5,
+    ]);
 });
 
 it('validates the purchase order form', function () {
@@ -117,4 +129,13 @@ it('validates the purchase order form', function () {
         'order_date' => now()->format('Y-m-d\TH:i'),
         'items' => [],
     ])->assertSessionHasErrors(['supplier_id', 'location_id', 'purchase_status', 'items']);
+});
+
+it('does not allow receiving a purchase at creation time', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+
+    $this->post(route('purchase-orders.store'), purchaseOrderPayload($unit, ['purchase_status' => 'received']))
+        ->assertSessionHasErrors(['purchase_status']);
 });

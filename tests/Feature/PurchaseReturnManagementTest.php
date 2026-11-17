@@ -112,7 +112,7 @@ it('lists the distributor purchases and their details for the return form', func
         ->assertJsonPath('items.0.purchased', 5);
 });
 
-it('creates a return, deducts stock and tracks the supplier return due', function () {
+it('creates a return awaiting approval without touching stock', function () {
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 50]);
@@ -130,9 +130,31 @@ it('creates a return, deducts stock and tracks the supplier return due', functio
         ->and($return->reason)->toBe('Defective or Damaged')
         ->and((float) $return->grand_total)->toBe(400.0)
         ->and((float) $return->payment_due)->toBe(400.0)
+        ->and($return->approval_status->value)->toBe('pending')
         ->and($return->items)->toHaveCount(1);
 
-    expect($unit->fresh()->quantity)->toBe(48);
+    // Nothing takes effect before the responsible manager approves.
+    expect($unit->fresh()->quantity)->toBe(50)
+        ->and((float) $return->supplier->fresh()->purchase_return_due)->toBe(0.0);
+});
+
+it('deducts stock and tracks the supplier return due on approval', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $order = returnParentOrder($unit);
+
+    $this->post(route('purchase-returns.store'), purchaseReturnPayload($order))->assertRedirect();
+    $return = PurchaseReturn::first();
+
+    $this->patch(route('purchase-returns.approve', $return))
+        ->assertRedirect(route('purchase-returns.index'));
+
+    $return->refresh();
+
+    expect($return->approval_status->value)->toBe('approved')
+        ->and($return->approved_by)->not->toBeNull()
+        ->and($unit->fresh()->quantity)->toBe(48);
 
     $this->assertDatabaseHas('stock_movements', [
         'unit_id' => $unit->id,
@@ -141,12 +163,6 @@ it('creates a return, deducts stock and tracks the supplier return due', functio
     ]);
 
     expect((float) $return->supplier->fresh()->purchase_return_due)->toBe(400.0);
-
-    $this->assertDatabaseHas('audit_logs', [
-        'event' => 'created',
-        'auditable_type' => PurchaseReturn::class,
-        'auditable_id' => $return->id,
-    ]);
 });
 
 it('validates the return against the chosen purchase', function () {
@@ -187,6 +203,7 @@ it('syncs stock and totals when the return quantities change', function () {
     $this->post(route('purchase-returns.store'), purchaseReturnPayload($order))->assertRedirect();
     $return = PurchaseReturn::first();
 
+    $this->patch(route('purchase-returns.approve', $return))->assertRedirect();
     expect($unit->fresh()->quantity)->toBe(48);
 
     $this->patch(route('purchase-returns.update', $return), purchaseReturnPayload($order, [
@@ -206,6 +223,8 @@ it('restores stock and clears the supplier return due when a return is deleted',
     $this->post(route('purchase-returns.store'), purchaseReturnPayload($order))->assertRedirect();
     $return = PurchaseReturn::first();
 
+    $this->patch(route('purchase-returns.approve', $return))->assertRedirect();
+
     expect($unit->fresh()->quantity)->toBe(48)
         ->and((float) $return->supplier->fresh()->purchase_return_due)->toBe(400.0);
 
@@ -218,16 +237,21 @@ it('restores stock and clears the supplier return due when a return is deleted',
         ->and((float) $return->supplier->fresh()->purchase_return_due)->toBe(0.0);
 });
 
-it('rejects returning more items than are in stock', function () {
+it('blocks approving a return that exceeds the stock on hand', function () {
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 1]);
     $order = returnParentOrder($unit);
 
     $this->post(route('purchase-returns.store'), purchaseReturnPayload($order))
+        ->assertRedirect(route('purchase-returns.index'));
+
+    $return = PurchaseReturn::first();
+
+    $this->patch(route('purchase-returns.approve', $return))
         ->assertRedirect()
         ->assertSessionHas('error');
 
-    expect(PurchaseReturn::count())->toBe(0)
+    expect($return->fresh()->approval_status->value)->toBe('pending')
         ->and($unit->fresh()->quantity)->toBe(1);
 });

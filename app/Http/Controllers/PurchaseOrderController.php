@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\ApprovalStatus;
 use App\Enums\PurchaseStatus;
 use App\Exceptions\InsufficientStockException;
 use App\Exports\PurchaseOrderExport;
@@ -15,12 +16,14 @@ use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Models\Unit;
 use App\Services\AuditService;
+use App\Services\LocationScope;
 use App\Services\PurchaseOrderService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -72,7 +75,7 @@ class PurchaseOrderController extends Controller
             'direction' => $direction,
             'totals' => $this->totals($request),
             'suppliers' => Supplier::query()->orderBy('name')->get(['id', 'name']),
-            'locations' => Location::query()->active()->orderBy('name')->get(['id', 'name']),
+            'locations' => $this->scopedLocations(),
         ]);
     }
 
@@ -85,8 +88,8 @@ class PurchaseOrderController extends Controller
 
         return view('purchase-orders.create', [
             'suppliers' => Supplier::query()->orderBy('name')->get(),
-            'locations' => Location::query()->active()->orderBy('name')->get(),
-            'statuses' => PurchaseStatus::options(),
+            'locations' => $this->scopedLocations(),
+            'statuses' => $this->creationStatusOptions(),
             'items' => $this->hydrateItems(collect(old('items', []))->all()),
         ]);
     }
@@ -155,7 +158,7 @@ class PurchaseOrderController extends Controller
     {
         $this->authorize('update', $purchaseOrder);
 
-        $itemsEditable = $purchaseOrder->purchase_status !== PurchaseStatus::Received;
+        $itemsEditable = $purchaseOrder->approval_status !== ApprovalStatus::Approved;
 
         $items = $itemsEditable && $this->oldItems() !== []
             ? $this->hydrateItems($this->oldItems())
@@ -164,8 +167,8 @@ class PurchaseOrderController extends Controller
         return view('purchase-invoices.edit', [
             'order' => $purchaseOrder,
             'suppliers' => Supplier::query()->orderBy('name')->get(),
-            'locations' => Location::query()->active()->orderBy('name')->get(),
-            'statuses' => PurchaseStatus::options(),
+            'locations' => $this->scopedLocations(),
+            'statuses' => $this->editStatusOptions($purchaseOrder),
             'itemsEditable' => $itemsEditable,
             'items' => $items,
         ]);
@@ -179,7 +182,7 @@ class PurchaseOrderController extends Controller
         $original = $purchaseOrder->getOriginal();
         $fromStatus = PurchaseStatus::from((string) $purchaseOrder->getRawOriginal('purchase_status'));
         $validated = $request->validated();
-        $itemsEditable = $purchaseOrder->purchase_status !== PurchaseStatus::Received;
+        $itemsEditable = $purchaseOrder->approval_status !== ApprovalStatus::Approved;
         $items = $itemsEditable ? $validated['items'] : [];
 
         try {
@@ -246,6 +249,75 @@ class PurchaseOrderController extends Controller
     }
 
     /**
+     * Approve (receive) a purchase: the responsible manager signs off and the
+     * purchase takes effect — stock is received and the supplier due registers.
+     */
+    public function approve(PurchaseOrder $purchaseOrder): RedirectResponse
+    {
+        $this->authorize('approve', $purchaseOrder);
+
+        if ($purchaseOrder->approval_status === ApprovalStatus::Approved) {
+            return back()->with('error', "Purchase order '{$purchaseOrder->reference_no}' is already approved.");
+        }
+
+        $original = $purchaseOrder->getOriginal();
+        $fromStatus = PurchaseStatus::from((string) $purchaseOrder->getRawOriginal('purchase_status'));
+
+        try {
+            DB::transaction(function () use ($purchaseOrder, $fromStatus, $original) {
+                $purchaseOrder->update([
+                    'approval_status' => ApprovalStatus::Approved,
+                    'approved_by' => Auth::id(),
+                    'approved_at' => now(),
+                    'purchase_status' => PurchaseStatus::Received,
+                ]);
+
+                PurchaseOrderService::applyStatusChange($purchaseOrder, $fromStatus, PurchaseStatus::Received);
+                PurchaseOrderService::applySupplierDue($purchaseOrder, $original);
+            });
+        } catch (InsufficientStockException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        AuditService::updated($purchaseOrder, $original, "Purchase order '{$purchaseOrder->reference_no}' approved and received.");
+
+        return redirect()->route('purchase-invoices.index')
+            ->with('success', "Purchase order '{$purchaseOrder->reference_no}' approved. Stock received and supplier due updated.");
+    }
+
+    /**
+     * Reject a purchase: it never takes effect and is marked cancelled.
+     */
+    public function reject(PurchaseOrder $purchaseOrder): RedirectResponse
+    {
+        $this->authorize('reject', $purchaseOrder);
+
+        if ($purchaseOrder->approval_status === ApprovalStatus::Approved) {
+            return back()->with('error', "Purchase order '{$purchaseOrder->reference_no}' is already approved. Cancel it instead.");
+        }
+
+        $original = $purchaseOrder->getOriginal();
+        $fromStatus = PurchaseStatus::from((string) $purchaseOrder->getRawOriginal('purchase_status'));
+
+        DB::transaction(function () use ($purchaseOrder, $fromStatus, $original) {
+            $purchaseOrder->update([
+                'approval_status' => ApprovalStatus::Rejected,
+                'approved_by' => Auth::id(),
+                'approved_at' => now(),
+                'purchase_status' => PurchaseStatus::Cancelled,
+            ]);
+
+            PurchaseOrderService::applyStatusChange($purchaseOrder, $fromStatus, PurchaseStatus::Cancelled);
+            PurchaseOrderService::applySupplierDue($purchaseOrder, $original);
+        });
+
+        AuditService::updated($purchaseOrder, $original, "Purchase order '{$purchaseOrder->reference_no}' rejected.");
+
+        return redirect()->route('purchase-invoices.index')
+            ->with('success', "Purchase order '{$purchaseOrder->reference_no}' rejected.");
+    }
+
+    /**
      * Search stock lines (products) for the purchase form.
      */
     public function searchUnits(Request $request): JsonResponse
@@ -305,18 +377,80 @@ class PurchaseOrderController extends Controller
 
     /**
      * Base query for the listing with all filters applied.
+     * Outlet Managers only see the purchases of their assigned location.
      */
     private function filteredQuery(Request $request): Builder
     {
-        return PurchaseOrder::query()
+        $query = PurchaseOrder::query()
             ->with(['supplier', 'location', 'creator'])
             ->when($request->filled('search'), fn ($q) => $q->search($request->string('search')->toString()))
             ->when($request->filled('supplier_id'), fn ($q) => $q->where('supplier_id', (int) $request->input('supplier_id')))
-            ->when($request->filled('location_id'), fn ($q) => $q->where('location_id', (int) $request->input('location_id')))
             ->when($request->filled('purchase_status'), fn ($q) => $q->where('purchase_status', $request->string('purchase_status')->toString()))
             ->when($request->filled('payment_status'), fn ($q) => $q->where('payment_status', $request->string('payment_status')->toString()))
             ->when($request->filled('date_from'), fn ($q) => $q->whereDate('order_date', '>=', $request->string('date_from')->toString()))
             ->when($request->filled('date_to'), fn ($q) => $q->whereDate('order_date', '<=', $request->string('date_to')->toString()));
+
+        $query = LocationScope::scopeQuery($query, $request->user());
+
+        return $query->when($request->filled('location_id'), fn ($q) => $q->where('location_id', (int) $request->input('location_id')));
+    }
+
+    /**
+     * Locations the current user may purchase for.
+     *
+     * @return Collection<int, Location>
+     */
+    private function scopedLocations(): Collection
+    {
+        $query = Location::query()->active()->orderBy('name');
+
+        $ids = LocationScope::accessibleLocationIds(Auth::user());
+
+        if ($ids !== null) {
+            $query->whereIn('id', $ids);
+        }
+
+        return $query->get();
+    }
+
+    /**
+     * Purchase statuses selectable when creating a purchase.
+     *
+     * @return array<string, string>
+     */
+    private function creationStatusOptions(): array
+    {
+        return array_filter(
+            PurchaseStatus::options(),
+            fn (string $value) => in_array($value, [PurchaseStatus::Pending->value, PurchaseStatus::Ordered->value], true),
+            ARRAY_FILTER_USE_KEY
+        );
+    }
+
+    /**
+     * Purchase statuses selectable when editing a purchase. "Received" is only
+     * reachable through the approval action.
+     *
+     * @return array<string, string>
+     */
+    private function editStatusOptions(PurchaseOrder $order): array
+    {
+        if ($order->approval_status === ApprovalStatus::Approved) {
+            return [
+                PurchaseStatus::Received->value => PurchaseStatus::Received->label(),
+                PurchaseStatus::Cancelled->value => PurchaseStatus::Cancelled->label(),
+            ];
+        }
+
+        return array_filter(
+            PurchaseStatus::options(),
+            fn (string $value) => in_array($value, [
+                PurchaseStatus::Pending->value,
+                PurchaseStatus::Ordered->value,
+                PurchaseStatus::Cancelled->value,
+            ], true),
+            ARRAY_FILTER_USE_KEY
+        );
     }
 
     /**
