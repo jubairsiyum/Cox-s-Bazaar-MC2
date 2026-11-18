@@ -7,14 +7,18 @@ namespace App\Http\Controllers;
 use App\Enums\StockTransferStatus;
 use App\Exceptions\InsufficientStockException;
 use App\Exports\StockTransferExport;
+use App\Helpers\Money;
 use App\Http\Requests\StockTransfer\StoreStockTransferRequest;
 use App\Http\Requests\StockTransfer\UpdateStockTransferRequest;
+use App\Models\Branch;
 use App\Models\Location;
 use App\Models\Product;
 use App\Models\StockTransfer;
 use App\Models\Unit;
 use App\Services\AuditService;
 use App\Services\LocationScope;
+use App\Services\NotificationService;
+use App\Services\PurchaseApprovalNotifier;
 use App\Services\StockTransferService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
@@ -62,6 +66,16 @@ class StockTransferController extends Controller
             $query->where(fn ($q) => $q->whereIn('from_location_id', $ids)->orWhereIn('to_location_id', $ids));
         }
 
+        // Overview branch filter: matches transfers where either side of the
+        // move belongs to the selected branch.
+        $query->when($request->filled('branch'), function ($q) use ($request) {
+            $branchLocationIds = Location::query()
+                ->where('branch_id', $request->integer('branch'))
+                ->pluck('id');
+
+            $q->where(fn ($q) => $q->whereIn('from_location_id', $branchLocationIds)->orWhereIn('to_location_id', $branchLocationIds));
+        });
+
         $transfers = $query
             ->orderBy($sort, $direction)
             ->paginate($perPage)
@@ -72,6 +86,7 @@ class StockTransferController extends Controller
             'perPage' => $perPage,
             'sort' => $sort,
             'direction' => $direction,
+            'branches' => Branch::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -86,7 +101,7 @@ class StockTransferController extends Controller
             'locations' => $this->scopedLocations(),
             'destinationLocations' => Location::query()->active()->orderBy('name')->get(),
             'statuses' => collect(StockTransferStatus::options())
-                ->except([StockTransferStatus::Received->value])
+                ->only(collect(StockTransferStatus::creatable())->map(fn (StockTransferStatus $status) => $status->value)->all())
                 ->all(),
             'items' => $this->hydrateItems(collect(old('items', []))->all()),
         ]);
@@ -126,6 +141,20 @@ class StockTransferController extends Controller
         }
 
         AuditService::created($transfer, "Stock transfer '{$transfer->reference_no}' created.");
+
+        $this->notifyReceivers(
+            $transfer,
+            "Stock transfer '{$transfer->reference_no}' awaits your approval.",
+            sprintf(
+                '%s → %s · %d line(s) · %s, submitted by %s.',
+                $transfer->fromLocation?->name ?? 'Unknown location',
+                $transfer->toLocation?->name ?? 'Unknown location',
+                $transfer->items()->count(),
+                Money::format($transfer->total_amount),
+                $request->user()?->name ?? 'Unknown user'
+            ),
+            'warning'
+        );
 
         return redirect()->route('stock-transfers.index')
             ->with('success', "Stock transfer '{$transfer->reference_no}' created successfully.");
@@ -203,6 +232,10 @@ class StockTransferController extends Controller
 
         AuditService::updated($stockTransfer, $original, "Stock transfer '{$stockTransfer->reference_no}' updated.");
 
+        if ($fromStatus !== $stockTransfer->status) {
+            $this->notifyStatusChange($stockTransfer, $fromStatus);
+        }
+
         return redirect()->route('stock-transfers.index')
             ->with('success', "Stock transfer '{$stockTransfer->reference_no}' updated successfully.");
     }
@@ -227,39 +260,57 @@ class StockTransferController extends Controller
     }
 
     /**
-     * Approve (receive) an incoming transfer: the receiving manager reviews
-     * and signs off. Afterwards the transfer reads "Received" for the
+     * Approve (accept / receive) an incoming transfer: the receiving manager
+     * reviews and signs off. Works both on a submitted request (draft) and on
+     * a dispatched transfer. Afterwards the transfer reads "Received" for the
      * receiving side and "Delivered" for the sending side.
      */
     public function approve(StockTransfer $stockTransfer): RedirectResponse
     {
         $this->authorize('approve', $stockTransfer);
 
-        if ($stockTransfer->status !== StockTransferStatus::InTransit) {
-            return back()->with('error', "Stock transfer '{$stockTransfer->reference_no}' must be dispatched before it can be approved.");
+        if (! in_array($stockTransfer->status, [StockTransferStatus::Draft, StockTransferStatus::InTransit], true)) {
+            return back()->with('error', "Stock transfer '{$stockTransfer->reference_no}' can no longer be approved.");
         }
 
         $original = $stockTransfer->getOriginal();
+        $fromStatus = StockTransferStatus::from((string) $stockTransfer->getRawOriginal('status'));
 
-        DB::transaction(function () use ($stockTransfer) {
-            $stockTransfer->update([
-                'status' => StockTransferStatus::Received,
-                'approved_by' => Auth::id(),
-                'approved_at' => now(),
-            ]);
+        try {
+            DB::transaction(function () use ($stockTransfer, $fromStatus) {
+                $stockTransfer->update([
+                    'status' => StockTransferStatus::Received,
+                    'approved_by' => Auth::id(),
+                    'approved_at' => now(),
+                ]);
 
-            StockTransferService::applyStatusChange($stockTransfer, StockTransferStatus::InTransit, StockTransferStatus::Received);
-        });
+                StockTransferService::applyStatusChange($stockTransfer, $fromStatus, StockTransferStatus::Received);
+            });
+        } catch (InsufficientStockException $e) {
+            return back()->with('error', $e->getMessage());
+        }
 
         AuditService::updated($stockTransfer, $original, "Stock transfer '{$stockTransfer->reference_no}' approved and received.");
+
+        $this->notifyCreator(
+            $stockTransfer,
+            "Stock transfer '{$stockTransfer->reference_no}' received.",
+            sprintf(
+                'Your transfer %s → %s was accepted and received by %s.',
+                $stockTransfer->fromLocation?->name ?? 'Unknown location',
+                $stockTransfer->toLocation?->name ?? 'Unknown location',
+                Auth::user()?->name ?? 'the receiving manager'
+            ),
+            'success'
+        );
 
         return redirect()->route('stock-transfers.index')
             ->with('success', "Stock transfer '{$stockTransfer->reference_no}' approved. It now shows as Received for you and Delivered for the sender.");
     }
 
     /**
-     * Reject an incoming transfer: it is cancelled and any dispatched stock
-     * returns to the sending location.
+     * Reject an incoming transfer: the receiving manager turns the request
+     * down. Any dispatched stock returns to the sending location.
      */
     public function reject(StockTransfer $stockTransfer): RedirectResponse
     {
@@ -273,15 +324,66 @@ class StockTransferController extends Controller
         $fromStatus = StockTransferStatus::from((string) $stockTransfer->getRawOriginal('status'));
 
         DB::transaction(function () use ($stockTransfer, $fromStatus) {
+            $stockTransfer->update(['status' => StockTransferStatus::Rejected]);
+
+            StockTransferService::applyStatusChange($stockTransfer, $fromStatus, StockTransferStatus::Rejected);
+        });
+
+        AuditService::updated($stockTransfer, $original, "Stock transfer '{$stockTransfer->reference_no}' rejected.");
+
+        $this->notifyCreator(
+            $stockTransfer,
+            "Stock transfer '{$stockTransfer->reference_no}' rejected.",
+            sprintf(
+                'Your transfer %s → %s was rejected by %s. Any dispatched stock has been returned.',
+                $stockTransfer->fromLocation?->name ?? 'Unknown location',
+                $stockTransfer->toLocation?->name ?? 'Unknown location',
+                Auth::user()?->name ?? 'the receiving manager'
+            ),
+            'error'
+        );
+
+        return redirect()->route('stock-transfers.index')
+            ->with('success', "Stock transfer '{$stockTransfer->reference_no}' rejected.");
+    }
+
+    /**
+     * Cancel a transfer: the sending manager calls off a pending transfer
+     * before it is received. Any dispatched stock returns to the source.
+     */
+    public function cancel(StockTransfer $stockTransfer): RedirectResponse
+    {
+        $this->authorize('cancel', $stockTransfer);
+
+        if (! in_array($stockTransfer->status, [StockTransferStatus::Draft, StockTransferStatus::InTransit], true)) {
+            return back()->with('error', "Stock transfer '{$stockTransfer->reference_no}' can no longer be cancelled.");
+        }
+
+        $original = $stockTransfer->getOriginal();
+        $fromStatus = StockTransferStatus::from((string) $stockTransfer->getRawOriginal('status'));
+
+        DB::transaction(function () use ($stockTransfer, $fromStatus) {
             $stockTransfer->update(['status' => StockTransferStatus::Cancelled]);
 
             StockTransferService::applyStatusChange($stockTransfer, $fromStatus, StockTransferStatus::Cancelled);
         });
 
-        AuditService::updated($stockTransfer, $original, "Stock transfer '{$stockTransfer->reference_no}' rejected.");
+        AuditService::updated($stockTransfer, $original, "Stock transfer '{$stockTransfer->reference_no}' cancelled by the sending side.");
+
+        $this->notifyReceivers(
+            $stockTransfer,
+            "Stock transfer '{$stockTransfer->reference_no}' cancelled.",
+            sprintf(
+                'The transfer %s → %s was cancelled by %s.',
+                $stockTransfer->fromLocation?->name ?? 'Unknown location',
+                $stockTransfer->toLocation?->name ?? 'Unknown location',
+                Auth::user()?->name ?? 'the sending manager'
+            ),
+            'info'
+        );
 
         return redirect()->route('stock-transfers.index')
-            ->with('success', "Stock transfer '{$stockTransfer->reference_no}' rejected and cancelled.");
+            ->with('success', "Stock transfer '{$stockTransfer->reference_no}' cancelled.");
     }
 
     /**
@@ -516,5 +618,64 @@ class StockTransferController extends Controller
             fn (array $item) => (int) $item['quantity'] * (float) $item['unit_price'],
             $items
         )), 2);
+    }
+
+    /**
+     * Notify the managers of the receiving location/branch about a transfer event.
+     */
+    private function notifyReceivers(StockTransfer $transfer, string $title, string $body, string $type): void
+    {
+        NotificationService::notifyMany(
+            PurchaseApprovalNotifier::managersFor($transfer->to_location_id, $transfer->toLocation?->branch_id),
+            $title,
+            $body,
+            route('stock-transfers.show', $transfer),
+            $type
+        );
+    }
+
+    /**
+     * Notify the creator of a transfer about a decision taken on it.
+     */
+    private function notifyCreator(StockTransfer $transfer, string $title, string $body, string $type): void
+    {
+        if ($transfer->creator === null) {
+            return;
+        }
+
+        NotificationService::notify($transfer->creator, $title, $body, route('stock-transfers.show', $transfer), $type);
+    }
+
+    /**
+     * Tell the receiving side when a transfer they were awaiting changes state.
+     */
+    private function notifyStatusChange(StockTransfer $transfer, StockTransferStatus $from): void
+    {
+        if ($transfer->status === StockTransferStatus::InTransit && $from === StockTransferStatus::Draft) {
+            $this->notifyReceivers(
+                $transfer,
+                "Stock transfer '{$transfer->reference_no}' dispatched.",
+                sprintf(
+                    'The transfer %s → %s is on the way and awaits your receipt sign-off.',
+                    $transfer->fromLocation?->name ?? 'Unknown location',
+                    $transfer->toLocation?->name ?? 'Unknown location'
+                ),
+                'warning'
+            );
+        }
+
+        if ($transfer->status === StockTransferStatus::Cancelled) {
+            $this->notifyReceivers(
+                $transfer,
+                "Stock transfer '{$transfer->reference_no}' cancelled.",
+                sprintf(
+                    'The transfer %s → %s was cancelled by %s.',
+                    $transfer->fromLocation?->name ?? 'Unknown location',
+                    $transfer->toLocation?->name ?? 'Unknown location',
+                    Auth::user()?->name ?? 'the sending manager'
+                ),
+                'info'
+            );
+        }
     }
 }

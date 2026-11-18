@@ -6,8 +6,8 @@ namespace App\Http\Requests\StockAdjustment;
 
 use App\Enums\StockAdjustmentType;
 use App\Models\StockAdjustment;
-use App\Models\StockAdjustmentItem;
 use App\Models\Unit;
+use App\Services\LocationScope;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -30,6 +30,7 @@ class UpdateStockAdjustmentRequest extends FormRequest
         return [
             'reference_no' => ['nullable', 'string', 'max:50', Rule::unique('stock_adjustments', 'reference_no')->whereNull('deleted_at')->ignore($adjustment->id)],
             'adjustment_date' => ['required', 'date'],
+            'location_id' => ['required', 'integer', Rule::exists('locations', 'id'), $this->accessibleLocationRule()],
             'type' => ['required', Rule::enum(StockAdjustmentType::class)],
             'reason' => ['required', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
@@ -47,6 +48,7 @@ class UpdateStockAdjustmentRequest extends FormRequest
         return [
             'reference_no' => 'Reference No',
             'adjustment_date' => 'Date',
+            'location_id' => 'Location',
             'type' => 'Adjustment type',
             'reason' => 'Reason',
             'items' => 'Products',
@@ -57,9 +59,20 @@ class UpdateStockAdjustmentRequest extends FormRequest
     }
 
     /**
-     * Quantity rules per operation. The document's own effect is restored
-     * before it is re-posted, so a line's available stock is the level the
-     * document originally adjusted from.
+     * Outlet Managers may only book adjustments against their own location.
+     */
+    protected function accessibleLocationRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if ($this->user() === null || ! LocationScope::canAccess($this->user(), $value)) {
+                $fail('You may only book adjustments for your own location.');
+            }
+        };
+    }
+
+    /**
+     * Quantity rules per operation. Only pending adjustments are editable,
+     * so a line's available stock is the current stock level.
      */
     protected function quantityWithinRules(): Closure
     {
@@ -81,14 +94,7 @@ class UpdateStockAdjustmentRequest extends FormRequest
 
             if ($type === StockAdjustmentType::Remove) {
                 $index = (int) explode('.', $attribute)[1];
-                $unitId = $this->input("items.{$index}.unit_id");
-
-                $existingItem = StockAdjustmentItem::query()
-                    ->where('stock_adjustment_id', $this->route('stockAdjustment')?->id)
-                    ->where('unit_id', $unitId)
-                    ->first();
-
-                $available = (int) ($existingItem?->quantity_before ?? Unit::query()->find($unitId)?->quantity ?? 0);
+                $available = (int) (Unit::query()->find($this->input("items.{$index}.unit_id"))?->quantity ?? 0);
 
                 if ($quantity > $available) {
                     $fail("Cannot remove more than the available stock ({$available}) for this product.");

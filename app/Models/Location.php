@@ -19,6 +19,7 @@ class Location extends Model
         'name',
         'code',
         'type',
+        'branch_id',
         'status',
         'address',
         'phone',
@@ -34,6 +35,11 @@ class Location extends Model
     }
 
     // ── Relationships ────────────────────────────────────────────────
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
+    }
 
     public function creator(): BelongsTo
     {

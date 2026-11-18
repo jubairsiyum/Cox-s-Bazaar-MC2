@@ -10,6 +10,8 @@
         'brand_id' => request('brand_id'),
         'category_id' => request('category_id'),
         'stock_status' => request('stock_status'),
+        'branch' => request('branch'),
+        'location_id' => request('location_id'),
         'per_page' => request('per_page'),
         'sort' => $col,
         'direction' => $sort === $col && $direction === 'asc' ? 'desc' : 'asc',
@@ -20,6 +22,8 @@
         'brand_id' => request('brand_id'),
         'category_id' => request('category_id'),
         'stock_status' => $status,
+        'branch' => request('branch'),
+        'location_id' => request('location_id'),
         'per_page' => request('per_page'),
         'sort' => request('sort'),
         'direction' => request('direction'),
@@ -35,6 +39,12 @@
     $maxQtyOnPage = max(1, (int) ($stockLevels->max('quantity') ?? 1), $threshold * 3);
     $activeStatus = (string) request('stock_status', '');
     $hasActiveFilters = request()->filled('search') || request()->filled('brand_id') || request()->filled('category_id') || request()->filled('stock_status');
+    $branchFilter = ! \App\Services\LocationScope::isRestricted(auth()->user()) && request()->filled('branch')
+        ? (int) request('branch')
+        : null;
+    $branchFilterName = $branchFilter !== null
+        ? ($branches->firstWhere('id', $branchFilter)?->name ?? 'the selected branch')
+        : null;
 @endphp
 
 <div x-data="ledgerModal()" class="space-y-6">
@@ -218,11 +228,60 @@
             </div>
         </div>
 
+        {{-- Location Scope Strip (branch/location-aware activity) --}}
+        <div class="flex flex-col gap-3 border-b border-line px-5 sm:px-6 py-3.5 bg-brand-500/5 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-center gap-2.5 min-w-0">
+                <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-500/10 text-brand-500 ring-1 ring-brand-500/20">
+                    <x-icon name="warehouse" class="size-4" />
+                </div>
+                <div class="min-w-0">
+                    <p class="text-xs font-semibold text-ink">
+                        @if($locationFilter !== null)
+                            Activity scoped to {{ $locations->firstWhere('id', $locationFilter)?->name ?? 'your location' }}
+                        @elseif($branchFilter !== null)
+                            Activity scoped to {{ $branchFilterName }} branch
+                        @else
+                            Activity across all locations
+                        @endif
+                    </p>
+                    <p class="text-[11px] text-muted">Stock totals are shared across locations (one row per product variant); the ledger below shows the selected scope.</p>
+                </div>
+            </div>
+
+            @unless(\App\Services\LocationScope::isRestricted(auth()->user()))
+                <form method="GET" action="{{ route('inventory.index') }}" class="flex items-center gap-2 shrink-0">
+                    @if(request('search'))<input type="hidden" name="search" value="{{ request('search') }}">@endif
+                    @if(request('brand_id'))<input type="hidden" name="brand_id" value="{{ request('brand_id') }}">@endif
+                    @if(request('category_id'))<input type="hidden" name="category_id" value="{{ request('category_id') }}">@endif
+                    @if(request('stock_status'))<input type="hidden" name="stock_status" value="{{ request('stock_status') }}">@endif
+                    @if(request('per_page'))<input type="hidden" name="per_page" value="{{ request('per_page') }}">@endif
+                    @if(request('sort'))<input type="hidden" name="sort" value="{{ request('sort') }}">@endif
+                    @if(request('direction'))<input type="hidden" name="direction" value="{{ request('direction') }}">@endif
+                    <select name="branch" onchange="this.form.submit()"
+                            class="rounded-xl border border-line bg-surface py-2 px-2.5 text-xs font-semibold text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 cursor-pointer">
+                        <option value="">All Branches</option>
+                        @foreach($branches as $branch)
+                            <option value="{{ $branch->id }}" @selected($branchFilter === $branch->id)>{{ $branch->name }}</option>
+                        @endforeach
+                    </select>
+                    <select name="location_id" onchange="this.form.submit()"
+                            class="rounded-xl border border-line bg-surface py-2 px-2.5 text-xs font-semibold text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 cursor-pointer">
+                        <option value="">All locations</option>
+                        @foreach($locations as $location)
+                            <option value="{{ $location->id }}" @selected($locationFilter === $location->id)>{{ $location->name }}</option>
+                        @endforeach
+                    </select>
+                </form>
+            @endunless
+        </div>
+
         {{-- Filter Command Toolbar --}}
         <div class="px-5 sm:px-6 py-4 border-b border-line bg-canvas/40">
             <form method="GET" action="{{ route('inventory.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
                 @if(request('sort'))<input type="hidden" name="sort" value="{{ request('sort') }}">@endif
                 @if(request('direction'))<input type="hidden" name="direction" value="{{ request('direction') }}">@endif
+                @if(request('branch'))<input type="hidden" name="branch" value="{{ request('branch') }}">@endif
+                @if(request('location_id'))<input type="hidden" name="location_id" value="{{ request('location_id') }}">@endif
 
                 {{-- Search --}}
                 <div class="sm:col-span-2 lg:col-span-4">
@@ -474,6 +533,77 @@
         </div>
     </div>
 
+    {{-- Scoped Stock Activity (branch/location-filtered ledger) --}}
+    <div class="rounded-3xl border border-line bg-surface shadow-card overflow-hidden">
+        <div class="flex flex-col gap-2 border-b border-line px-5 sm:px-6 py-4 sm:py-5 bg-surface sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h2 class="text-base sm:text-lg font-bold text-ink">Recent stock activity</h2>
+                <p class="text-xs text-muted mt-0.5">
+                    @if($locationFilter !== null)
+                        Ledger movements at {{ $locations->firstWhere('id', $locationFilter)?->name ?? 'the selected location' }}
+                    @elseif($branchFilter !== null)
+                        Ledger movements for {{ $branchFilterName }} branch
+                    @else
+                        Ledger movements across all locations
+                    @endif
+                    · latest {{ $scopedMovements->count() }} entries
+                </p>
+            </div>
+            @can('stock-adjustments.manage')
+                <a href="{{ route('stock-adjustments.create') }}"
+                   class="btn-scale inline-flex items-center gap-1.5 rounded-2xl border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-ink shadow-2xs hover:border-brand-500 hover:text-brand-500 hover:bg-soft transition-colors shrink-0">
+                    <x-icon name="plus" class="size-3.5" />
+                    <span>New Adjustment</span>
+                </a>
+            @endcan
+        </div>
+
+        <div class="table-wrap max-w-full overflow-x-auto border-0 rounded-none">
+            <table class="data-table w-full text-left border-collapse">
+                <thead>
+                    <tr class="border-b border-line bg-canvas/40 text-xs font-semibold text-muted tracking-wider uppercase">
+                        <th scope="col" class="py-3 px-5 text-start">Date</th>
+                        <th scope="col" class="py-3 px-5 text-start">Product</th>
+                        <th scope="col" class="py-3 px-5 text-start">Type</th>
+                        <th scope="col" class="py-3 px-5 text-end">Quantity</th>
+                        <th scope="col" class="py-3 px-5 text-start">Location</th>
+                        <th scope="col" class="py-3 px-5 text-start">Note</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-line bg-surface">
+                    @forelse($scopedMovements as $movement)
+                        <tr class="hover:bg-soft/40 transition-colors">
+                            <td class="py-3 px-5 text-xs text-muted whitespace-nowrap tabular-nums">
+                                {{ $movement->created_at->format('d M Y H:i') }}
+                            </td>
+                            <td class="py-3 px-5 text-xs font-semibold text-ink">
+                                {{ $movement->unit?->displayName() ?? '—' }}
+                            </td>
+                            <td class="py-3 px-5 text-xs text-ink whitespace-nowrap">
+                                {{ $movement->type->label() }}
+                            </td>
+                            <td class="py-3 px-5 text-xs font-bold text-end tabular-nums whitespace-nowrap {{ (int) $movement->quantity < 0 ? 'text-danger' : 'text-success' }}">
+                                {{ (int) $movement->quantity > 0 ? '+' : '' }}{{ number_format((int) $movement->quantity) }}
+                            </td>
+                            <td class="py-3 px-5 text-xs text-muted whitespace-nowrap">
+                                {{ $movement->location?->name ?? '—' }}
+                            </td>
+                            <td class="py-3 px-5 text-xs text-muted max-w-xs truncate" title="{{ $movement->note }}">
+                                {{ $movement->note ?: '—' }}
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="6" class="py-10 px-6 text-center text-xs text-muted">
+                                No stock movements recorded for this scope yet.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     {{-- Stock Movements History Modal / Drawer --}}
     <div x-show="modalOpen" x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-overlay backdrop-blur-xs overflow-y-auto"
@@ -591,7 +721,7 @@ function ledgerModal() {
             this.modalOpen = true;
 
             try {
-                const response = await fetch(`/inventory/${unitId}/movements`, {
+                const response = await fetch(`/inventory/${unitId}/movements?${new URLSearchParams(window.location.search)}`, {
                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
                 });
                 const data = await response.json();

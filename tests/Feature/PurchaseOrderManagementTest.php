@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 use App\Enums\ApprovalStatus;
 use App\Enums\PaymentStatus;
+use App\Models\Branch;
 use App\Models\Location;
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Models\Unit;
+use App\Models\User;
+use App\Notifications\GenericDatabaseNotification;
+use App\Services\PurchaseApprovalNotifier;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\SettingsSeeder;
+use Illuminate\Support\Facades\Notification;
 
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
@@ -138,4 +143,92 @@ it('does not allow receiving a purchase at creation time', function () {
 
     $this->post(route('purchase-orders.store'), purchaseOrderPayload($unit, ['purchase_status' => 'received']))
         ->assertSessionHasErrors(['purchase_status']);
+});
+
+/**
+ * A verified purchasing user with the given role and branch/location assignment.
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function purchaseOrderTeamUser(string $role, array $attributes = []): User
+{
+    $user = User::factory()->create($attributes);
+    $user->assignRole($role);
+
+    return $user;
+}
+
+it('finds the responsible managers by location or by branch', function () {
+    $location = Location::factory()->create();
+    $branch = Branch::query()->create(['name' => 'Sadar Outlet', 'code' => 'TB1', 'status' => 'active']);
+
+    $byLocation = purchaseOrderTeamUser('Outlet Manager', ['location_id' => $location->id, 'branch_id' => null]);
+    $byBranch = purchaseOrderTeamUser('Manager', ['location_id' => null, 'branch_id' => $branch->id]);
+    $inactive = purchaseOrderTeamUser('Outlet Manager', ['location_id' => $location->id, 'status' => 'inactive']);
+    $elsewhere = purchaseOrderTeamUser('Outlet Manager', ['location_id' => Location::factory()->create()->id]);
+
+    $found = PurchaseApprovalNotifier::managersFor($location->id, $branch->id);
+
+    expect($found->pluck('id')->all())
+        ->toContain($byLocation->id, $byBranch->id)
+        ->not->toContain($inactive->id, $elsewhere->id);
+});
+
+it('notifies the location and branch managers when a purchase awaits approval', function () {
+    Notification::fake();
+
+    $location = Location::factory()->create();
+    $branch = Branch::query()->create(['name' => 'Sadar Outlet', 'code' => 'TB1', 'status' => 'active']);
+
+    $locationManager = purchaseOrderTeamUser('Outlet Manager', ['location_id' => $location->id, 'branch_id' => null]);
+    $branchManager = purchaseOrderTeamUser('Manager', ['location_id' => null, 'branch_id' => $branch->id]);
+    $elsewhere = purchaseOrderTeamUser('Outlet Manager', ['location_id' => Location::factory()->create()->id]);
+
+    $creator = purchaseOrderTeamUser('Manager', ['location_id' => null, 'branch_id' => $branch->id]);
+    $unit = Unit::factory()->create(['quantity' => 50]);
+
+    $this->actingAs($creator)
+        ->post(route('purchase-orders.store'), purchaseOrderPayload($unit, ['location_id' => $location->id]))
+        ->assertRedirect(route('purchase-invoices.index'));
+
+    $order = PurchaseOrder::first();
+
+    $awaitsApproval = fn (GenericDatabaseNotification $notification): bool => str_contains($notification->title, $order->reference_no)
+        && str_contains($notification->title, 'awaits your approval')
+        && $notification->type === 'warning';
+
+    Notification::assertSentTo($locationManager, GenericDatabaseNotification::class, $awaitsApproval);
+    Notification::assertSentTo($branchManager, GenericDatabaseNotification::class, $awaitsApproval);
+    Notification::assertNotSentTo($elsewhere, GenericDatabaseNotification::class);
+});
+
+it('notifies the creator when a purchase is approved or rejected', function () {
+    Notification::fake();
+
+    $admin = actingAsSuperAdmin();
+    $location = Location::factory()->create();
+
+    $this->post(route('purchase-orders.store'), purchaseOrderPayload(
+        Unit::factory()->create(['quantity' => 50]),
+        ['location_id' => $location->id]
+    ))->assertRedirect();
+    $approved = PurchaseOrder::first();
+
+    $this->patch(route('purchase-invoices.approve', $approved))
+        ->assertRedirect(route('purchase-invoices.index'));
+
+    Notification::assertSentTo($admin, GenericDatabaseNotification::class, fn (GenericDatabaseNotification $notification): bool => str_contains($notification->title, 'approved')
+        && $notification->type === 'success');
+
+    $this->post(route('purchase-orders.store'), purchaseOrderPayload(
+        Unit::factory()->create(['quantity' => 50]),
+        ['location_id' => $location->id]
+    ))->assertRedirect();
+    $rejected = PurchaseOrder::orderByDesc('id')->first();
+
+    $this->patch(route('purchase-invoices.reject', $rejected))
+        ->assertRedirect(route('purchase-invoices.index'));
+
+    Notification::assertSentTo($admin, GenericDatabaseNotification::class, fn (GenericDatabaseNotification $notification): bool => str_contains($notification->title, 'rejected')
+        && $notification->type === 'error');
 });

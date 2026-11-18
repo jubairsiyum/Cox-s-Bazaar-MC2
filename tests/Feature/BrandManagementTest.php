@@ -114,6 +114,28 @@ it('stores the uploaded logo path when creating a brand', function () {
     Storage::disk('public')->assertExists($brand->logo);
 });
 
+it('allows uploading an svg logo when creating a brand', function () {
+    actingAsSuperAdmin();
+    Storage::fake('public');
+
+    $svgContent = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40"/></svg>';
+
+    $response = $this->post(route('brands.store'), [
+        'name' => 'SvgBrand',
+        'logo' => UploadedFile::fake()->createWithContent('logo.svg', $svgContent)->mimeType('image/svg+xml'),
+    ]);
+
+    $response->assertSessionHasNoErrors();
+    $response->assertRedirect(route('brands.index'));
+
+    $brand = Brand::where('name', 'SvgBrand')->first();
+
+    expect($brand)->not->toBeNull()
+        ->and($brand->logo)->toStartWith('brand-logos/');
+
+    Storage::disk('public')->assertExists($brand->logo);
+});
+
 it('fails validation when the logo is not an image', function () {
     actingAsSuperAdmin();
     Storage::fake('public');

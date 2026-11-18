@@ -31,39 +31,8 @@
       <span x-show="$store.theme.dark || $store.theme.resolvedTheme === 'dark'" x-cloak><x-icon name="sun" class="size-5 text-warning" /></span>
     </button>
 
-    {{-- Notification button --}}
-    <div class="relative" x-data="{ notifyOpen: false }" @click.outside="notifyOpen = false">
-      <button @click="notifyOpen = !notifyOpen"
-              class="relative grid size-11 place-items-center rounded-full bg-surface text-muted shadow-card transition-[transform,background-color] duration-200 hover:text-ink active:scale-[0.97]"
-              aria-label="Notifications">
-        <x-icon name="bell" class="size-5" />
-        <span class="absolute right-3 top-3 size-2 rounded-full bg-danger animate-pulse"></span>
-      </button>
-
-      <div x-show="notifyOpen" x-cloak
-           x-transition:enter="transition duration-300 ease-[cubic-bezier(.16,1,.3,1)]"
-           x-transition:enter-start="opacity-0 scale-95 -translate-y-2"
-           x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-           x-transition:leave="transition duration-150 ease-in"
-           x-transition:leave-start="opacity-100 scale-100"
-           x-transition:leave-end="opacity-0 scale-95"
-           class="absolute right-0 z-50 mt-2 w-72 origin-top-right rounded-2xl border border-line bg-surface p-3 shadow-card">
-        <div class="flex items-center justify-between border-b border-line pb-2 px-1">
-          <p class="text-xs font-bold uppercase tracking-wider text-ink">Notifications</p>
-          <span class="rounded-full bg-soft px-2 py-0.5 text-[10px] font-semibold text-brand-500">2 New</span>
-        </div>
-        <div class="mt-2 space-y-1 text-xs">
-          <a href="#" class="block rounded-xl p-2 transition-colors hover:bg-soft">
-            <p class="font-semibold text-ink">Delivery completed</p>
-            <p class="text-muted text-[11px]">Trip #FR156KL89K delivered safely</p>
-          </a>
-          <a href="#" class="block rounded-xl p-2 transition-colors hover:bg-soft">
-            <p class="font-semibold text-ink">New fleet added</p>
-            <p class="text-muted text-[11px]">Vehicle DH-124 registered to fleet</p>
-          </a>
-        </div>
-      </div>
-    </div>
+    {{-- Notification bell (real notifications) --}}
+    <x-header.notification-dropdown />
 
     {{-- Profile dropdown --}}
     <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="open = false">

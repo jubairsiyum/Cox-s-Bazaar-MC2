@@ -57,4 +57,13 @@ class StockTransferPolicy
     {
         return $this->approve($user, $stockTransfer);
     }
+
+    /**
+     * Cancel a transfer: the sending side calls this off before receipt.
+     */
+    public function cancel(User $user, StockTransfer $stockTransfer): bool
+    {
+        return $user->can('stock-transfers.manage')
+            && LocationScope::canAccess($user, $stockTransfer->from_location_id);
+    }
 }

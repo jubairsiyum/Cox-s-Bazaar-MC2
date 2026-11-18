@@ -16,8 +16,10 @@ use App\Models\Unit;
  *  - Remove: stock goes down by the entered quantity
  *  - Set:    stock is corrected to the entered (counted) quantity
  *
- * Every line stores the stock level before and after the document, so an
- * adjustment can be reversed exactly as long as nothing has moved since.
+ * An adjustment only touches stock once it is approved; `apply()` then
+ * re-computes each line against the stock level at approval time and stores
+ * the before/after snapshot on the line, so an approved adjustment can be
+ * reversed exactly as long as nothing has moved since.
  */
 class StockAdjustmentService
 {
@@ -34,15 +36,24 @@ class StockAdjustmentService
     }
 
     /**
-     * Post the stock effect of every line (idempotent: stock is set to the
-     * line's stored quantity_after).
+     * Post the stock effect of every line (called when the adjustment is
+     * approved). Each line captures the stock level before and after posting.
      */
     public static function apply(StockAdjustment $adjustment): void
     {
         $adjustment->load('items');
 
         foreach ($adjustment->items as $item) {
-            StockService::adjust($item->unit, $item->quantity_after, self::note($adjustment));
+            $unit = Unit::query()->findOrFail((int) $item->unit_id);
+            $quantityBefore = (int) $unit->quantity;
+            $quantityAfter = self::targetQuantity($adjustment->type, (int) $item->quantity, $quantityBefore);
+
+            $item->update([
+                'quantity_before' => $quantityBefore,
+                'quantity_after' => $quantityAfter,
+            ]);
+
+            StockService::adjust($unit, $quantityAfter, self::note($adjustment), self::locationId($adjustment));
         }
     }
 
@@ -55,13 +66,14 @@ class StockAdjustmentService
         $adjustment->load('items');
 
         foreach ($adjustment->items as $item) {
-            StockService::adjust($item->unit, $item->quantity_before, self::note($adjustment));
+            StockService::adjust($item->unit, (int) $item->quantity_before, self::note($adjustment), self::locationId($adjustment));
         }
     }
 
     /**
-     * Replace the line items of an adjustment, capturing the stock level
-     * before and after each line.
+     * Replace the line items of an adjustment with a preview of the stock
+     * level before and after each line (final values are captured when the
+     * adjustment is approved).
      *
      * @param  array<int, array<string, mixed>>  $rows
      */
@@ -91,5 +103,13 @@ class StockAdjustmentService
     private static function note(StockAdjustment $adjustment): string
     {
         return "Stock adjustment {$adjustment->reference_no}.";
+    }
+
+    /**
+     * Location the adjustment's stock effect happened at, when known.
+     */
+    private static function locationId(StockAdjustment $adjustment): ?int
+    {
+        return $adjustment->location_id !== null ? (int) $adjustment->location_id : null;
     }
 }

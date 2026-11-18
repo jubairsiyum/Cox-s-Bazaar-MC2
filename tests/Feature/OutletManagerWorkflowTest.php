@@ -173,6 +173,85 @@ it('stops the sending side from approving its own transfer', function () {
         ->assertForbidden();
 });
 
+it('shows accept and reject options to the receiving manager for a submitted request', function () {
+    $from = Location::factory()->create();
+    $to = Location::factory()->create();
+    $unit = Unit::factory()->create(['quantity' => 50]);
+
+    $sender = outletManagerUser($from);
+    $receiver = outletManagerUser($to);
+
+    $this->actingAs($sender)
+        ->post(route('stock-transfers.store'), [
+            'transfer_date' => now()->format('Y-m-d\TH:i'),
+            'reference_no' => null,
+            'status' => 'draft',
+            'from_location_id' => $from->id,
+            'to_location_id' => $to->id,
+            'shipping_charges' => 0,
+            'additional_notes' => 'Please restock',
+            'items' => [['unit_id' => $unit->id, 'quantity' => 5, 'unit_price' => 200.0]],
+        ])
+        ->assertRedirect(route('stock-transfers.index'));
+
+    $transfer = StockTransfer::first();
+
+    // The request reads as awaiting approval on the receiving side.
+    expect($transfer->displayStatusFor($receiver)['label'])->toBe('Awaiting Approval')
+        ->and($transfer->displayStatusFor($sender)['label'])->toBe('Pending');
+
+    // The receiving manager is alerted so the request cannot be missed.
+    expect($receiver->fresh()->notifications()->count())->toBe(1)
+        ->and($receiver->fresh()->notifications()->first()->data['type'])->toBe('warning');
+
+    $this->actingAs($receiver)
+        ->get(route('stock-transfers.index'))
+        ->assertOk()
+        ->assertSee($transfer->reference_no)
+        ->assertSee('Accept')
+        ->assertSee('Reject');
+
+    $this->actingAs($receiver)
+        ->patch(route('stock-transfers.approve', $transfer))
+        ->assertRedirect(route('stock-transfers.index'));
+
+    expect($transfer->fresh()->status->value)->toBe('received')
+        ->and($transfer->fresh()->approved_by)->toBe($receiver->id)
+        ->and(collect($sender->fresh()->notifications)->pluck('data.type')->all())->toContain('success');
+});
+
+it('lets the receiving manager reject a submitted request', function () {
+    $from = Location::factory()->create();
+    $to = Location::factory()->create();
+    $unit = Unit::factory()->create(['quantity' => 50]);
+
+    $sender = outletManagerUser($from);
+    $receiver = outletManagerUser($to);
+
+    $this->actingAs($sender)
+        ->post(route('stock-transfers.store'), [
+            'transfer_date' => now()->format('Y-m-d\TH:i'),
+            'reference_no' => null,
+            'status' => 'draft',
+            'from_location_id' => $from->id,
+            'to_location_id' => $to->id,
+            'shipping_charges' => 0,
+            'additional_notes' => null,
+            'items' => [['unit_id' => $unit->id, 'quantity' => 5, 'unit_price' => 200.0]],
+        ])
+        ->assertRedirect(route('stock-transfers.index'));
+
+    $transfer = StockTransfer::first();
+
+    $this->actingAs($receiver)
+        ->patch(route('stock-transfers.reject', $transfer))
+        ->assertRedirect(route('stock-transfers.index'));
+
+    expect($transfer->fresh()->status->value)->toBe('rejected')
+        ->and((int) $unit->fresh()->quantity)->toBe(50)
+        ->and(collect($sender->fresh()->notifications)->pluck('data.type')->all())->toContain('error');
+});
+
 it('scopes the return register and its approval to the assigned location', function () {
     $mine = Location::factory()->create();
     $other = Location::factory()->create();

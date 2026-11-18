@@ -4,19 +4,27 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\ApprovalStatus;
 use App\Enums\StockAdjustmentType;
 use App\Exports\StockAdjustmentExport;
+use App\Helpers\Money;
 use App\Http\Requests\StockAdjustment\StoreStockAdjustmentRequest;
 use App\Http\Requests\StockAdjustment\UpdateStockAdjustmentRequest;
+use App\Models\Branch;
+use App\Models\Location;
 use App\Models\Product;
 use App\Models\StockAdjustment;
 use App\Models\Unit;
 use App\Services\AuditService;
+use App\Services\LocationScope;
+use App\Services\NotificationService;
+use App\Services\PurchaseApprovalNotifier;
 use App\Services\StockAdjustmentService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
@@ -45,9 +53,20 @@ class StockAdjustmentController extends Controller
             : 'adjustment_date';
         $direction = $request->string('direction')->toString() === 'asc' ? 'asc' : 'desc';
 
-        $adjustments = StockAdjustment::query()
-            ->with('creator')
+        $query = StockAdjustment::query()
+            ->with(['creator', 'location'])
             ->when($request->filled('search'), fn ($q) => $q->search($request->string('search')->toString()))
+            ->when($request->filled('status'), fn ($q) => $q->where('approval_status', $request->string('status')->toString()))
+            ->when($request->filled('location_id'), fn ($q) => $q->where('location_id', $request->integer('location_id')))
+            ->when($request->filled('branch'), fn ($q) => $q->whereIn(
+                'location_id',
+                Location::query()->where('branch_id', $request->integer('branch'))->pluck('id')
+            ));
+
+        // Outlet Managers see the adjustments of their location/branch only.
+        LocationScope::scopeQuery($query, $request->user(), 'location_id');
+
+        $adjustments = $query
             ->orderBy($sort, $direction)
             ->paginate($perPage)
             ->withQueryString();
@@ -57,6 +76,9 @@ class StockAdjustmentController extends Controller
             'perPage' => $perPage,
             'sort' => $sort,
             'direction' => $direction,
+            'locations' => Location::query()->active()->orderBy('name')->get(),
+            'statuses' => ApprovalStatus::options(),
+            'branches' => Branch::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -67,6 +89,7 @@ class StockAdjustmentController extends Controller
         return view('stock-adjustments.create', [
             'types' => StockAdjustmentType::options(),
             'typeHints' => collect(StockAdjustmentType::cases())->mapWithKeys(fn (StockAdjustmentType $type) => [$type->value => $type->hint()])->all(),
+            'locations' => $this->scopedLocations(),
             'items' => $this->formItems($request),
         ]);
     }
@@ -80,46 +103,61 @@ class StockAdjustmentController extends Controller
             $adjustment = StockAdjustment::create([
                 'reference_no' => $validated['reference_no'] ?? null,
                 'adjustment_date' => $validated['adjustment_date'],
+                'location_id' => $validated['location_id'],
                 'type' => $validated['type'],
+                'approval_status' => ApprovalStatus::Pending,
                 'total_amount' => $this->itemsTotal($items),
                 'reason' => $validated['reason'],
                 'created_by' => $request->user()->id,
             ]);
 
             StockAdjustmentService::saveItems($adjustment, $items);
-            StockAdjustmentService::apply($adjustment);
 
             return $adjustment;
         });
 
-        AuditService::created($adjustment, "Stock adjustment '{$adjustment->reference_no}' created.");
+        AuditService::created($adjustment, "Stock adjustment '{$adjustment->reference_no}' submitted for approval.");
+
+        $this->notifyManagers(
+            $adjustment,
+            "Stock adjustment '{$adjustment->reference_no}' awaits your approval.",
+            sprintf(
+                '%s · %s · %s, submitted by %s.',
+                $adjustment->type->label(),
+                $adjustment->location?->name ?? 'Unknown location',
+                Money::format($adjustment->total_amount),
+                $request->user()?->name ?? 'Unknown user'
+            ),
+            'warning'
+        );
 
         return redirect()->route('stock-adjustments.index')
-            ->with('success', "Stock adjustment '{$adjustment->reference_no}' created successfully.");
+            ->with('success', "Stock adjustment '{$adjustment->reference_no}' submitted for approval.");
     }
 
-    public function edit(StockAdjustment $stockAdjustment): View
+    public function edit(StockAdjustment $stockAdjustment): View|RedirectResponse
     {
         $this->authorize('update', $stockAdjustment);
 
-        if (! $stockAdjustment->isReversible()) {
+        if (! $stockAdjustment->isPending()) {
             return redirect()->route('stock-adjustments.index')
-                ->with('error', "Stock adjustment '{$stockAdjustment->reference_no}' can no longer be edited because stock has moved since it was posted. Create a new adjustment to correct it.");
+                ->with('error', "Stock adjustment '{$stockAdjustment->reference_no}' can no longer be edited because it has already been decided. Create a new adjustment to correct it.");
         }
 
         return view('stock-adjustments.edit', [
             'stockAdjustment' => $stockAdjustment,
             'types' => StockAdjustmentType::options(),
             'typeHints' => collect(StockAdjustmentType::cases())->mapWithKeys(fn (StockAdjustmentType $type) => [$type->value => $type->hint()])->all(),
+            'locations' => $this->scopedLocations(),
             'items' => $this->oldItems() !== [] ? $this->hydrateItems($this->oldItems()) : $this->presentItems($stockAdjustment),
         ]);
     }
 
     public function update(UpdateStockAdjustmentRequest $request, StockAdjustment $stockAdjustment): RedirectResponse
     {
-        if (! $stockAdjustment->isReversible()) {
+        if (! $stockAdjustment->isPending()) {
             return redirect()->route('stock-adjustments.index')
-                ->with('error', "Stock adjustment '{$stockAdjustment->reference_no}' can no longer be updated because stock has moved since it was posted. Create a new adjustment to correct it.");
+                ->with('error', "Stock adjustment '{$stockAdjustment->reference_no}' can no longer be edited because it has already been decided. Create a new adjustment to correct it.");
         }
 
         $original = $stockAdjustment->getOriginal();
@@ -127,19 +165,16 @@ class StockAdjustmentController extends Controller
         $items = $validated['items'];
 
         DB::transaction(function () use ($stockAdjustment, $validated, $items) {
-            // Return stock to its pre-adjustment level before re-posting.
-            StockAdjustmentService::reverse($stockAdjustment);
-
             $stockAdjustment->update([
                 'reference_no' => $validated['reference_no'] ?: $stockAdjustment->reference_no,
                 'adjustment_date' => $validated['adjustment_date'],
+                'location_id' => $validated['location_id'],
                 'type' => $validated['type'],
                 'total_amount' => $this->itemsTotal($items),
                 'reason' => $validated['reason'],
             ]);
 
             StockAdjustmentService::saveItems($stockAdjustment, $items);
-            StockAdjustmentService::apply($stockAdjustment);
         });
 
         AuditService::updated($stockAdjustment, $original, "Stock adjustment '{$stockAdjustment->reference_no}' updated.");
@@ -152,12 +187,15 @@ class StockAdjustmentController extends Controller
     {
         $this->authorize('delete', $stockAdjustment);
 
-        if (! $stockAdjustment->isReversible()) {
+        if ($stockAdjustment->isApproved() && ! $stockAdjustment->isReversible()) {
             return back()->with('error', "Stock adjustment '{$stockAdjustment->reference_no}' can no longer be deleted because stock has moved since it was posted. Create a new adjustment to correct it.");
         }
 
         DB::transaction(function () use ($stockAdjustment) {
-            StockAdjustmentService::reverse($stockAdjustment);
+            if ($stockAdjustment->isApproved()) {
+                StockAdjustmentService::reverse($stockAdjustment);
+            }
+
             $stockAdjustment->delete();
         });
 
@@ -165,6 +203,79 @@ class StockAdjustmentController extends Controller
 
         return redirect()->route('stock-adjustments.index')
             ->with('success', "Stock adjustment '{$stockAdjustment->reference_no}' deleted successfully.");
+    }
+
+    /**
+     * Approve (apply) an adjustment request: stock only moves once the
+     * responsible manager signs off.
+     */
+    public function approve(StockAdjustment $stockAdjustment): RedirectResponse
+    {
+        $this->authorize('approve', $stockAdjustment);
+
+        if (! $stockAdjustment->isPending()) {
+            return back()->with('error', "Stock adjustment '{$stockAdjustment->reference_no}' has already been decided.");
+        }
+
+        $original = $stockAdjustment->getOriginal();
+
+        DB::transaction(function () use ($stockAdjustment) {
+            $stockAdjustment->update([
+                'approval_status' => ApprovalStatus::Approved,
+                'approved_by' => Auth::id(),
+                'approved_at' => now(),
+            ]);
+
+            StockAdjustmentService::apply($stockAdjustment);
+        });
+
+        AuditService::posted($stockAdjustment, "Stock adjustment '{$stockAdjustment->reference_no}' approved and applied.");
+
+        $this->notifyCreator(
+            $stockAdjustment,
+            "Stock adjustment '{$stockAdjustment->reference_no}' approved.",
+            sprintf(
+                'Your adjustment for %s was approved and applied by %s.',
+                $stockAdjustment->location?->name ?? 'Unknown location',
+                Auth::user()?->name ?? 'an authorized manager'
+            ),
+            'success'
+        );
+
+        return redirect()->route('stock-adjustments.index')
+            ->with('success', "Stock adjustment '{$stockAdjustment->reference_no}' approved and applied.");
+    }
+
+    /**
+     * Reject an adjustment request: nothing is posted to stock.
+     */
+    public function reject(StockAdjustment $stockAdjustment): RedirectResponse
+    {
+        $this->authorize('reject', $stockAdjustment);
+
+        if (! $stockAdjustment->isPending()) {
+            return back()->with('error', "Stock adjustment '{$stockAdjustment->reference_no}' has already been decided.");
+        }
+
+        $original = $stockAdjustment->getOriginal();
+
+        $stockAdjustment->update(['approval_status' => ApprovalStatus::Rejected]);
+
+        AuditService::updated($stockAdjustment, $original, "Stock adjustment '{$stockAdjustment->reference_no}' rejected.");
+
+        $this->notifyCreator(
+            $stockAdjustment,
+            "Stock adjustment '{$stockAdjustment->reference_no}' rejected.",
+            sprintf(
+                'Your adjustment for %s was rejected by %s. No stock was changed.',
+                $stockAdjustment->location?->name ?? 'Unknown location',
+                Auth::user()?->name ?? 'an authorized manager'
+            ),
+            'error'
+        );
+
+        return redirect()->route('stock-adjustments.index')
+            ->with('success', "Stock adjustment '{$stockAdjustment->reference_no}' rejected.");
     }
 
     /**
@@ -347,5 +458,45 @@ class StockAdjustmentController extends Controller
             fn (array $item) => (int) $item['quantity'] * (float) $item['unit_price'],
             $items
         )), 2);
+    }
+
+    /**
+     * Locations the current user may book adjustments against.
+     *
+     * @return Collection<int, Location>
+     */
+    private function scopedLocations(): Collection
+    {
+        $query = Location::query()->active()->orderBy('name');
+
+        LocationScope::scopeQuery($query, Auth::user(), 'id');
+
+        return $query->get();
+    }
+
+    /**
+     * Notify the managers of the location/branch the adjustment happened at.
+     */
+    private function notifyManagers(StockAdjustment $stockAdjustment, string $title, string $body, string $type): void
+    {
+        NotificationService::notifyMany(
+            PurchaseApprovalNotifier::managersFor($stockAdjustment->location_id, $stockAdjustment->location?->branch_id),
+            $title,
+            $body,
+            route('stock-adjustments.index'),
+            $type
+        );
+    }
+
+    /**
+     * Notify the creator of an adjustment about a decision taken on it.
+     */
+    private function notifyCreator(StockAdjustment $stockAdjustment, string $title, string $body, string $type): void
+    {
+        if ($stockAdjustment->creator === null) {
+            return;
+        }
+
+        NotificationService::notify($stockAdjustment->creator, $title, $body, route('stock-adjustments.index'), $type);
     }
 }

@@ -46,6 +46,7 @@
             'stockAdjustment' => $stockAdjustment,
             'types' => $types,
             'typeHints' => $typeHints,
+            'locations' => $locations,
             'items' => $items,
         ])
     </form>

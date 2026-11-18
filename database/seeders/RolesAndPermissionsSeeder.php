@@ -39,7 +39,7 @@ class RolesAndPermissionsSeeder extends Seeder
             // Sales
             'sales-orders.manage', 'sales-invoices.manage',
             'sales-invoices.post', 'sales-invoices.view',
-            'sales-returns.manage', 'customer-collections.manage',
+            'sales-returns.manage', 'sales-returns.approve', 'customer-collections.manage',
             // POS
             'pos.access',
             // Finance
@@ -81,7 +81,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'purchase-returns.manage', 'purchase-returns.approve', 'supplier-payments.manage',
             'sales-orders.manage', 'sales-invoices.manage',
             'sales-invoices.post', 'sales-invoices.view',
-            'sales-returns.manage', 'customer-collections.manage',
+            'sales-returns.manage', 'sales-returns.approve', 'customer-collections.manage',
             'pos.access',
             'finance.view',
             'reports.view', 'reports.export',
@@ -126,6 +126,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'purchase-orders.manage', 'purchase-invoices.manage',
             'purchase-invoices.post', 'purchase-invoices.view', 'purchase-invoices.approve',
             'purchase-returns.manage', 'purchase-returns.approve',
+            'sales-orders.manage', 'sales-invoices.view', 'sales-invoices.manage', 'sales-invoices.post',
+            'sales-returns.manage', 'sales-returns.approve', 'customer-collections.manage', 'pos.access',
             'supplier-payments.view',
             'finance.view',
             'reports.view', 'reports.export',

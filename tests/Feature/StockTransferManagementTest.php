@@ -236,3 +236,171 @@ it('denies access without the stock-transfers.manage permission', function () {
 
     $this->actingAs($user)->get(route('stock-transfers.index'))->assertForbidden();
 });
+
+/**
+ * A verified Outlet Manager assigned to the given location.
+ */
+function transferManagerAt(Location $location): User
+{
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'location_id' => $location->id,
+    ]);
+    $user->assignRole('Outlet Manager');
+
+    return $user;
+}
+
+it('lets the receiving manager accept a submitted draft request', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $payload = transferPayload($unit, 'draft', 5);
+
+    $this->post(route('stock-transfers.store'), $payload)->assertRedirect();
+    $transfer = StockTransfer::first();
+
+    expect($unit->fresh()->quantity)->toBe(50);
+
+    $this->patch(route('stock-transfers.approve', $transfer))
+        ->assertRedirect(route('stock-transfers.index'));
+
+    expect($transfer->fresh()->status->value)->toBe('received')
+        ->and($unit->fresh()->quantity)->toBe(50);
+
+    $this->assertDatabaseHas('stock_movements', [
+        'unit_id' => $unit->id,
+        'type' => 'transfer_out',
+        'quantity' => -5,
+    ]);
+
+    $this->assertDatabaseHas('stock_movements', [
+        'unit_id' => $unit->id,
+        'type' => 'transfer_in',
+        'quantity' => 5,
+    ]);
+});
+
+it('marks a rejected transfer as rejected and returns dispatched stock', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $payload = transferPayload($unit, 'draft', 5);
+
+    $this->post(route('stock-transfers.store'), $payload)->assertRedirect();
+    $draft = StockTransfer::first();
+
+    $this->patch(route('stock-transfers.reject', $draft))->assertRedirect();
+
+    expect($draft->fresh()->status->value)->toBe('rejected')
+        ->and($unit->fresh()->quantity)->toBe(50);
+
+    $this->post(route('stock-transfers.store'), $payload)->assertRedirect();
+    $dispatched = StockTransfer::latest('id')->first();
+
+    $this->patch(route('stock-transfers.update', $dispatched), array_merge($payload, ['status' => 'in-transit']))->assertRedirect();
+    expect($unit->fresh()->quantity)->toBe(45);
+
+    $this->patch(route('stock-transfers.reject', $dispatched))->assertRedirect();
+
+    expect($dispatched->fresh()->status->value)->toBe('rejected')
+        ->and($unit->fresh()->quantity)->toBe(50);
+});
+
+it('lets the sending manager cancel a pending transfer', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $payload = transferPayload($unit, 'draft', 5);
+
+    $this->post(route('stock-transfers.store'), $payload)->assertRedirect();
+    $transfer = StockTransfer::first();
+
+    $this->patch(route('stock-transfers.cancel', $transfer))
+        ->assertRedirect(route('stock-transfers.index'));
+
+    expect($transfer->fresh()->status->value)->toBe('cancelled')
+        ->and($unit->fresh()->quantity)->toBe(50);
+});
+
+it('notifies the receiving managers on creation and the creator on decisions', function () {
+    $admin = actingAsSuperAdmin();
+
+    $to = Location::factory()->create();
+    $receiver = transferManagerAt($to);
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $payload = transferPayload($unit, 'draft', 5);
+    $payload['to_location_id'] = $to->id;
+
+    $this->post(route('stock-transfers.store'), $payload)->assertRedirect();
+    $transfer = StockTransfer::first();
+
+    $notifications = $receiver->fresh()->notifications();
+
+    expect($notifications->count())->toBe(1)
+        ->and($notifications->first()->data['type'])->toBe('warning');
+
+    $this->patch(route('stock-transfers.approve', $transfer))->assertRedirect();
+
+    expect($admin->fresh()->notifications()->first()->data['type'])->toBe('success');
+
+    $this->post(route('stock-transfers.store'), $payload)->assertRedirect();
+    $second = StockTransfer::latest('id')->first();
+
+    $this->patch(route('stock-transfers.reject', $second))->assertRedirect();
+
+    expect(collect($admin->fresh()->notifications)->pluck('data.type')->all())
+        ->toContain('error');
+
+    $this->post(route('stock-transfers.store'), $payload)->assertRedirect();
+    $third = StockTransfer::latest('id')->first();
+
+    $this->patch(route('stock-transfers.cancel', $third))->assertRedirect();
+
+    $receiverTypes = collect($receiver->fresh()->notifications)->pluck('data.type')->all();
+    $creatorTypes = collect($admin->fresh()->notifications)->pluck('data.type')->all();
+
+    expect($receiverTypes)->toContain('warning')
+        ->and($receiverTypes)->toContain('info')
+        ->and($creatorTypes)->toContain('success')
+        ->and($creatorTypes)->toContain('error');
+});
+
+it('rejects creating a transfer with a decided status', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $payload = transferPayload($unit, 'draft', 5);
+
+    $this->post(route('stock-transfers.store'), array_merge($payload, ['status' => 'received']))
+        ->assertSessionHasErrors('status');
+
+    $this->post(route('stock-transfers.store'), array_merge($payload, ['status' => 'rejected']))
+        ->assertSessionHasErrors('status');
+
+    $this->assertDatabaseCount('stock_transfers', 0);
+});
+
+it('blocks an outlet manager from dispatching stock of another location', function () {
+    $mine = Location::factory()->create();
+    $other = Location::factory()->create();
+    $to = Location::factory()->create();
+    $unit = Unit::factory()->create(['quantity' => 50]);
+
+    $manager = transferManagerAt($mine);
+
+    $this->actingAs($manager)
+        ->post(route('stock-transfers.store'), [
+            'transfer_date' => now()->format('Y-m-d\TH:i'),
+            'reference_no' => null,
+            'status' => 'draft',
+            'from_location_id' => $other->id,
+            'to_location_id' => $to->id,
+            'shipping_charges' => 0,
+            'additional_notes' => null,
+            'items' => [['unit_id' => $unit->id, 'quantity' => 5, 'unit_price' => 200.0]],
+        ])
+        ->assertSessionHasErrors('from_location_id');
+
+    $this->assertDatabaseCount('stock_transfers', 0);
+});

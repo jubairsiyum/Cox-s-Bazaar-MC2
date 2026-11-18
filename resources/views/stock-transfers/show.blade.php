@@ -8,8 +8,10 @@
     $transferStatus = $transfer->displayStatusFor(auth()->user());
     $itemsSubtotal = $transfer->items->sum('subtotal');
     $totalUnits = $transfer->items->sum('quantity');
-    $canApprove = auth()->user()?->can('approve', $transfer) && $transfer->status === \App\Enums\StockTransferStatus::InTransit;
-    $canReject = auth()->user()?->can('reject', $transfer) && in_array($transfer->status, [\App\Enums\StockTransferStatus::Draft, \App\Enums\StockTransferStatus::InTransit], true);
+    $canDecide = in_array($transfer->status, [\App\Enums\StockTransferStatus::Draft, \App\Enums\StockTransferStatus::InTransit], true);
+    $canApprove = auth()->user()?->can('approve', $transfer) && $canDecide;
+    $canReject = auth()->user()?->can('reject', $transfer) && $canDecide;
+    $canCancel = auth()->user()?->can('cancel', $transfer) && $canDecide;
 @endphp
 
 <style>
@@ -56,7 +58,7 @@
                         @click="confirmModal = { open: true, kind: 'approve' }"
                         class="btn-scale inline-flex items-center gap-1.5 rounded-2xl bg-success px-4 py-2.5 text-xs sm:text-sm font-semibold text-on-brand shadow-sm hover:opacity-95 transition-opacity cursor-pointer">
                     <x-icon name="check" class="size-4" />
-                    <span>Approve / Receive</span>
+                    <span>Accept / Receive</span>
                 </button>
             @endif
 
@@ -66,6 +68,15 @@
                         class="btn-scale inline-flex items-center gap-1.5 rounded-2xl border border-danger/30 bg-danger/10 px-4 py-2.5 text-xs sm:text-sm font-semibold text-danger hover:bg-danger hover:text-on-brand transition-colors cursor-pointer">
                     <x-svg.x class="size-4" />
                     <span>Reject</span>
+                </button>
+            @endif
+
+            @if($canCancel)
+                <button type="button"
+                        @click="confirmModal = { open: true, kind: 'cancel' }"
+                        class="btn-scale inline-flex items-center gap-1.5 rounded-2xl border border-line bg-surface px-4 py-2.5 text-xs sm:text-sm font-semibold text-muted hover:text-ink hover:bg-soft transition-colors cursor-pointer">
+                    <x-svg.x class="size-4" />
+                    <span>Cancel Transfer</span>
                 </button>
             @endif
 
@@ -273,14 +284,14 @@
         </div>
     </div>
 
-    {{-- Approve / Reject Confirmation Modal --}}
+    {{-- Accept / Reject / Cancel Confirmation Modal --}}
     <div x-show="confirmModal.open" x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay backdrop-blur-xs no-print"
          @keydown.escape.window="confirmModal.open = false">
         <div class="w-full max-w-md rounded-3xl border border-line bg-surface shadow-card p-6" @click.stop>
             <div class="flex items-start gap-3.5">
                 <div class="flex size-11 shrink-0 items-center justify-center rounded-2xl ring-1"
-                     :class="confirmModal.kind === 'approve' ? 'bg-success/10 text-success ring-success/20' : 'bg-danger/10 text-danger ring-danger/20'">
+                     :class="confirmModal.kind === 'approve' ? 'bg-success/10 text-success ring-success/20' : (confirmModal.kind === 'cancel' ? 'bg-soft text-muted ring-line' : 'bg-danger/10 text-danger ring-danger/20')">
                     <template x-if="confirmModal.kind === 'approve'">
                         <x-icon name="check" class="size-5" />
                     </template>
@@ -290,13 +301,16 @@
                 </div>
                 <div class="min-w-0 flex-1">
                     <h3 class="text-base font-bold text-ink"
-                        x-text="confirmModal.kind === 'approve' ? 'Approve and receive transfer?' : 'Reject this transfer?'"></h3>
+                        x-text="confirmModal.kind === 'approve' ? 'Accept and receive transfer?' : (confirmModal.kind === 'cancel' ? 'Cancel this transfer?' : 'Reject this transfer?')"></h3>
                     <p class="mt-1.5 text-xs text-muted leading-relaxed">
                         <template x-if="confirmModal.kind === 'approve'">
                             <span>Receiving <strong class="text-ink">{{ $transfer->reference_no }}</strong> posts {{ number_format($totalUnits) }} {{ Str::plural('unit', $totalUnits) }} to <strong class="text-ink">{{ $transfer->toLocation?->name }}</strong> and marks it Delivered for the sender.</span>
                         </template>
-                        <template x-if="confirmModal.kind !== 'approve'">
-                            <span>Rejecting <strong class="text-ink">{{ $transfer->reference_no }}</strong> cancels the transfer and returns any dispatched stock to <strong class="text-ink">{{ $transfer->fromLocation?->name }}</strong>.</span>
+                        <template x-if="confirmModal.kind === 'reject'">
+                            <span>Rejecting <strong class="text-ink">{{ $transfer->reference_no }}</strong> marks it Rejected and returns any dispatched stock to <strong class="text-ink">{{ $transfer->fromLocation?->name }}</strong>.</span>
+                        </template>
+                        <template x-if="confirmModal.kind === 'cancel'">
+                            <span>Cancelling <strong class="text-ink">{{ $transfer->reference_no }}</strong> notifies the receiving side and returns any dispatched stock to <strong class="text-ink">{{ $transfer->fromLocation?->name }}</strong>.</span>
                         </template>
                     </p>
                 </div>
@@ -305,7 +319,7 @@
             <div class="mt-6 flex items-center justify-end gap-2.5 pt-4 border-t border-line">
                 <button type="button" @click="confirmModal.open = false"
                         class="btn-scale rounded-xl border border-line bg-surface px-4 py-2 text-xs font-semibold text-ink hover:bg-soft transition-colors cursor-pointer">
-                    Cancel
+                    Close
                 </button>
                 @if($canApprove)
                     <form x-show="confirmModal.kind === 'approve'" method="POST" action="{{ route('stock-transfers.approve', $transfer) }}">
@@ -314,7 +328,7 @@
                         <button type="submit"
                                 class="btn-scale inline-flex items-center gap-1.5 rounded-xl bg-success px-4 py-2 text-xs font-semibold text-on-brand shadow-sm hover:opacity-95 transition-opacity cursor-pointer">
                             <x-icon name="check" class="size-3.5" />
-                            <span>Approve / Receive</span>
+                            <span>Accept / Receive</span>
                         </button>
                     </form>
                 @endif
@@ -326,6 +340,17 @@
                                 class="btn-scale inline-flex items-center gap-1.5 rounded-xl bg-danger px-4 py-2 text-xs font-semibold text-on-brand shadow-sm hover:opacity-95 transition-opacity cursor-pointer">
                             <x-svg.x class="size-3.5" />
                             <span>Confirm Rejection</span>
+                        </button>
+                    </form>
+                @endif
+                @if($canCancel)
+                    <form x-show="confirmModal.kind === 'cancel'" method="POST" action="{{ route('stock-transfers.cancel', $transfer) }}">
+                        @csrf
+                        @method('PATCH')
+                        <button type="submit"
+                                class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-line bg-soft px-4 py-2 text-xs font-semibold text-ink hover:bg-soft transition-colors cursor-pointer">
+                            <x-svg.x class="size-3.5" />
+                            <span>Confirm Cancellation</span>
                         </button>
                     </form>
                 @endif
