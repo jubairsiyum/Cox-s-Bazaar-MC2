@@ -66,7 +66,7 @@
       <p class="text-xs text-muted">Latest wholesale orders dispatched to retailers</p>
     </div>
     <div class="flex items-center gap-3">
-      <a href="{{ url('/sales') }}" 
+      <a href="{{ route('collections.index') }}" 
          class="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3.5 py-1.5 text-xs font-semibold text-ink transition-[transform,background-color] duration-200 hover:bg-soft hover:text-brand-500 active:scale-[0.97] shadow-2xs">
         <span>All Invoices</span>
         <x-icon name="arrow-up-right" class="size-3.5" />

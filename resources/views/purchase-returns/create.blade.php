@@ -35,7 +35,7 @@
                 @endif
             </div>
             <p class="text-xs sm:text-sm text-muted mt-1">
-                Select a distributor and original invoice to specify returned quantities and submit for manager approval.
+                Select a distributor and original invoice to specify returned quantities and submit — the return is applied immediately.
             </p>
         </div>
 

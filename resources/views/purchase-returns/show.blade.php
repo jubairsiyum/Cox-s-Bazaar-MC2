@@ -51,7 +51,7 @@
         {{-- Action Bar --}}
         <div class="flex items-center gap-2 flex-wrap shrink-0 no-print">
             @can('approve', $purchaseReturn)
-                @if($purchaseReturn->approval_status !== \App\Enums\ApprovalStatus::Approved)
+                @if($purchaseReturn->approval_status === \App\Enums\ApprovalStatus::Pending)
                     <button type="button" @click="confirmModal = 'approve'"
                             class="btn-scale inline-flex items-center gap-1.5 rounded-2xl bg-success hover:bg-success/90 px-4 py-2.5 text-xs sm:text-sm font-semibold text-on-brand shadow-sm transition-colors cursor-pointer">
                         <x-icon name="check" class="size-4" />
@@ -344,7 +344,7 @@
 
     {{-- Approve Modal --}}
     @can('approve', $purchaseReturn)
-        @if($purchaseReturn->approval_status !== \App\Enums\ApprovalStatus::Approved)
+        @if($purchaseReturn->approval_status === \App\Enums\ApprovalStatus::Pending)
             <div x-show="confirmModal === 'approve'" x-cloak
                  class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-overlay backdrop-blur-xs no-print"
                  @keydown.escape.window="confirmModal = null">

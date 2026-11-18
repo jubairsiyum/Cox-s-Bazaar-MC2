@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\SalesInvoiceStatus;
 use App\Enums\SalesOrderStatus;
+use App\Exceptions\InsufficientStockException;
 use App\Http\Requests\SalesOrder\StoreSalesOrderRequest;
 use App\Http\Requests\SalesOrder\UpdateSalesOrderRequest;
 use App\Models\Branch;
 use App\Models\Customer;
 use App\Models\Location;
+use App\Models\Product;
 use App\Models\SalesOrder;
 use App\Models\Unit;
 use App\Services\AuditService;
+use App\Services\SalesInvoiceService;
 use App\Services\SalesScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -83,6 +87,10 @@ class SalesOrderController extends Controller
 
     /**
      * Store a newly created sales order.
+     *
+     * Saving the order completes the sale: its sales invoice is generated and
+     * posted immediately (stock-out), the same way a POS quick sale works —
+     * there is no manual "Create Invoice" step and no approval hold.
      */
     public function store(StoreSalesOrderRequest $request): RedirectResponse
     {
@@ -92,29 +100,37 @@ class SalesOrderController extends Controller
             return back()->withInput()->with('error', 'You can only create orders for your own branch/location.');
         }
 
-        $order = DB::transaction(function () use ($request, $validated) {
-            $order = SalesOrder::create([
-                'order_date' => $validated['order_date'],
-                'expected_date' => $validated['expected_date'] ?? null,
-                'customer_id' => $validated['customer_id'],
-                'location_id' => $validated['location_id'],
-                'branch_id' => $request->user()?->branch_id,
-                'status' => SalesOrderStatus::Draft,
-                'tax_rate' => (float) ($validated['tax_rate'] ?? 0),
-                'note' => $validated['note'] ?? null,
-                'created_by' => $request->user()?->id,
-            ]);
+        try {
+            [$order, $invoice] = DB::transaction(function () use ($request, $validated) {
+                $order = SalesOrder::create([
+                    'order_date' => $validated['order_date'],
+                    'expected_date' => $validated['expected_date'] ?? null,
+                    'customer_id' => $validated['customer_id'],
+                    'location_id' => $validated['location_id'],
+                    'branch_id' => $request->user()?->branch_id,
+                    'status' => SalesOrderStatus::Draft,
+                    'tax_rate' => (float) ($validated['tax_rate'] ?? 0),
+                    'note' => $validated['note'] ?? null,
+                    'created_by' => $request->user()?->id,
+                ]);
 
-            $this->saveItems($order, $validated['items']);
-            $this->recalculate($order, (float) ($validated['tax_rate'] ?? 0));
+                $this->saveItems($order, $validated['items']);
+                $this->recalculate($order, (float) ($validated['tax_rate'] ?? 0));
 
-            return $order;
-        });
+                $invoice = SalesInvoiceService::generateFromOrder($order, $request->user()?->id);
+
+                return [$order, $invoice];
+            });
+        } catch (InsufficientStockException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
 
         AuditService::created($order, "Sales order '{$order->order_no}' created.");
+        AuditService::created($invoice, "Sales invoice '{$invoice->invoice_no}' generated from sales order '{$order->order_no}'.");
+        AuditService::posted($invoice, "Sales invoice '{$invoice->invoice_no}' posted. Stock issued.");
 
         return redirect()->route('sales-orders.show', $order)
-            ->with('success', "Sales order '{$order->order_no}' created successfully.");
+            ->with('success', "Sales order '{$order->order_no}' created — invoice '{$invoice->invoice_no}' generated and posted.");
     }
 
     /**
@@ -215,7 +231,9 @@ class SalesOrderController extends Controller
     }
 
     /**
-     * Confirm a draft order: it becomes ready for invoicing.
+     * Confirm a legacy draft order: it becomes ready for invoicing. New orders
+     * are invoiced the moment they are saved, so this only applies to old
+     * draft orders kept for the manual conversion path.
      */
     public function confirm(SalesOrder $salesOrder): RedirectResponse
     {
@@ -236,46 +254,50 @@ class SalesOrderController extends Controller
     }
 
     /**
-     * Cancel an order that has no invoice yet.
+     * Cancel an order: its generated invoice is voided and the stock comes
+     * back. A cancelled sale leaves nothing behind — no open invoice, no
+     * issued stock.
      */
     public function cancel(SalesOrder $salesOrder): RedirectResponse
     {
         $this->authorize('update', $salesOrder);
 
-        if (! $salesOrder->status->isEditable()) {
-            return back()->with('error', "Sales order '{$salesOrder->order_no}' can no longer be cancelled.");
+        if ($salesOrder->status === SalesOrderStatus::Cancelled) {
+            return back()->with('error', "Sales order '{$salesOrder->order_no}' is already cancelled.");
         }
 
         $original = $salesOrder->getOriginal();
 
-        $salesOrder->update(['status' => SalesOrderStatus::Cancelled]);
+        DB::transaction(function () use ($salesOrder) {
+            $salesOrder->update(['status' => SalesOrderStatus::Cancelled]);
+
+            // Posted invoices bring the stock back on void; draft ones never
+            // touched it and are simply settled.
+            foreach ($salesOrder->invoices as $invoice) {
+                if ($invoice->status !== SalesInvoiceStatus::Voided) {
+                    SalesInvoiceService::void($invoice, "Sales order {$salesOrder->order_no} cancelled.");
+                }
+            }
+        });
 
         AuditService::updated($salesOrder, $original, "Sales order '{$salesOrder->order_no}' cancelled.");
 
         return redirect()->route('sales-orders.show', $salesOrder)
-            ->with('success', "Sales order '{$salesOrder->order_no}' cancelled.");
+            ->with('success', "Sales order '{$salesOrder->order_no}' cancelled. Its invoice was voided and stock restored.");
     }
 
     /**
-     * Product search for the order item picker (same shape as the invoice one).
+     * Product search for the order item picker: matches product name,
+     * product code, model and barcode (same search as the purchase form).
      */
     public function searchUnits(Request $request): JsonResponse
     {
         $this->authorize('viewAny', SalesOrder::class);
 
-        $term = $request->string('search')->toString();
-
         $units = Unit::query()
-            ->with('product:id,name,barcode,sale_price')
-            ->when($term !== '', function (Builder $query) use ($term) {
-                $query->where(function (Builder $q) use ($term) {
-                    $q->where('product_name', 'like', "%{$term}%")
-                        ->orWhere('units.note', 'like', "%{$term}%")
-                        ->orWhereHas('product', fn (Builder $p) => $p->where('name', 'like', "%{$term}%")
-                            ->orWhere('barcode', 'like', "%{$term}%"));
-                });
-            })
-            ->orderBy('product_name')
+            ->with('product')
+            ->search($request->string('search')->toString())
+            ->orderBy(Product::query()->select('name')->whereColumn('products.id', 'units.product_id'))
             ->limit(20)
             ->get();
 

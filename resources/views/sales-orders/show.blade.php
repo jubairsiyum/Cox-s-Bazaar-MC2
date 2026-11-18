@@ -58,6 +58,10 @@
                         <x-icon name="settings" class="size-4" />
                         <span>Edit</span>
                     </a>
+                    <x-confirm-delete :action="route('sales-orders.destroy', $order)" label="Delete" confirm-text="Delete Order" />
+                @endif
+
+                @if($order->status !== \App\Enums\SalesOrderStatus::Cancelled)
                     <form method="POST" action="{{ route('sales-orders.cancel', $order) }}" class="inline">
                         @csrf
                         @method('PATCH')
@@ -66,19 +70,8 @@
                             <span>Cancel</span>
                         </button>
                     </form>
-                    <x-confirm-delete :action="route('sales-orders.destroy', $order)" label="Delete" confirm-text="Delete Order" />
                 @endif
             @endcan
-
-            @if($order->status !== \App\Enums\SalesOrderStatus::Invoiced && $order->status !== \App\Enums\SalesOrderStatus::Cancelled)
-                @can('create', \App\Models\SalesInvoice::class)
-                    <a href="{{ route('sales-invoices.create', ['sales_order' => $order->id]) }}"
-                       class="btn-scale inline-flex items-center gap-2 rounded-2xl bg-success hover:bg-success/90 px-5 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-sm transition-colors">
-                        <x-icon name="enquiries" class="size-4" />
-                        <span>Create Invoice</span>
-                    </a>
-                @endcan
-            @endif
         </div>
     </div>
 
@@ -169,7 +162,7 @@
 
             @if($order->invoices->isNotEmpty())
                 <div class="rounded-3xl border border-line bg-surface p-5 sm:p-6 shadow-card">
-                    <h2 class="text-base font-bold text-ink pb-4 mb-4 border-b border-line">Converted Invoices</h2>
+                    <h2 class="text-base font-bold text-ink pb-4 mb-4 border-b border-line">Generated Invoice</h2>
                     <ul class="space-y-2">
                         @foreach($order->invoices as $invoice)
                             <li class="flex items-center justify-between gap-2">

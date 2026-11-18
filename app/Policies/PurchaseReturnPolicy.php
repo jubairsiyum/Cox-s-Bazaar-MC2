@@ -37,7 +37,8 @@ class PurchaseReturnPolicy
     }
 
     /**
-     * Approve a return: the responsible manager of its location.
+     * Complete a legacy return awaiting sign-off: the responsible manager of
+     * its location. New returns take effect on submission.
      */
     public function approve(User $user, PurchaseReturn $purchaseReturn): bool
     {

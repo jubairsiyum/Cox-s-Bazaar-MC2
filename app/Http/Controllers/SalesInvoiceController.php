@@ -73,6 +73,28 @@ class SalesInvoiceController extends Controller
     }
 
     /**
+     * Collections — every distributor invoice in one list: generated from a
+     * sales order or rung up on the POS alike, scoped to the user's own
+     * branch/location like the rest of the sales section.
+     */
+    public function distributorIndex(Request $request): View
+    {
+        $this->authorize('viewAny', SalesInvoice::class);
+
+        $invoices = $this->distributorQuery($request)
+            ->orderBy('invoice_date', 'desc')
+            ->paginate(25)
+            ->withQueryString();
+
+        return view('collections.index', [
+            'invoices' => $invoices,
+            'branches' => Branch::query()->orderBy('name')->get(['id', 'name']),
+            'statusOptions' => SalesInvoiceStatus::options(),
+            'canFilterBranch' => ! SalesScope::isRestricted($request->user()),
+        ]);
+    }
+
+    /**
      * Show the invoice creation form, optionally prefilled from a sales order.
      */
     public function create(Request $request): View
@@ -355,12 +377,15 @@ class SalesInvoiceController extends Controller
 
     /**
      * Base query for the register with all filters applied.
-     * Outlet Managers only see invoices of their branch/location.
+     * The register only lists order-generated invoices — POS/direct sales
+     * are shown on the Collections page. Outlet Managers only see invoices
+     * of their branch/location.
      */
     private function filteredQuery(Request $request): Builder
     {
         $query = SalesInvoice::query()
             ->with(['customer', 'location', 'branch'])
+            ->whereNotNull('sales_order_id')
             ->when($request->filled('search'), fn ($q) => $q->search($request->string('search')->toString()))
             ->when($request->filled('customer_id'), fn ($q) => $q->where('customer_id', (int) $request->input('customer_id')))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')->toString()))
@@ -373,6 +398,35 @@ class SalesInvoiceController extends Controller
         return $query
             ->when($request->filled('location_id'), fn ($q) => $q->where('location_id', (int) $request->input('location_id')))
             ->when($request->filled('branch_id'), fn ($q) => $q->where('branch_id', (int) $request->input('branch_id')));
+    }
+
+    /**
+     * Base query for the Collections list: all distributor invoices —
+     * order-generated and POS/direct alike — with the simple page filters
+     * applied and the usual branch/location scoping for restricted users.
+     */
+    private function distributorQuery(Request $request): Builder
+    {
+        $query = SalesInvoice::query()
+            ->with(['customer' => fn ($q) => $q->withTrashed(), 'location', 'items.unit.product'])
+            ->when($request->filled('search'), fn ($q) => $q->search($request->string('search')->toString()))
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')->toString()))
+            ->when($request->filled('payment_status'), fn ($q) => $q->where('payment_status', $request->string('payment_status')->toString()));
+
+        return SalesScope::scopeQuery($query, $request->user())
+            ->when($request->filled('branch_id'), function (Builder $q) use ($request): void {
+                // POS/walk-in invoices carry no branch of their own: their
+                // location's branch counts as the branch for filtering.
+                $branchId = (int) $request->input('branch_id');
+
+                $q->where(function (Builder $inner) use ($branchId): void {
+                    $inner->where('branch_id', $branchId)
+                        ->orWhereIn(
+                            'location_id',
+                            Location::query()->where('branch_id', $branchId)->pluck('id')
+                        );
+                });
+            });
     }
 
     /**

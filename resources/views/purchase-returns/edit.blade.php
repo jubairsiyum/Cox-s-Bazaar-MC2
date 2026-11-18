@@ -29,7 +29,7 @@
                 <x-status-badge :status="$purchaseReturn->approval_status->value" :label="$purchaseReturn->approval_status->label()" />
             </div>
             <p class="text-xs sm:text-sm text-muted mt-1">
-                Modify return quantities, reason, or attached documentation for this supplier return request.
+                Modify return quantities, reason, or attached documentation — stock and supplier credits adjust automatically.
             </p>
         </div>
 

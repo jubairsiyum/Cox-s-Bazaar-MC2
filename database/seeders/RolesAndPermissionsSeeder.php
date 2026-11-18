@@ -111,6 +111,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'products.view', 'brands.view', 'categories.view', 'units.view', 'customers.view', 'inventory.view',
             'sales-orders.manage', 'sales-invoices.manage',
             'sales-invoices.post', 'sales-invoices.view',
+            'sales-returns.manage',
             'customer-collections.manage',
             'pos.access',
             'reports.view',

@@ -17,7 +17,6 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Services\AuditService;
 use App\Services\LocationScope;
-use App\Services\PurchaseApprovalNotifier;
 use App\Services\PurchaseReturnService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -93,6 +92,10 @@ class PurchaseReturnController extends Controller
 
     /**
      * Store a newly created purchase return in storage.
+     *
+     * Submission is effective: the return is signed off by its creator (the
+     * responsible manager) and stock and the supplier return due move in the
+     * same transaction. There is no separate approval step.
      */
     public function store(StorePurchaseReturnRequest $request): RedirectResponse
     {
@@ -109,7 +112,9 @@ class PurchaseReturnController extends Controller
                     'supplier_id' => $validated['supplier_id'],
                     'location_id' => $order->location_id,
                     'reason' => $validated['reason'],
-                    'approval_status' => ApprovalStatus::Pending,
+                    'approval_status' => ApprovalStatus::Approved,
+                    'approved_by' => $request->user()->id,
+                    'approved_at' => now(),
                     'subtotal' => 0,
                     'tax_rate' => 0,
                     'tax_amount' => 0,
@@ -122,7 +127,11 @@ class PurchaseReturnController extends Controller
                 $this->saveItems($return, $order, $items);
                 $this->recalculate($return);
 
-                // Stock and supplier dues only move once the return is approved.
+                // The return takes effect on submission: stock leaves and the
+                // supplier return due registers immediately.
+                PurchaseReturnService::syncStock($return, []);
+                PurchaseReturnService::applySupplierDue($return);
+
                 return $return;
             });
         } catch (InsufficientStockException $e) {
@@ -130,10 +139,9 @@ class PurchaseReturnController extends Controller
         }
 
         AuditService::created($return, "Purchase return '{$return->reference_no}' created.");
-        PurchaseApprovalNotifier::awaitingApproval($return);
 
         return redirect()->route('purchase-returns.index')
-            ->with('success', "Purchase return '{$return->reference_no}' submitted for approval.");
+            ->with('success', "Purchase return '{$return->reference_no}' applied. Stock and supplier return due updated.");
     }
 
     /**
@@ -178,13 +186,17 @@ class PurchaseReturnController extends Controller
 
     /**
      * Update the specified purchase return in storage.
+     *
+     * Applied returns (every return created under the current lifecycle) move
+     * stock and the supplier return due in step with the edited quantities.
+     * Legacy returns still awaiting sign-off are completed through the legacy
+     * approve / reject actions.
      */
     public function update(UpdatePurchaseReturnRequest $request, PurchaseReturn $purchaseReturn): RedirectResponse
     {
         $original = $purchaseReturn->getOriginal();
         $originalQuantities = $purchaseReturn->items->pluck('quantity', 'unit_id')->all();
         $wasApproved = $purchaseReturn->approval_status === ApprovalStatus::Approved;
-        $wasRejected = $purchaseReturn->approval_status === ApprovalStatus::Rejected;
         $validated = $request->validated();
         $order = PurchaseOrder::query()->with('items')->findOrFail($validated['purchase_order_id']);
         $items = $this->returnableItems($validated['items']);
@@ -201,16 +213,12 @@ class PurchaseReturnController extends Controller
                     'supplier_id' => $validated['supplier_id'],
                     'location_id' => $order->location_id,
                     'reason' => $validated['reason'],
-                    // Editing a rejected return puts it back in the approval queue.
-                    'approval_status' => $purchaseReturn->approval_status === ApprovalStatus::Rejected
-                        ? ApprovalStatus::Pending
-                        : $purchaseReturn->approval_status,
                     'document' => $this->storeDocument($request) ?? $purchaseReturn->document,
                 ]);
 
                 $this->recalculate($purchaseReturn);
 
-                // Stock and supplier dues only move for approved returns.
+                // Stock and supplier dues only move for applied returns.
                 if ($wasApproved) {
                     PurchaseReturnService::syncStock($purchaseReturn, $originalQuantities);
                     PurchaseReturnService::applySupplierDue($purchaseReturn, $original);
@@ -223,11 +231,6 @@ class PurchaseReturnController extends Controller
         $this->deleteReplacedDocument($request, $original);
 
         AuditService::updated($purchaseReturn, $original, "Purchase return '{$purchaseReturn->reference_no}' updated.");
-
-        // A resubmitted return is back in the approval queue.
-        if ($wasRejected && $purchaseReturn->approval_status === ApprovalStatus::Pending) {
-            PurchaseApprovalNotifier::awaitingApproval($purchaseReturn);
-        }
 
         return redirect()->route('purchase-returns.index')
             ->with('success', "Purchase return '{$purchaseReturn->reference_no}' updated successfully.");
@@ -266,15 +269,19 @@ class PurchaseReturnController extends Controller
     }
 
     /**
-     * Approve a return: the responsible manager signs off and the return
-     * takes effect — stock leaves and the supplier return due registers.
+     * Legacy cleanup: apply a return created before returns became effective
+     * at submission.
+     *
+     * New returns are recorded as approved on creation and never pass through
+     * here. Only legacy rows still sitting on "pending" carry an approval
+     * step, and completing one moves stock and the supplier return due.
      */
     public function approve(PurchaseReturn $purchaseReturn): RedirectResponse
     {
         $this->authorize('approve', $purchaseReturn);
 
-        if ($purchaseReturn->approval_status === ApprovalStatus::Approved) {
-            return back()->with('error', "Purchase return '{$purchaseReturn->reference_no}' is already approved.");
+        if ($purchaseReturn->approval_status !== ApprovalStatus::Pending) {
+            return back()->with('error', "Purchase return '{$purchaseReturn->reference_no}' does not await sign-off.");
         }
 
         $original = $purchaseReturn->getOriginal();
@@ -295,21 +302,21 @@ class PurchaseReturnController extends Controller
         }
 
         AuditService::updated($purchaseReturn, $original, "Purchase return '{$purchaseReturn->reference_no}' approved.");
-        PurchaseApprovalNotifier::decided($purchaseReturn, true);
 
         return redirect()->route('purchase-returns.index')
             ->with('success', "Purchase return '{$purchaseReturn->reference_no}' approved. Stock and supplier return due updated.");
     }
 
     /**
-     * Reject a return: it never takes effect.
+     * Legacy cleanup: reject a return created before returns became effective
+     * at submission. It never takes effect.
      */
     public function reject(PurchaseReturn $purchaseReturn): RedirectResponse
     {
         $this->authorize('reject', $purchaseReturn);
 
-        if ($purchaseReturn->approval_status === ApprovalStatus::Approved) {
-            return back()->with('error', "Purchase return '{$purchaseReturn->reference_no}' is already approved. Delete it instead.");
+        if ($purchaseReturn->approval_status !== ApprovalStatus::Pending) {
+            return back()->with('error', "Purchase return '{$purchaseReturn->reference_no}' does not await sign-off.");
         }
 
         $original = $purchaseReturn->getOriginal();
@@ -325,7 +332,6 @@ class PurchaseReturnController extends Controller
         });
 
         AuditService::updated($purchaseReturn, $original, "Purchase return '{$purchaseReturn->reference_no}' rejected.");
-        PurchaseApprovalNotifier::decided($purchaseReturn, false);
 
         return redirect()->route('purchase-returns.index')
             ->with('success', "Purchase return '{$purchaseReturn->reference_no}' rejected.");

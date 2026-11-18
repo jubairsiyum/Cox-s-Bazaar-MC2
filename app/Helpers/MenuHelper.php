@@ -78,6 +78,7 @@ class MenuHelper
                 'subItems' => [
                     ['name' => 'Purchase Orders', 'path' => '/purchase-orders', 'can' => 'purchase-orders.manage'],
                     ['name' => 'Purchase Invoices', 'path' => '/purchase-invoices', 'canany' => ['purchase-invoices.view', 'purchase-invoices.manage', 'purchase-invoices.post']],
+                    ['name' => 'Purchase Dues', 'path' => '/purchase-dues', 'canany' => ['purchase-invoices.view', 'purchase-invoices.manage', 'supplier-payments.view', 'supplier-payments.manage']],
                     ['name' => 'Purchase Returns', 'path' => '/purchase-returns', 'can' => 'purchase-returns.manage'],
                 ],
             ],
@@ -89,7 +90,7 @@ class MenuHelper
                     ['name' => 'Sales Orders', 'path' => '/sales-orders', 'can' => 'sales-orders.manage'],
                     ['name' => 'Sales Invoices', 'path' => '/sales-invoices', 'canany' => ['sales-invoices.view', 'sales-invoices.manage', 'sales-invoices.post']],
                     ['name' => 'Sales Returns', 'path' => '/sales-returns', 'can' => 'sales-returns.manage'],
-                    ['name' => 'Collections', 'path' => '/customer-collections', 'can' => 'customer-collections.manage'],
+                    ['name' => 'Collections', 'path' => '/collections', 'canany' => ['sales-invoices.view', 'sales-invoices.manage', 'customer-collections.manage']],
                 ],
             ],
             [

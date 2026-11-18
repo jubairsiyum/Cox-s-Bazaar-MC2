@@ -19,6 +19,10 @@ use Illuminate\Support\Facades\DB;
  * Posting issues the stock-out for every line through StockService; voiding
  * brings the stock back and settles the invoice. Draft invoices are pure
  * documents and never touch stock.
+ *
+ * Completed sales orders are invoiced through {@see generateFromOrder()},
+ * which issues and posts the invoice immediately — a sale always moves stock
+ * and produces its invoice, exactly like a POS quick sale.
  */
 class SalesInvoiceService
 {
@@ -43,6 +47,47 @@ class SalesInvoiceService
             'tax_amount' => $taxAmount,
             'grand_total' => round($subtotal + $taxAmount, 2),
         ]);
+    }
+
+    /**
+     * Generate the invoice for a completed sales order and post it on the
+     * spot: the invoice is copied from the order's line items and the
+     * stock-out takes effect immediately, like a POS quick sale. Call inside
+     * the order's transaction so an {@see InsufficientStockException} rolls
+     * the whole sale back.
+     *
+     * @throws InsufficientStockException
+     */
+    public static function generateFromOrder(SalesOrder $order, ?int $createdBy = null): SalesInvoice
+    {
+        $order->load('items');
+
+        $invoice = SalesInvoice::create([
+            'invoice_date' => now(),
+            'customer_id' => $order->customer_id,
+            'sales_order_id' => $order->id,
+            'location_id' => $order->location_id,
+            'branch_id' => $order->branch_id,
+            'status' => SalesInvoiceStatus::Draft,
+            'tax_rate' => (float) $order->tax_rate,
+            'note' => 'Generated from Sales Order '.$order->order_no,
+            'created_by' => $createdBy,
+        ]);
+
+        foreach ($order->items as $item) {
+            $invoice->items()->create([
+                'unit_id' => (int) $item->unit_id,
+                'quantity' => (int) $item->quantity,
+                'unit_price' => (float) $item->unit_price,
+                'discount' => (float) $item->discount,
+                'subtotal' => (float) $item->subtotal,
+            ]);
+        }
+
+        self::recalculate($invoice, (float) $order->tax_rate);
+        self::post($invoice);
+
+        return $invoice;
     }
 
     /**
@@ -77,23 +122,26 @@ class SalesInvoiceService
     }
 
     /**
-     * Void a posted invoice: the stock-out is reversed and nothing is owed.
+     * Void an invoice: a posted stock-out is reversed and nothing is owed.
+     * Draft invoices never touched stock, so voiding one restores nothing.
      */
     public static function void(SalesInvoice $invoice, ?string $reason = null): void
     {
         DB::transaction(function () use ($invoice, $reason) {
             $invoice->load('items.unit');
 
-            foreach ($invoice->items as $item) {
-                /** @var Unit $unit */
-                $unit = $item->unit;
+            if ($invoice->status === SalesInvoiceStatus::Posted) {
+                foreach ($invoice->items as $item) {
+                    /** @var Unit $unit */
+                    $unit = $item->unit;
 
-                StockService::restock(
-                    $unit,
-                    (int) $item->quantity,
-                    $invoice,
-                    "Sales invoice {$invoice->invoice_no} voided — stock restored."
-                );
+                    StockService::restock(
+                        $unit,
+                        (int) $item->quantity,
+                        $invoice,
+                        "Sales invoice {$invoice->invoice_no} voided — stock restored."
+                    );
+                }
             }
 
             $invoice->update([

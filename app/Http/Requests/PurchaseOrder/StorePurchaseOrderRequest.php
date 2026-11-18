@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\PurchaseOrder;
 
-use App\Enums\PurchaseStatus;
 use App\Models\PurchaseOrder;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -26,7 +25,6 @@ class StorePurchaseOrderRequest extends FormRequest
             'reference_no' => ['nullable', 'string', 'max:50', Rule::unique('purchase_orders', 'reference_no')->whereNull('deleted_at')],
             'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
             'location_id' => ['required', 'integer', 'exists:locations,id'],
-            'purchase_status' => ['required', Rule::in([PurchaseStatus::Pending->value, PurchaseStatus::Ordered->value])],
             'tax_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'paid_amount' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'document' => ['nullable', 'file', 'max:5120', 'mimes:pdf,csv,zip,doc,docx,jpeg,jpg,png'],
@@ -47,7 +45,6 @@ class StorePurchaseOrderRequest extends FormRequest
             'reference_no' => 'Reference No',
             'supplier_id' => 'Supplier',
             'location_id' => 'Business Location',
-            'purchase_status' => 'Purchase Status',
             'tax_rate' => 'Purchase Tax',
             'paid_amount' => 'Amount Paid',
             'document' => 'Attach Document',

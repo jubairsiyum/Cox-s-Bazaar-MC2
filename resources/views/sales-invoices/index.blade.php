@@ -25,7 +25,7 @@
                 <span class="font-medium text-ink">Sales Invoices</span>
             </nav>
             <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink">Sales Invoices</h1>
-            <p class="text-xs sm:text-sm text-muted mt-1">Register of customer invoices with post/void workflow and payment tracking.</p>
+            <p class="text-xs sm:text-sm text-muted mt-1">Invoices generated from sales orders, with post/void workflow and payment tracking. POS sales are listed under Collections.</p>
         </div>
 
         <div class="flex items-center gap-2 shrink-0">
@@ -49,14 +49,6 @@
                     <span>Excel</span>
                 </a>
             </div>
-
-            @can('create', \App\Models\SalesInvoice::class)
-                <a href="{{ route('sales-invoices.create') }}"
-                   class="btn-scale inline-flex items-center gap-2 rounded-2xl bg-brand-500 hover:bg-brand-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-on-brand shadow-sm transition-colors">
-                    <x-icon name="plus" class="size-4" />
-                    <span>Create Invoice</span>
-                </a>
-            @endcan
         </div>
     </div>
 
@@ -205,6 +197,34 @@
                                 <div class="flex items-center justify-end gap-1.5">
                                     <a href="{{ route('sales-invoices.show', $invoice) }}" class="rounded-lg border border-line bg-soft px-2.5 py-1 text-[11px] font-semibold text-ink hover:border-brand-500 hover:text-brand-500 transition-colors">View</a>
                                     <a href="{{ route('sales-invoices.print', $invoice) }}" target="_blank" class="rounded-lg border border-line bg-soft px-2.5 py-1 text-[11px] font-semibold text-ink hover:border-brand-500 hover:text-brand-500 transition-colors">Print</a>
+                                    @can('update', $invoice)
+                                        <a href="{{ route('sales-invoices.edit', $invoice) }}" class="rounded-lg border border-line bg-soft px-2.5 py-1 text-[11px] font-semibold text-ink hover:border-brand-500 hover:text-brand-500 transition-colors">Edit</a>
+                                    @endcan
+                                    @can('post', $invoice)
+                                        @if($invoice->status->value === 'draft')
+                                            <form method="POST" action="{{ route('sales-invoices.post', $invoice) }}" class="inline" onsubmit="return confirm('Post this invoice? Stock will be issued.')">
+                                                @csrf
+                                                @method('PATCH')
+                                                <button type="submit" class="rounded-lg border border-brand-500/30 bg-brand-500/10 px-2.5 py-1 text-[11px] font-semibold text-brand-500 hover:bg-brand-500/15 transition-colors cursor-pointer">Post</button>
+                                            </form>
+                                        @endif
+                                    @endcan
+                                    @can('void', $invoice)
+                                        @if($invoice->status->value === 'posted')
+                                            <form method="POST" action="{{ route('sales-invoices.void', $invoice) }}" class="inline" onsubmit="return confirm('Void this invoice? Stock will be restored.')">
+                                                @csrf
+                                                @method('PATCH')
+                                                <button type="submit" class="rounded-lg border border-danger/30 bg-danger/10 px-2.5 py-1 text-[11px] font-semibold text-danger hover:bg-danger/15 transition-colors cursor-pointer">Void</button>
+                                            </form>
+                                        @endif
+                                    @endcan
+                                    @can('delete', $invoice)
+                                        <form method="POST" action="{{ route('sales-invoices.destroy', $invoice) }}" class="inline" onsubmit="return confirm('Delete this draft invoice? This cannot be undone.')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="rounded-lg border border-danger/30 px-2.5 py-1 text-[11px] font-semibold text-danger hover:bg-danger/10 transition-colors cursor-pointer">Delete</button>
+                                        </form>
+                                    @endcan
                                 </div>
                             </td>
                         </tr>

@@ -69,12 +69,12 @@
                 @if($pendingReturnsCount > 0)
                     <span class="inline-flex items-center gap-1.5 rounded-full bg-warning/10 px-3 py-1 text-xs font-semibold text-warning ring-1 ring-warning/20 tabular-nums">
                         <x-icon name="alert-triangle" class="size-3.5" />
-                        <span>{{ number_format($pendingReturnsCount) }} pending {{ Str::plural('approval', $pendingReturnsCount) }}</span>
+                        <span>{{ number_format($pendingReturnsCount) }} awaiting {{ Str::plural('completion', $pendingReturnsCount) }}</span>
                     </span>
                 @endif
             </div>
             <p class="text-xs sm:text-sm text-muted mt-1">
-                Goods returned to your suppliers — manage return authorizations, stock deductions, and supplier credit balances.
+                Goods returned to your suppliers — manage supplier returns, stock deductions, and credit balances.
             </p>
         </div>
 
@@ -144,11 +144,11 @@
             </div>
         </div>
 
-        {{-- KPI 3: Pending Approval --}}
+        {{-- KPI 3: Legacy Pending --}}
         <div class="rounded-3xl border border-line bg-surface p-5 shadow-card lift flex flex-col justify-between">
             <div class="flex items-start justify-between gap-3">
                 <div>
-                    <span class="text-[11px] font-semibold text-muted uppercase tracking-wider">Pending Approval</span>
+                    <span class="text-[11px] font-semibold text-muted uppercase tracking-wider">Awaiting Completion</span>
                     <p class="text-2xl sm:text-3xl font-bold tracking-tight {{ $pendingReturnsCount > 0 ? 'text-warning' : 'text-ink' }} mt-1.5 tabular-nums">
                         {{ number_format($pendingReturnsCount) }}
                     </p>
@@ -158,7 +158,7 @@
                 </div>
             </div>
             <p class="mt-3 text-xs text-muted">
-                {{ $pendingReturnsCount > 0 ? 'Awaiting manager authorization' : 'Queue is completely clear' }}
+                {{ $pendingReturnsCount > 0 ? 'Legacy returns awaiting sign-off' : 'Queue is completely clear' }}
             </p>
         </div>
 
@@ -524,11 +524,11 @@
                                         </a>
 
                                         @can('approve', $return)
-                                            @if($return->approval_status !== \App\Enums\ApprovalStatus::Approved)
+                                            @if($return->approval_status === \App\Enums\ApprovalStatus::Pending)
                                                 <button type="button"
                                                         @click="openActionModal('approve', @js(['ref' => $return->reference_no, 'supplier' => $return->supplier?->name ?? '—', 'total' => \App\Helpers\Money::format($return->grand_total), 'url' => route('purchase-returns.approve', $return)]))"
                                                         class="btn-scale inline-flex items-center gap-1 rounded-xl border border-success/30 bg-success/10 px-2.5 py-1.5 text-xs font-semibold text-success hover:bg-success hover:text-on-brand transition-colors cursor-pointer"
-                                                        title="Approve return">
+                                                        title="Receive this legacy pending return">
                                                     <x-icon name="check" class="size-3.5" />
                                                     <span>Approve</span>
                                                 </button>

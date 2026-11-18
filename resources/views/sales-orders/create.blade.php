@@ -28,7 +28,7 @@
                 </span>
             </div>
             <p class="text-xs sm:text-sm text-muted mt-1">
-                Capture the order now — confirm it and convert it into a sales invoice when it is ready to bill.
+                Capture the sale now — saving the order automatically generates and posts its sales invoice, and stock is issued immediately.
             </p>
         </div>
 
