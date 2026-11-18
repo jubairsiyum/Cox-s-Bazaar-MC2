@@ -1,36 +1,63 @@
 @extends('layouts.app')
 
-@section('title', 'Edit Purchase Order')
+@section('title', 'Edit Purchase Order ' . $order->reference_no . ' — ' . config('app.name', "Cox's Bazaar Mobile Center"))
 @section('page_title', 'Purchase Invoices')
 
 @section('content')
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+<div class="space-y-6">
+    {{-- Executive Breadcrumb Header --}}
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-            <div class="flex items-baseline gap-2">
-                <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Purchase Invoices</h1>
-                <span class="text-sm text-gray-500 dark:text-gray-400">Edit Purchase Order {{ $order->reference_no }}</span>
+            <nav class="flex items-center gap-1.5 text-xs text-muted mb-2" aria-label="Breadcrumb">
+                <a href="{{ route('dashboard') }}" class="inline-flex items-center gap-1 hover:text-brand-500 transition-colors">
+                    <x-icon name="dashboard" class="size-3.5" />
+                    <span>Home</span>
+                </a>
+                <span class="text-muted/60">/</span>
+                <span class="text-muted">Purchasing</span>
+                <span class="text-muted/60">/</span>
+                <a href="{{ route('purchase-invoices.index') }}" class="hover:text-brand-500 transition-colors">Purchase Invoices</a>
+                <span class="text-muted/60">/</span>
+                <span class="font-medium text-ink">Edit {{ $order->reference_no }}</span>
+            </nav>
+
+            <div class="flex items-center gap-3 flex-wrap">
+                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink">Edit Purchase Invoice</h1>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-xs font-bold text-brand-500 ring-1 ring-brand-500/20 tabular-nums">
+                    {{ $order->reference_no }}
+                </span>
+                <x-status-badge :status="$order->purchase_status->value" :label="$order->purchase_status->label()" />
+                <x-status-badge :status="$order->approval_status->value" :label="$order->approval_status->label()" />
             </div>
+            <p class="text-xs sm:text-sm text-muted mt-1">
+                Update order details, payment status, attached documents, or line items before receiving approval.
+            </p>
         </div>
-        <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-            <a href="{{ route('dashboard') }}" class="hover:text-brand-500 flex items-center gap-1">
-                <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                </svg>
-                Home
+
+        <div class="flex items-center gap-2.5 flex-wrap shrink-0">
+            <a href="{{ route('purchase-invoices.show', $order) }}"
+               class="btn-scale inline-flex items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-2.5 text-xs sm:text-sm font-semibold text-ink shadow-2xs hover:bg-soft hover:text-brand-500 transition-colors">
+                <x-svg.eye class="size-4" />
+                <span>View Invoice</span>
             </a>
-            <span>&rsaquo;</span>
-            <a href="{{ route('purchase-invoices.index') }}" class="hover:text-brand-500">Purchase Invoices List</a>
-            <span>&rsaquo;</span>
-            <span class="text-gray-700 dark:text-gray-300 font-medium">Edit Purchase Order</span>
+            <a href="{{ route('purchase-invoices.index') }}"
+               class="btn-scale inline-flex items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-2.5 text-xs sm:text-sm font-semibold text-muted shadow-2xs hover:bg-soft hover:text-ink transition-colors">
+                <x-svg.arrow-left class="size-4" />
+                <span>Back to Purchase Invoices</span>
+            </a>
         </div>
     </div>
 
     @if(! $itemsEditable)
-        <div class="card mb-4 border-t-4 border-t-amber-500 shadow-sm">
-            <div class="card-body p-4 text-sm text-gray-700 dark:text-gray-300">
-                This order has been received, so its line items are frozen. You can still update the
-                supplier, status, payment and document details below.
+        <div class="rounded-3xl border border-warning/30 bg-warning/10 p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+            <div class="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-warning/15 text-warning ring-1 ring-warning/25">
+                <x-icon name="alert-triangle" class="size-5" />
+            </div>
+            <div>
+                <h2 class="text-sm font-bold text-ink">Line Items Frozen (Order Received)</h2>
+                <p class="text-xs sm:text-sm text-muted mt-0.5 leading-relaxed">
+                    This order has been received, so its line items are frozen. You can still update the supplier, status, payment, and document details below.
+                </p>
             </div>
         </div>
     @endif
@@ -48,4 +75,5 @@
             'itemsEditable' => $itemsEditable,
         ])
     </form>
+</div>
 @endsection

@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Stock Levels')
+@section('title', 'Stock Levels — ' . config('app.name', "Cox's Bazaar Mobile Center"))
 @section('page_title', 'Stock Levels')
 
 @section('content')
@@ -14,270 +14,580 @@
         'sort' => $col,
         'direction' => $sort === $col && $direction === 'asc' ? 'desc' : 'asc',
     ]));
+
+    $statusFilterLink = fn (?string $status) => route('inventory.index', array_filter([
+        'search' => request('search'),
+        'brand_id' => request('brand_id'),
+        'category_id' => request('category_id'),
+        'stock_status' => $status,
+        'per_page' => request('per_page'),
+        'sort' => request('sort'),
+        'direction' => request('direction'),
+    ]));
+
+    $totalSkus = (int) ($summary->skus ?? 0);
+    $totalQty = (int) ($summary->total_quantity ?? 0);
+    $totalValue = (float) ($summary->stock_value ?? 0);
+    $lowStockCount = (int) ($summary->low_stock ?? 0);
+    $outOfStockCount = (int) ($summary->out_of_stock ?? 0);
+    $healthyStockCount = max(0, $totalSkus - $lowStockCount - $outOfStockCount);
+    $healthyPct = $totalSkus > 0 ? (int) round(($healthyStockCount / $totalSkus) * 100) : 0;
+    $maxQtyOnPage = max(1, (int) ($stockLevels->max('quantity') ?? 1), $threshold * 3);
+    $activeStatus = (string) request('stock_status', '');
+    $hasActiveFilters = request()->filled('search') || request()->filled('brand_id') || request()->filled('category_id') || request()->filled('stock_status');
 @endphp
 
-<div x-data="ledgerModal()" class="relative">
-    {{-- Header Bar --}}
-    <div class="mb-4 flex flex-wrap items-baseline gap-2">
-        <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Stock Levels</h1>
-        <span class="text-sm text-gray-500 dark:text-gray-400">Current stock, valuation and alerts across all product variants</span>
+<div x-data="ledgerModal()" class="space-y-6">
+
+    {{-- Top Breadcrumb & Executive Header --}}
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+            {{-- Breadcrumb --}}
+            <nav class="flex items-center gap-1.5 text-xs text-muted mb-2" aria-label="Breadcrumb">
+                <a href="{{ route('dashboard') }}" class="inline-flex items-center gap-1 hover:text-brand-500 transition-colors">
+                    <x-icon name="dashboard" class="size-3.5" />
+                    <span>Home</span>
+                </a>
+                <span class="text-muted/60">/</span>
+                <span class="text-muted">Inventory</span>
+                <span class="text-muted/60">/</span>
+                <span class="font-medium text-ink">Stock Levels</span>
+            </nav>
+
+            {{-- Title & Context Pills --}}
+            <div class="flex items-center gap-3 flex-wrap">
+                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink">Stock Levels</h1>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-xs font-semibold text-brand-500 ring-1 ring-brand-500/20 tabular-nums">
+                    <span class="size-1.5 rounded-full bg-brand-500"></span>
+                    {{ number_format($totalSkus) }} {{ Str::plural('SKU', $totalSkus) }}
+                </span>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-soft px-3 py-1 text-[11px] font-medium text-muted border border-line">
+                    <x-icon name="alert-triangle" class="size-3.5 text-warning" />
+                    <span>Low-stock threshold ≤ {{ $threshold }}</span>
+                </span>
+            </div>
+            <p class="text-xs sm:text-sm text-muted mt-1">Monitor live stock quantities, inventory valuation in BDT, low-stock alerts, and unit movement ledgers.</p>
+        </div>
+
+        {{-- Right Quick Actions --}}
+        <div class="flex items-center gap-2.5 flex-wrap shrink-0">
+            @if($hasActiveFilters || request('sort'))
+                <a href="{{ route('inventory.index') }}"
+                   class="btn-scale inline-flex items-center gap-1.5 rounded-2xl border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-muted hover:text-ink hover:bg-soft transition-colors shadow-2xs">
+                    <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span>Reset</span>
+                </a>
+            @endif
+
+            @can('create', App\Models\StockAdjustment::class)
+                <a href="{{ route('stock-adjustments.create') }}"
+                   class="btn-scale inline-flex items-center gap-2 rounded-2xl bg-brand-500 px-4 py-2.5 text-xs sm:text-sm font-semibold text-on-brand shadow-sm hover:bg-brand-600 transition-colors">
+                    <x-icon name="plus" class="size-4" />
+                    <span>New Adjustment</span>
+                </a>
+            @endcan
+        </div>
     </div>
 
-    {{-- Summary Cards --}}
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
-        <div class="card shadow-sm">
-            <div class="card-body p-4">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Total SKUs</div>
-                <div class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{{ number_format((int) ($summary->skus ?? 0)) }}</div>
-            </div>
-        </div>
-        <div class="card shadow-sm">
-            <div class="card-body p-4">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Total Stock</div>
-                <div class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{{ number_format((int) ($summary->total_quantity ?? 0)) }}</div>
-            </div>
-        </div>
-        <div class="card shadow-sm">
-            <div class="card-body p-4">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Stock Value</div>
-                <div class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{{ \App\Helpers\Money::format($summary->stock_value ?? 0) }}</div>
-            </div>
-        </div>
-        <div class="card shadow-sm border-t-4 border-t-amber-500">
-            <div class="card-body p-4">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Low Stock (≤ {{ $threshold }})</div>
-                <div class="mt-1 text-2xl font-bold text-amber-600 dark:text-amber-400">{{ number_format((int) ($summary->low_stock ?? 0)) }}</div>
-            </div>
-        </div>
-        <div class="card shadow-sm border-t-4 border-t-red-500">
-            <div class="card-body p-4">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Out of Stock</div>
-                <div class="mt-1 text-2xl font-bold text-red-600 dark:text-red-400">{{ number_format((int) ($summary->out_of_stock ?? 0)) }}</div>
-            </div>
-        </div>
-    </div>
-
-    {{-- Main Card --}}
-    <div class="card shadow-sm">
-        <div class="card-header flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 dark:border-gray-800">
-            <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Stock overview</h2>
-        </div>
-
-        <div class="card-body p-4">
-            {{-- Filters --}}
-            <form method="GET" action="{{ route('inventory.index') }}" class="mb-4 flex flex-wrap items-end gap-3 text-sm">
+    {{-- 4-Card Inventory Intelligence KPI Strip --}}
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {{-- KPI 1: Total Stock Units --}}
+        <div class="rounded-3xl border border-line bg-surface p-5 shadow-card lift flex flex-col justify-between">
+            <div class="flex items-start justify-between gap-3">
                 <div>
-                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Search</label>
-                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Product name, code, barcode ..."
-                           class="py-1.5 px-3 text-xs rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-hidden focus:border-indigo-500">
+                    <span class="text-[11px] font-semibold text-muted uppercase tracking-wider">Total Stock Units</span>
+                    <p class="text-2xl sm:text-3xl font-bold tracking-tight text-ink mt-1.5 tabular-nums">
+                        {{ number_format($totalQty) }}
+                    </p>
                 </div>
+                <div class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-500 ring-1 ring-brand-500/20">
+                    <x-icon name="box" class="size-5" />
+                </div>
+            </div>
+            <div class="mt-3 flex items-center gap-2 text-xs text-muted">
+                <span class="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-semibold text-success">
+                    {{ number_format($healthyStockCount) }} healthy
+                </span>
+                <span>across {{ number_format($totalSkus) }} SKUs</span>
+            </div>
+        </div>
+
+        {{-- KPI 2: Stock Value --}}
+        <div class="rounded-3xl border border-line bg-surface p-5 shadow-card lift flex flex-col justify-between">
+            <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <span class="text-[11px] font-semibold text-muted uppercase tracking-wider">Stock Value</span>
+                    <p class="text-xl sm:text-2xl font-bold tracking-tight text-ink mt-1.5 tabular-nums money truncate" title="{{ \App\Helpers\Money::format($totalValue) }}">
+                        {{ \App\Helpers\Money::format($totalValue) }}
+                    </p>
+                </div>
+                <div class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-success/10 text-success ring-1 ring-success/20">
+                    <x-icon name="taka" class="size-5" />
+                </div>
+            </div>
+            <div class="mt-3 space-y-1.5">
+                <div class="h-1.5 w-full rounded-full bg-soft overflow-hidden">
+                    <div class="h-full rounded-full bg-success transition-all duration-500" style="width: {{ $healthyPct }}%;"></div>
+                </div>
+                <p class="text-xs text-muted">
+                    <strong class="text-ink font-semibold">{{ $healthyPct }}%</strong> of SKUs at healthy level
+                </p>
+            </div>
+        </div>
+
+        {{-- KPI 3: Low Stock Alerts --}}
+        <div class="rounded-3xl border border-line bg-surface p-5 shadow-card lift flex flex-col justify-between">
+            <div class="flex items-start justify-between gap-3">
                 <div>
-                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Brand</label>
-                    <select name="brand_id" class="py-1.5 px-2 text-xs rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800">
+                    <span class="text-[11px] font-semibold text-muted uppercase tracking-wider">Low Stock Alerts</span>
+                    <p class="text-2xl sm:text-3xl font-bold tracking-tight text-warning mt-1.5 tabular-nums">
+                        {{ number_format($lowStockCount) }}
+                    </p>
+                </div>
+                <div class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-warning/10 text-warning ring-1 ring-warning/20">
+                    <x-icon name="alert-triangle" class="size-5" />
+                </div>
+            </div>
+            <div class="mt-3 flex items-center justify-between gap-2 text-xs text-muted">
+                <span>Qty between 1 and {{ $threshold }}</span>
+                <a href="{{ $statusFilterLink('low') }}" class="font-semibold text-warning hover:underline inline-flex items-center gap-0.5 shrink-0">
+                    <span>View</span>
+                    <x-icon name="arrow-up-right" class="size-3.5" />
+                </a>
+            </div>
+        </div>
+
+        {{-- KPI 4: Out of Stock --}}
+        <div class="rounded-3xl border border-line bg-surface p-5 shadow-card lift flex flex-col justify-between">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <span class="text-[11px] font-semibold text-muted uppercase tracking-wider">Out of Stock</span>
+                    <p class="text-2xl sm:text-3xl font-bold tracking-tight text-danger mt-1.5 tabular-nums">
+                        {{ number_format($outOfStockCount) }}
+                    </p>
+                </div>
+                <div class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-danger/10 text-danger ring-1 ring-danger/20">
+                    <x-icon name="smartphone" class="size-5" />
+                </div>
+            </div>
+            <div class="mt-3 flex items-center justify-between gap-2 text-xs text-muted">
+                <span>Requires immediate restock</span>
+                <a href="{{ $statusFilterLink('out') }}" class="font-semibold text-danger hover:underline inline-flex items-center gap-0.5 shrink-0">
+                    <span>Inspect</span>
+                    <x-icon name="arrow-up-right" class="size-3.5" />
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {{-- Main Stock Directory Shell --}}
+    <div class="rounded-3xl border border-line bg-surface shadow-card overflow-hidden">
+
+        {{-- Shell Header & Quick Stock Status Pills --}}
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-line px-5 sm:px-6 py-4 sm:py-5 bg-surface">
+            <div>
+                <h2 class="text-base sm:text-lg font-bold text-ink">Stock overview</h2>
+                <p class="text-xs text-muted mt-0.5">
+                    Showing {{ $stockLevels->count() }} of {{ number_format($stockLevels->total()) }} variants · Sorted by <span class="font-semibold text-ink">{{ str_replace('_', ' ', ucfirst($sort)) }}</span> ({{ strtoupper($direction) }})
+                </p>
+            </div>
+
+            {{-- Server-Backed Status Filter Pills --}}
+            <div class="flex items-center gap-1.5 flex-wrap">
+                <a href="{{ $statusFilterLink(null) }}"
+                   class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all {{ $activeStatus === '' ? 'bg-brand-500 text-on-brand shadow-xs' : 'bg-soft text-muted hover:text-ink' }}">
+                    <span>All</span>
+                </a>
+                <a href="{{ $statusFilterLink('in') }}"
+                   class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all {{ $activeStatus === 'in' ? 'bg-brand-500 text-on-brand shadow-xs' : 'bg-soft text-muted hover:text-ink' }}">
+                    <span class="size-1.5 rounded-full {{ $activeStatus === 'in' ? 'bg-on-brand' : 'bg-success' }}"></span>
+                    <span>In Stock</span>
+                </a>
+                <a href="{{ $statusFilterLink('low') }}"
+                   class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all {{ $activeStatus === 'low' ? 'bg-brand-500 text-on-brand shadow-xs' : 'bg-soft text-muted hover:text-ink' }}">
+                    <span class="size-1.5 rounded-full {{ $activeStatus === 'low' ? 'bg-on-brand' : 'bg-warning' }}"></span>
+                    <span>Low Stock</span>
+                </a>
+                <a href="{{ $statusFilterLink('out') }}"
+                   class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all {{ $activeStatus === 'out' ? 'bg-brand-500 text-on-brand shadow-xs' : 'bg-soft text-muted hover:text-ink' }}">
+                    <span class="size-1.5 rounded-full {{ $activeStatus === 'out' ? 'bg-on-brand' : 'bg-danger' }}"></span>
+                    <span>Out of Stock</span>
+                </a>
+            </div>
+        </div>
+
+        {{-- Filter Command Toolbar --}}
+        <div class="px-5 sm:px-6 py-4 border-b border-line bg-canvas/40">
+            <form method="GET" action="{{ route('inventory.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+                @if(request('sort'))<input type="hidden" name="sort" value="{{ request('sort') }}">@endif
+                @if(request('direction'))<input type="hidden" name="direction" value="{{ request('direction') }}">@endif
+
+                {{-- Search --}}
+                <div class="sm:col-span-2 lg:col-span-4">
+                    <label for="inv-search" class="block text-[11px] font-semibold uppercase tracking-wider text-muted mb-1">Search</label>
+                    <div class="relative flex items-center">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted">
+                            <x-icon name="search" class="size-4" />
+                        </span>
+                        <input id="inv-search" type="text" name="search" value="{{ request('search') }}"
+                               placeholder="Product name, code, barcode..."
+                               class="w-full rounded-xl border border-line bg-surface pl-10 pr-3 py-2 text-xs text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 transition-colors">
+                    </div>
+                </div>
+
+                {{-- Brand --}}
+                <div class="lg:col-span-2">
+                    <label for="inv-brand" class="block text-[11px] font-semibold uppercase tracking-wider text-muted mb-1">Brand</label>
+                    <select id="inv-brand" name="brand_id"
+                            class="w-full rounded-xl border border-line bg-surface px-3 py-2 text-xs font-medium text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 cursor-pointer">
                         <option value="">All Brands</option>
                         @foreach($brands as $brand)
                             <option value="{{ $brand->id }}" @selected(request('brand_id') == $brand->id)>{{ $brand->name }}</option>
                         @endforeach
                     </select>
                 </div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Category</label>
-                    <select name="category_id" class="py-1.5 px-2 text-xs rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800">
+
+                {{-- Category --}}
+                <div class="lg:col-span-2">
+                    <label for="inv-category" class="block text-[11px] font-semibold uppercase tracking-wider text-muted mb-1">Category</label>
+                    <select id="inv-category" name="category_id"
+                            class="w-full rounded-xl border border-line bg-surface px-3 py-2 text-xs font-medium text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 cursor-pointer">
                         <option value="">All Categories</option>
                         @foreach($categories as $category)
                             <option value="{{ $category->id }}" @selected(request('category_id') == $category->id)>{{ $category->name }}</option>
                         @endforeach
                     </select>
                 </div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Stock Status</label>
-                    <select name="stock_status" class="py-1.5 px-2 text-xs rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800">
+
+                {{-- Stock Status --}}
+                <div class="lg:col-span-2">
+                    <label for="inv-status" class="block text-[11px] font-semibold uppercase tracking-wider text-muted mb-1">Stock Status</label>
+                    <select id="inv-status" name="stock_status"
+                            class="w-full rounded-xl border border-line bg-surface px-3 py-2 text-xs font-medium text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 cursor-pointer">
                         <option value="">All</option>
                         <option value="in" @selected(request('stock_status') === 'in')>In Stock</option>
                         <option value="low" @selected(request('stock_status') === 'low')>Low Stock</option>
                         <option value="out" @selected(request('stock_status') === 'out')>Out of Stock</option>
                     </select>
                 </div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Show</label>
-                    <select name="per_page" class="py-1.5 px-2 text-xs rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800">
-                        <option value="10" @selected($perPage == 10)>10</option>
-                        <option value="25" @selected($perPage == 25)>25</option>
-                        <option value="50" @selected($perPage == 50)>50</option>
-                        <option value="100" @selected($perPage == 100)>100</option>
-                    </select>
+
+                {{-- Per Page & Submit --}}
+                <div class="sm:col-span-2 lg:col-span-2 flex items-center gap-2">
+                    <div class="w-20 shrink-0">
+                        <label for="inv-per-page" class="block text-[11px] font-semibold uppercase tracking-wider text-muted mb-1">Show</label>
+                        <select id="inv-per-page" name="per_page"
+                                class="w-full rounded-xl border border-line bg-surface px-2.5 py-2 text-xs font-semibold text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 cursor-pointer">
+                            <option value="10" @selected($perPage == 10)>10</option>
+                            <option value="25" @selected($perPage == 25)>25</option>
+                            <option value="50" @selected($perPage == 50)>50</option>
+                            <option value="100" @selected($perPage == 100)>100</option>
+                        </select>
+                    </div>
+                    <button type="submit"
+                            class="btn-scale flex-1 mt-4 inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-500 hover:bg-brand-600 px-3.5 py-2 text-xs font-semibold text-on-brand shadow-xs transition-colors cursor-pointer">
+                        <span>Filter</span>
+                    </button>
                 </div>
-                <button type="submit"
-                        class="px-4 py-1.5 rounded-lg text-white text-xs font-medium shadow-xs transition hover:opacity-95 cursor-pointer"
-                        style="background-color: #00c0ef;">
-                    Filter
-                </button>
-                <a href="{{ route('inventory.index') }}"
-                   class="px-4 py-1.5 rounded-lg text-xs font-medium border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 transition hover:bg-gray-50 dark:hover:bg-gray-700">
-                    Reset
-                </a>
             </form>
+        </div>
 
-            {{-- Table --}}
-            <div class="table-wrap border border-gray-200 dark:border-gray-700 rounded-md" style="overflow-y: hidden !important;">
-                <table class="data-table w-full text-left" id="stock-levels-table">
-                    <thead>
-                        <tr class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-                            <th class="p-3">
-                                <a href="{{ $sortLink('product_name') }}" class="flex items-center gap-1 text-sm font-bold text-gray-800 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400">
-                                    Product
-                                    <span class="text-xs opacity-70">{{ $sort === 'product_name' ? ($direction === 'asc' ? '↑' : '↓') : '⇅' }}</span>
-                                </a>
-                            </th>
-                            <th class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">Brand</th>
-                            <th class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">Category</th>
-                            <th class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">Unit</th>
-                            <th class="p-3">
-                                <a href="{{ $sortLink('quantity') }}" class="flex items-center gap-1 text-sm font-bold text-gray-800 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400">
-                                    Quantity
-                                    <span class="text-xs opacity-70">{{ $sort === 'quantity' ? ($direction === 'asc' ? '↑' : '↓') : '⇅' }}</span>
-                                </a>
-                            </th>
-                            <th class="p-3">
-                                <a href="{{ $sortLink('unit_cost') }}" class="flex items-center gap-1 text-sm font-bold text-gray-800 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400">
-                                    Unit Cost
-                                    <span class="text-xs opacity-70">{{ $sort === 'unit_cost' ? ($direction === 'asc' ? '↑' : '↓') : '⇅' }}</span>
-                                </a>
-                            </th>
-                            <th class="p-3">
-                                <a href="{{ $sortLink('stock_value') }}" class="flex items-center gap-1 text-sm font-bold text-gray-800 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400">
-                                    Stock Value
-                                    <span class="text-xs opacity-70">{{ $sort === 'stock_value' ? ($direction === 'asc' ? '↑' : '↓') : '⇅' }}</span>
-                                </a>
-                            </th>
-                            <th class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">Status</th>
-                            <th class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-gray-900">
-                        @forelse($stockLevels as $stockLevel)
-                            @php
-                                $stockValue = $stockLevel->quantity * (float) ($stockLevel->unit_cost ?? 0);
-                            @endphp
-                            <tr class="odd:bg-gray-50 dark:odd:bg-gray-800/40 hover:bg-gray-100 dark:hover:bg-gray-800/70 transition">
-                                <td class="p-3 text-sm font-medium text-gray-900 dark:text-gray-100">
-                                    {{ $stockLevel->displayName() }}
-                                    <div class="text-xs text-gray-500 dark:text-gray-400 font-normal">{{ $stockLevel->product?->product_id }}</div>
-                                </td>
-                                <td class="p-3 text-sm text-gray-600 dark:text-gray-300">{{ $stockLevel->product?->brand?->name ?? '—' }}</td>
-                                <td class="p-3 text-sm text-gray-600 dark:text-gray-300">{{ $stockLevel->product?->category?->name ?? '—' }}</td>
-                                <td class="p-3 text-sm text-gray-600 dark:text-gray-300">{{ $stockLevel->unit }}</td>
-                                <td class="p-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ number_format($stockLevel->quantity) }}</td>
-                                <td class="p-3 text-sm text-gray-600 dark:text-gray-300">{{ \App\Helpers\Money::format($stockLevel->unit_cost ?? 0) }}</td>
-                                <td class="p-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ \App\Helpers\Money::format($stockValue) }}</td>
-                                <td class="p-3">
-                                    @if($stockLevel->quantity <= 0)
-                                        <span class="badge badge-danger">Out of stock</span>
-                                    @elseif($stockLevel->isLowStock())
-                                        <span class="badge badge-warning">Low stock</span>
+        {{-- Data Table --}}
+        <div class="table-wrap max-w-full overflow-x-auto border-0 rounded-none">
+            <table class="data-table w-full text-left border-collapse" id="stock-levels-table">
+                <thead>
+                    <tr class="border-b border-line bg-canvas/40 text-xs font-semibold text-muted tracking-wider uppercase">
+                        <th scope="col" class="py-3.5 px-5 text-start">
+                            <a href="{{ $sortLink('product_name') }}" class="inline-flex items-center gap-1.5 font-bold text-ink hover:text-brand-500 transition-colors">
+                                <span>Product</span>
+                                <span class="text-[10px] text-brand-500 font-black">{{ $sort === 'product_name' ? ($direction === 'asc' ? '▲' : '▼') : '⇅' }}</span>
+                            </a>
+                        </th>
+                        <th scope="col" class="py-3.5 px-5 text-start text-xs font-bold text-ink">Brand & Category</th>
+                        <th scope="col" class="py-3.5 px-5 text-start text-xs font-bold text-ink">Unit</th>
+                        <th scope="col" class="py-3.5 px-5 text-start">
+                            <a href="{{ $sortLink('quantity') }}" class="inline-flex items-center gap-1.5 font-bold text-ink hover:text-brand-500 transition-colors">
+                                <span>Quantity</span>
+                                <span class="text-[10px] text-brand-500 font-black">{{ $sort === 'quantity' ? ($direction === 'asc' ? '▲' : '▼') : '⇅' }}</span>
+                            </a>
+                        </th>
+                        <th scope="col" class="py-3.5 px-5 text-end">
+                            <a href="{{ $sortLink('unit_cost') }}" class="inline-flex items-center gap-1.5 font-bold text-ink hover:text-brand-500 transition-colors">
+                                <span>Unit Cost</span>
+                                <span class="text-[10px] text-brand-500 font-black">{{ $sort === 'unit_cost' ? ($direction === 'asc' ? '▲' : '▼') : '⇅' }}</span>
+                            </a>
+                        </th>
+                        <th scope="col" class="py-3.5 px-5 text-end">
+                            <a href="{{ $sortLink('stock_value') }}" class="inline-flex items-center gap-1.5 font-bold text-ink hover:text-brand-500 transition-colors">
+                                <span>Stock Value</span>
+                                <span class="text-[10px] text-brand-500 font-black">{{ $sort === 'stock_value' ? ($direction === 'asc' ? '▲' : '▼') : '⇅' }}</span>
+                            </a>
+                        </th>
+                        <th scope="col" class="py-3.5 px-5 text-start text-xs font-bold text-ink">Status</th>
+                        <th scope="col" class="py-3.5 px-5 text-end text-xs font-bold text-ink">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-line bg-surface">
+                    @forelse($stockLevels as $stockLevel)
+                        @php
+                            $stockValue = $stockLevel->quantity * (float) ($stockLevel->unit_cost ?? 0);
+                            $brandName = $stockLevel->product?->brand?->name;
+                            $categoryName = $stockLevel->product?->category?->name;
+                            $isOut = $stockLevel->quantity <= 0;
+                            $isLow = !$isOut && $stockLevel->isLowStock();
+                            $qtyBarPct = $isOut ? 0 : min(100, max(8, (int) round(($stockLevel->quantity / $maxQtyOnPage) * 100)));
+                            $qtyBarColor = $isOut ? 'bg-danger' : ($isLow ? 'bg-warning' : 'bg-success');
+                            $qtyTextColor = $isOut ? 'text-danger' : ($isLow ? 'text-warning' : 'text-ink');
+                        @endphp
+                        <tr class="hover:bg-soft/40 transition-colors duration-150 group">
+                            {{-- Product with Brand Logo --}}
+                            <td class="py-4 px-5 text-start">
+                                <div class="flex items-center gap-3">
+                                    @if($brandName)
+                                        <x-brand-logo :name="$brandName" size="sm" />
                                     @else
-                                        <span class="badge badge-success">In stock</span>
+                                        <div class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-soft text-muted border border-line">
+                                            <x-icon name="smartphone" class="size-4" />
+                                        </div>
                                     @endif
-                                </td>
-                                <td class="p-3 text-xs whitespace-nowrap">
-                                    <div class="flex items-center gap-2">
-                                        @can('create', App\Models\StockAdjustment::class)
-                                            <a href="{{ route('stock-adjustments.create', ['unit_id' => $stockLevel->id]) }}"
-                                               class="inline-flex items-center gap-1 rounded-full border border-indigo-500/60 px-3 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 transition hover:bg-indigo-50 dark:hover:bg-indigo-500/10 cursor-pointer">
-                                                <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                                </svg>
-                                                Adjust Stock
-                                            </a>
-                                        @endcan
-                                        <button type="button" @click="openLedger({{ $stockLevel->id }}, @js($stockLevel->displayName()))"
-                                                class="inline-flex items-center gap-1 rounded-full border border-gray-300 dark:border-gray-700 px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 transition hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
-                                            <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                            </svg>
-                                            Ledger
-                                        </button>
+                                    <div class="min-w-0">
+                                        <span class="block text-sm font-semibold text-ink group-hover:text-brand-500 transition-colors">
+                                            {{ $stockLevel->displayName() }}
+                                        </span>
+                                        <span class="block text-[11px] text-muted tabular-nums">
+                                            {{ $stockLevel->product?->product_id ?: 'SKU #' . $stockLevel->id }}
+                                        </span>
                                     </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="9" class="p-8 text-center text-gray-500 dark:text-gray-400 text-sm font-medium">
-                                    No stock found.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+                                </div>
+                            </td>
 
-            {{-- Pagination --}}
-            <div class="mt-4">
-                {{ $stockLevels->links() }}
-            </div>
+                            {{-- Brand & Category --}}
+                            <td class="py-4 px-5 text-start">
+                                <span class="block text-xs font-semibold text-ink">{{ $brandName ?? '—' }}</span>
+                                <span class="block text-[11px] text-muted">{{ $categoryName ?? 'Uncategorized' }}</span>
+                            </td>
+
+                            {{-- Unit --}}
+                            <td class="py-4 px-5 text-start">
+                                <span class="inline-flex items-center rounded-lg bg-soft px-2 py-0.5 text-xs font-semibold text-ink border border-line">
+                                    {{ $stockLevel->unit }}
+                                </span>
+                            </td>
+
+                            {{-- Quantity + Visual Meter --}}
+                            <td class="py-4 px-5 text-start">
+                                <div class="flex flex-col gap-1.5 min-w-28 max-w-36">
+                                    <div class="flex items-baseline justify-between gap-2">
+                                        <span class="text-sm font-bold tabular-nums {{ $qtyTextColor }}">
+                                            {{ number_format($stockLevel->quantity) }}
+                                        </span>
+                                        <span class="text-[10px] text-muted">{{ $stockLevel->unit }}</span>
+                                    </div>
+                                    <div class="h-1.5 w-full rounded-full bg-soft overflow-hidden">
+                                        <div class="h-full rounded-full {{ $qtyBarColor }} transition-all duration-300" style="width: {{ $qtyBarPct }}%;"></div>
+                                    </div>
+                                </div>
+                            </td>
+
+                            {{-- Unit Cost --}}
+                            <td class="py-4 px-5 text-end text-sm text-muted tabular-nums money whitespace-nowrap">
+                                {{ \App\Helpers\Money::format($stockLevel->unit_cost ?? 0) }}
+                            </td>
+
+                            {{-- Stock Value --}}
+                            <td class="py-4 px-5 text-end text-sm font-bold text-ink tabular-nums money whitespace-nowrap">
+                                {{ \App\Helpers\Money::format($stockValue) }}
+                            </td>
+
+                            {{-- Status Badge (Exact text preserved for tests) --}}
+                            <td class="py-4 px-5 text-start whitespace-nowrap">
+                                @if($isOut)
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-danger/10 px-2.5 py-1 text-xs font-semibold text-danger ring-1 ring-danger/20">
+                                        <span class="size-1.5 rounded-full bg-danger"></span>
+                                        Out of stock
+                                    </span>
+                                @elseif($isLow)
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning ring-1 ring-warning/20">
+                                        <span class="size-1.5 rounded-full bg-warning"></span>
+                                        Low stock
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-success ring-1 ring-success/20">
+                                        <span class="size-1.5 rounded-full bg-success"></span>
+                                        In stock
+                                    </span>
+                                @endif
+                            </td>
+
+                            {{-- Actions --}}
+                            <td class="py-4 px-5 text-end whitespace-nowrap">
+                                <div class="inline-flex items-center justify-end gap-2">
+                                    @can('create', App\Models\StockAdjustment::class)
+                                        <a href="{{ route('stock-adjustments.create', ['unit_id' => $stockLevel->id]) }}"
+                                           class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs hover:border-brand-500 hover:text-brand-500 hover:bg-soft transition-colors">
+                                            <x-svg.pencil class="size-3.5 text-muted" />
+                                            <span>Adjust Stock</span>
+                                        </a>
+                                    @endcan
+                                    <button type="button"
+                                            @click="openLedger({{ $stockLevel->id }}, @js($stockLevel->displayName()), {{ (int) $stockLevel->quantity }}, @js($stockLevel->unit))"
+                                            class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-brand-500/30 bg-brand-500/10 px-3 py-1.5 text-xs font-semibold text-brand-500 hover:bg-brand-500 hover:text-on-brand transition-colors cursor-pointer">
+                                        <x-svg.time class="size-3.5" />
+                                        <span>Ledger</span>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="8" class="py-14 px-6 text-center">
+                                <div class="max-w-sm mx-auto flex flex-col items-center justify-center text-center">
+                                    <div class="flex size-16 items-center justify-center rounded-3xl bg-soft text-brand-500 ring-1 ring-line mb-4">
+                                        <x-icon name="box" class="size-8" />
+                                    </div>
+                                    <h3 class="text-base font-bold text-ink">No stock found.</h3>
+                                    <p class="text-xs text-muted mt-1.5 leading-relaxed">
+                                        @if($hasActiveFilters)
+                                            No product variants match your current search or filter criteria.
+                                        @else
+                                            Add products and purchase inventory to start tracking stock levels.
+                                        @endif
+                                    </p>
+                                    @if($hasActiveFilters)
+                                        <a href="{{ route('inventory.index') }}"
+                                           class="mt-4 rounded-xl border border-line bg-surface px-4 py-2 text-xs font-semibold text-ink hover:bg-soft transition-colors shadow-2xs">
+                                            Reset Filters
+                                        </a>
+                                    @endif
+                                </div>
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        {{-- Pagination Footer --}}
+        <div class="border-t border-line px-5 sm:px-6 py-4 bg-surface">
+            {{ $stockLevels->links() }}
         </div>
     </div>
 
-    {{-- Stock Ledger Modal --}}
+    {{-- Stock Movements History Modal / Drawer --}}
     <div x-show="modalOpen" x-cloak
-         class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 py-10"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-overlay backdrop-blur-xs overflow-y-auto"
          @keydown.escape.window="modalOpen = false">
-        <div class="w-full max-w-3xl rounded-lg bg-white shadow-2xl dark:bg-gray-900 mx-4" @click.stop>
-            <div class="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 px-6 py-4">
-                <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">
-                    Stock Ledger — <span x-text="productName"></span>
-                </h3>
+        <div class="w-full max-w-3xl rounded-3xl border border-line bg-surface shadow-card overflow-hidden my-8"
+             @click.stop
+             x-show="modalOpen"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 scale-95 translate-y-2"
+             x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100 scale-100"
+             x-transition:leave-end="opacity-0 scale-95">
+
+            {{-- Modal Header --}}
+            <div class="flex items-start justify-between gap-4 border-b border-line px-6 py-5 bg-surface">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-500 ring-1 ring-brand-500/20">
+                        <x-svg.time class="size-5" />
+                    </div>
+                    <div class="min-w-0">
+                        <h3 class="text-base sm:text-lg font-bold text-ink truncate">
+                            Stock Ledger — <span x-text="productName"></span>
+                        </h3>
+                        <p class="text-xs text-muted mt-0.5">
+                            Latest 50 stock movements · Current balance:
+                            <strong class="text-ink tabular-nums" x-text="currentStock + ' ' + unitLabel"></strong>
+                        </p>
+                    </div>
+                </div>
                 <button type="button" @click="modalOpen = false"
-                        class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition cursor-pointer">
-                    <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
+                        class="rounded-xl p-1.5 text-muted hover:text-ink hover:bg-soft transition-colors cursor-pointer"
+                        aria-label="Close stock ledger">
+                    <x-svg.x class="size-5" />
                 </button>
             </div>
-            <div class="px-6 py-5">
-                <div class="table-wrap border border-gray-200 dark:border-gray-700 rounded-md">
-                    <table class="data-table w-full text-left">
-                        <thead>
-                            <tr class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-                                <th class="p-3 text-xs font-bold text-gray-800 dark:text-gray-100">Date</th>
-                                <th class="p-3 text-xs font-bold text-gray-800 dark:text-gray-100">Type</th>
-                                <th class="p-3 text-xs font-bold text-gray-800 dark:text-gray-100">Change</th>
-                                <th class="p-3 text-xs font-bold text-gray-800 dark:text-gray-100">After</th>
-                                <th class="p-3 text-xs font-bold text-gray-800 dark:text-gray-100">Note</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-gray-900">
-                            <template x-for="(movement, index) in movements" :key="index">
-                                <tr>
-                                    <td class="p-3 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap" x-text="movement.date"></td>
-                                    <td class="p-3 text-xs text-gray-900 dark:text-gray-100" x-text="movement.type"></td>
-                                    <td class="p-3 text-xs font-medium" :class="movement.quantity >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
-                                        x-text="(movement.quantity > 0 ? '+' : '') + movement.quantity"></td>
-                                    <td class="p-3 text-xs text-gray-900 dark:text-gray-100" x-text="movement.quantity_after"></td>
-                                    <td class="p-3 text-xs text-gray-600 dark:text-gray-300" x-text="movement.note || '—'"></td>
-                                </tr>
-                            </template>
-                            <tr x-show="movements.length === 0">
-                                <td colspan="5" class="p-6 text-center text-sm text-gray-500 dark:text-gray-400">No movements recorded.</td>
-                            </tr>
-                        </tbody>
-                    </table>
+
+            {{-- Modal Body --}}
+            <div class="p-6 bg-canvas/20 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                {{-- Loading State --}}
+                <div x-show="loading" class="py-12 text-center">
+                    <div class="inline-flex items-center gap-2.5 rounded-2xl border border-line bg-surface px-4 py-2.5 text-xs font-semibold text-muted shadow-2xs">
+                        <span class="size-3.5 rounded-full border-2 border-brand-500 border-t-transparent animate-spin"></span>
+                        <span>Loading stock movement history...</span>
+                    </div>
                 </div>
+
+                {{-- Movements Table --}}
+                <div x-show="!loading" class="rounded-2xl border border-line bg-surface overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="data-table w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-line bg-canvas/40 text-[11px] font-bold text-muted uppercase tracking-wider">
+                                    <th class="py-3 px-4">Date</th>
+                                    <th class="py-3 px-4">Type</th>
+                                    <th class="py-3 px-4 text-end">Change</th>
+                                    <th class="py-3 px-4 text-end">Balance After</th>
+                                    <th class="py-3 px-4">Note</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-line bg-surface">
+                                <template x-for="(movement, index) in movements" :key="index">
+                                    <tr class="hover:bg-soft/40 transition-colors">
+                                        <td class="py-3 px-4 text-xs text-muted whitespace-nowrap tabular-nums" x-text="movement.date"></td>
+                                        <td class="py-3 px-4 text-xs font-semibold text-ink whitespace-nowrap" x-text="movement.type"></td>
+                                        <td class="py-3 px-4 text-end whitespace-nowrap">
+                                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold tabular-nums"
+                                                  :class="movement.quantity >= 0 ? 'bg-success/10 text-success ring-1 ring-success/20' : 'bg-danger/10 text-danger ring-1 ring-danger/20'"
+                                                  x-text="(movement.quantity > 0 ? '+' : '') + movement.quantity"></span>
+                                        </td>
+                                        <td class="py-3 px-4 text-xs font-bold text-ink text-end tabular-nums" x-text="movement.quantity_after"></td>
+                                        <td class="py-3 px-4 text-xs text-muted" x-text="movement.note || '—'"></td>
+                                    </tr>
+                                </template>
+                                <tr x-show="movements.length === 0">
+                                    <td colspan="5" class="py-10 px-6 text-center text-xs font-medium text-muted">
+                                        No movements recorded for this product variant.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Modal Footer --}}
+            <div class="flex items-center justify-between gap-3 border-t border-line px-6 py-4 bg-surface">
+                <span class="text-xs text-muted" x-show="!loading" x-text="movements.length + ' movement entries shown'"></span>
+                <button type="button" @click="modalOpen = false"
+                        class="btn-scale ml-auto rounded-xl border border-line bg-surface px-4 py-2 text-xs font-semibold text-ink hover:bg-soft transition-colors cursor-pointer">
+                    Close
+                </button>
             </div>
         </div>
     </div>
+
 </div>
 
 <script>
 function ledgerModal() {
     return {
         modalOpen: false,
+        loading: false,
         productName: '',
+        currentStock: 0,
+        unitLabel: '',
         movements: [],
 
-        async openLedger(unitId, productName) {
+        async openLedger(unitId, productName, currentStock = 0, unitLabel = '') {
             this.productName = productName;
+            this.currentStock = currentStock;
+            this.unitLabel = unitLabel;
             this.movements = [];
+            this.loading = true;
             this.modalOpen = true;
 
             try {
@@ -288,6 +598,8 @@ function ledgerModal() {
                 this.movements = data.items || [];
             } catch (error) {
                 this.movements = [];
+            } finally {
+                this.loading = false;
             }
         }
     };

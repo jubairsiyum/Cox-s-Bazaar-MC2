@@ -1,171 +1,188 @@
 @extends('layouts.app')
 
-@section('title', 'Add Location')
+@section('title', 'Add Location — ' . config('app.name', "Cox's Bazaar Mobile Center"))
 @section('page_title', 'Warehouses')
 
 @section('content')
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+<div class="space-y-6">
+
+    {{-- Top Breadcrumb & Executive Header --}}
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-            <div class="flex items-baseline gap-2">
-                <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Warehouses</h1>
-                <span class="text-sm text-gray-500 dark:text-gray-400">Add/Update Location</span>
+            <nav class="flex items-center gap-1.5 text-xs text-muted mb-2" aria-label="Breadcrumb">
+                <a href="{{ route('dashboard') }}" class="inline-flex items-center gap-1 hover:text-brand-500 transition-colors">
+                    <x-icon name="dashboard" class="size-3.5" />
+                    <span>Home</span>
+                </a>
+                <span class="text-muted/60">/</span>
+                <span class="text-muted">Inventory</span>
+                <span class="text-muted/60">/</span>
+                <a href="{{ route('warehouses.index') }}" class="hover:text-brand-500 transition-colors">Warehouses</a>
+                <span class="text-muted/60">/</span>
+                <span class="font-medium text-ink">Add Location</span>
+            </nav>
+
+            <div class="flex items-center gap-3 flex-wrap">
+                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink">Add Location</h1>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-xs font-semibold text-brand-500 ring-1 ring-brand-500/20">
+                    New Warehouse / Outlet
+                </span>
+            </div>
+            <p class="text-xs sm:text-sm text-muted mt-1">Register a warehouse, brand shop, or SR placement for inventory and stock transfer tracking.</p>
+        </div>
+
+        <a href="{{ route('warehouses.index') }}"
+           class="btn-scale inline-flex items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-2.5 text-xs sm:text-sm font-semibold text-ink shadow-2xs hover:bg-soft hover:text-brand-500 transition-colors shrink-0">
+            <x-svg.arrow-left class="size-4" />
+            <span>Back to Warehouses</span>
+        </a>
+    </div>
+
+    {{-- Validation Summary --}}
+    @if ($errors->any())
+        <div class="rounded-2xl border border-danger/30 bg-danger/10 p-4 flex items-start gap-3">
+            <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-danger/15 text-danger">
+                <x-icon name="alert-triangle" class="size-4" />
+            </div>
+            <div class="min-w-0 flex-1">
+                <p class="text-sm font-bold text-danger">Please Enter Valid Data</p>
+                <ul class="mt-1 list-disc list-inside space-y-0.5 text-xs text-ink/90">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
             </div>
         </div>
-        <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-            <a href="{{ route('dashboard') }}" class="hover:text-brand-500 flex items-center gap-1">
-                <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                </svg>
-                Home
-            </a>
-            <span>&rsaquo;</span>
-            <a href="{{ route('warehouses.index') }}" class="hover:text-brand-500">Warehouses List</a>
-            <span>&rsaquo;</span>
-            <span class="text-gray-700 dark:text-gray-300 font-medium">Add Location</span>
-        </div>
-    </div>
+    @endif
 
     {{-- Main Form Card --}}
-    <div class="card border-t-4 border-t-cyan-500 shadow-sm">
-        @if ($errors->any())
-            <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300">
-                Please Enter Valid Data
+    <div class="rounded-3xl border border-line bg-surface p-6 sm:p-8 shadow-card">
+        <div class="flex items-center gap-3 pb-5 mb-6 border-b border-line">
+            <div class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-500 ring-1 ring-brand-500/20">
+                <x-icon name="warehouse" class="size-5" />
             </div>
-        @endif
-
-        <div class="card-body">
-            <form method="POST" action="{{ route('warehouses.store') }}">
-                @csrf
-
-                <div class="max-w-3xl space-y-4">
-                    <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                        <label for="name"
-                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
-                            Location Name<span class="text-red-500 font-bold">*</span>
-                        </label>
-                        <div class="sm:col-span-2">
-                            <input type="text" id="name" name="name" value="{{ old('name') }}" required
-                                class="form-control @error('name') is-invalid @enderror"
-                                placeholder="e.g. Main Warehouse, Brand Shop - Cox's Bazar">
-                            @error('name')
-                                <div class="form-error">{{ $message }}</div>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                        <label for="code"
-                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
-                            Location Code
-                        </label>
-                        <div class="sm:col-span-2">
-                            <input type="text" id="code" name="code" value="{{ old('code') }}"
-                                class="form-control @error('code') is-invalid @enderror"
-                                placeholder="e.g. WH01 (optional, unique)">
-                            @error('code')
-                                <div class="form-error">{{ $message }}</div>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                        <label for="type"
-                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
-                            Type<span class="text-red-500 font-bold">*</span>
-                        </label>
-                        <div class="sm:col-span-2">
-                            <select id="type" name="type" required class="form-control @error('type') is-invalid @enderror">
-                                <option value="">Please Select</option>
-                                @foreach(\App\Enums\LocationType::options() as $value => $label)
-                                    <option value="{{ $value }}" @selected(old('type') === $value)>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                            @error('type')
-                                <div class="form-error">{{ $message }}</div>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                        <label for="status"
-                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
-                            Status
-                        </label>
-                        <div class="sm:col-span-2">
-                            <select id="status" name="status" class="form-control @error('status') is-invalid @enderror">
-                                <option value="active" @selected(old('status', 'active') === 'active')>Active</option>
-                                <option value="inactive" @selected(old('status') === 'inactive')>Inactive</option>
-                            </select>
-                            @error('status')
-                                <div class="form-error">{{ $message }}</div>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                        <label for="address"
-                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
-                            Address
-                        </label>
-                        <div class="sm:col-span-2">
-                            <input type="text" id="address" name="address" value="{{ old('address') }}"
-                                class="form-control @error('address') is-invalid @enderror"
-                                placeholder="Street address (optional)">
-                            @error('address')
-                                <div class="form-error">{{ $message }}</div>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
-                        <label for="phone"
-                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right">
-                            Phone
-                        </label>
-                        <div class="sm:col-span-2">
-                            <input type="text" id="phone" name="phone" value="{{ old('phone') }}"
-                                class="form-control @error('phone') is-invalid @enderror"
-                                placeholder="Contact number (optional)">
-                            @error('phone')
-                                <div class="form-error">{{ $message }}</div>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-3 items-start gap-2">
-                        <label for="note"
-                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 sm:text-right pt-2">
-                            Note
-                        </label>
-                        <div class="sm:col-span-2">
-                            <textarea id="note" name="note" rows="3"
-                                class="form-control @error('note') is-invalid @enderror"
-                                placeholder="Additional details (optional)">{{ old('note') }}</textarea>
-                            @error('note')
-                                <div class="form-error">{{ $message }}</div>
-                            @enderror
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Action Buttons --}}
-                <div class="mt-8 pt-4 border-t border-gray-100 dark:border-gray-800 flex justify-center items-center gap-4">
-                    <button type="submit"
-                        class="px-8 py-2.5 rounded-md text-white font-medium text-sm transition-all shadow-sm flex items-center gap-2"
-                        style="background-color: #00a65a;">
-                        <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                        </svg>
-                        Save
-                    </button>
-                    <a href="{{ route('warehouses.index') }}"
-                        class="px-8 py-2.5 rounded-md text-white font-medium text-sm transition-all shadow-sm flex items-center gap-2"
-                        style="background-color: #f39c12;">
-                        Close
-                    </a>
-                </div>
-            </form>
+            <div>
+                <h2 class="text-base font-bold text-ink">Location Profile</h2>
+                <p class="text-xs text-muted mt-0.5">Define identifying code, location type, operational status, and contact information.</p>
+            </div>
         </div>
+
+        <form method="POST" action="{{ route('warehouses.store') }}" class="space-y-6">
+            @csrf
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {{-- Location Name --}}
+                <div>
+                    <label for="name" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                        Location Name <span class="text-danger">*</span>
+                    </label>
+                    <input type="text" id="name" name="name" value="{{ old('name') }}" required
+                           placeholder="e.g. Main Warehouse, Brand Shop - Cox's Bazar"
+                           class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('name') border-danger @enderror">
+                    @error('name')
+                        <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                {{-- Location Code --}}
+                <div>
+                    <label for="code" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                        Location Code
+                    </label>
+                    <input type="text" id="code" name="code" value="{{ old('code') }}"
+                           placeholder="e.g. WH01 (optional, unique)"
+                           class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('code') border-danger @enderror">
+                    @error('code')
+                        <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                {{-- Type --}}
+                <div>
+                    <label for="type" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                        Type <span class="text-danger">*</span>
+                    </label>
+                    <select id="type" name="type" required
+                            class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all cursor-pointer @error('type') border-danger @enderror">
+                        <option value="">Please Select</option>
+                        @foreach(\App\Enums\LocationType::options() as $value => $label)
+                            <option value="{{ $value }}" @selected(old('type') === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    @error('type')
+                        <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                {{-- Status --}}
+                <div>
+                    <label for="status" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                        Status
+                    </label>
+                    <select id="status" name="status"
+                            class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all cursor-pointer @error('status') border-danger @enderror">
+                        <option value="active" @selected(old('status', 'active') === 'active')>Active</option>
+                        <option value="inactive" @selected(old('status') === 'inactive')>Inactive</option>
+                    </select>
+                    @error('status')
+                        <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                {{-- Address --}}
+                <div>
+                    <label for="address" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                        Address
+                    </label>
+                    <input type="text" id="address" name="address" value="{{ old('address') }}"
+                           placeholder="Street address (optional)"
+                           class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('address') border-danger @enderror">
+                    @error('address')
+                        <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                {{-- Phone --}}
+                <div>
+                    <label for="phone" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                        Phone
+                    </label>
+                    <input type="text" id="phone" name="phone" value="{{ old('phone') }}"
+                           placeholder="Contact number (optional)"
+                           class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('phone') border-danger @enderror">
+                    @error('phone')
+                        <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                {{-- Note --}}
+                <div class="md:col-span-2">
+                    <label for="note" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                        Note
+                    </label>
+                    <textarea id="note" name="note" rows="3"
+                              placeholder="Additional details about this location (optional)"
+                              class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all resize-none @error('note') border-danger @enderror">{{ old('note') }}</textarea>
+                    @error('note')
+                        <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
+                    @enderror
+                </div>
+            </div>
+
+            {{-- Form Footer Actions --}}
+            <div class="pt-5 border-t border-line flex items-center justify-end gap-3">
+                <a href="{{ route('warehouses.index') }}"
+                   class="btn-scale rounded-2xl border border-line bg-surface px-5 py-2.5 text-xs sm:text-sm font-semibold text-ink hover:bg-soft transition-colors">
+                    Cancel
+                </a>
+                <button type="submit"
+                        class="btn-scale inline-flex items-center gap-2 rounded-2xl bg-brand-500 hover:bg-brand-600 px-6 py-2.5 text-xs sm:text-sm font-semibold text-on-brand shadow-sm transition-colors cursor-pointer">
+                    <x-icon name="check" class="size-4" />
+                    <span>Save Location</span>
+                </button>
+            </div>
+        </form>
     </div>
+
+</div>
 @endsection
