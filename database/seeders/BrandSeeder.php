@@ -41,10 +41,14 @@ class BrandSeeder extends Seeder
     public function run(): void
     {
         foreach (self::BRANDS as $name => $note) {
-            Brand::firstOrCreate(
+            $brand = Brand::withTrashed()->firstOrCreate(
                 ['name' => $name],
                 ['note' => $note]
             );
+
+            if ($brand->trashed()) {
+                $brand->restore();
+            }
         }
     }
 }

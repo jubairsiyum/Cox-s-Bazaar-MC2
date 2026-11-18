@@ -408,10 +408,12 @@
                                 </span>
                             </td>
 
-                            {{-- Product + Brand Logo + Category + Variant --}}
+                            {{-- Product + Photo / Brand Logo + Category + Variant --}}
                             <td x-show="columns.product" class="py-4 px-5 text-start">
                                 <div class="flex items-center gap-3">
-                                    @if($product->brand)
+                                    @if($product->photo)
+                                        <x-thumbnail :src="$product->photo_url" :alt="$product->name . ' photo'" :label="$product->name" size="size-9 rounded-lg" class="group-hover:scale-105 transition-transform" />
+                                    @elseif($product->brand)
                                         <x-brand-logo :name="$product->brand->name" size="sm" class="group-hover:scale-105 transition-transform" />
                                     @else
                                         <div class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-soft text-muted border border-line">
@@ -574,10 +576,12 @@
                         <article style="--item-i: {{ $loop->index }}"
                                  class="group relative flex flex-col justify-between rounded-2xl border border-line bg-surface p-5 shadow-2xs transition-all duration-200 hover:border-brand-500/40 hover:shadow-card">
                             <div>
-                                {{-- Top Row: Brand Logo + Name + Status --}}
+                                {{-- Top Row: Photo / Brand Logo + Name + Status --}}
                                 <div class="flex items-start justify-between gap-3">
                                     <div class="flex items-center gap-3 min-w-0">
-                                        @if($product->brand)
+                                        @if($product->photo)
+                                            <x-thumbnail :src="$product->photo_url" :alt="$product->name . ' photo'" :label="$product->name" size="size-10 rounded-xl" class="group-hover:scale-105 transition-transform" />
+                                        @elseif($product->brand)
                                             <x-brand-logo :name="$product->brand->name" size="default" class="group-hover:scale-105 transition-transform" />
                                         @else
                                             <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-soft text-muted border border-line">

@@ -12,6 +12,7 @@
         'name' => (string) old('name', ''),
         'note' => (string) old('note', ''),
         'productCount' => (int) old('_product_count', 0),
+        'logoUrl' => null,
     ];
 
     $sortLink = fn (string $col) => route('brands.index', array_filter([
@@ -191,7 +192,11 @@
                     <span class="text-[11px] font-semibold text-muted uppercase tracking-wider">Leading Brand</span>
                     @if($topBrand)
                         <div class="mt-2 flex items-center gap-2.5 min-w-0">
-                            <x-brand-logo :name="$topBrand->name" size="sm" />
+                            @if($topBrand->logo)
+                                <x-thumbnail :src="$topBrand->logo_url" :alt="$topBrand->name . ' logo'" :label="$topBrand->name" size="size-8 rounded-lg" />
+                            @else
+                                <x-brand-logo :name="$topBrand->name" size="sm" />
+                            @endif
                             <p class="text-lg font-bold tracking-tight text-ink truncate" title="{{ $topBrand->name }}">
                                 {{ $topBrand->name }}
                             </p>
@@ -456,7 +461,11 @@
                                 {{-- Card Top Row: Logo + Title + Product Count Badge --}}
                                 <div class="flex items-start justify-between gap-3">
                                     <div class="flex items-center gap-3.5 min-w-0">
-                                        <x-brand-logo :name="$brand->name" size="lg" class="group-hover:scale-105 transition-transform duration-200" />
+                                        @if($brand->logo)
+                                            <x-thumbnail :src="$brand->logo_url" :alt="$brand->name . ' logo'" :label="$brand->name" size="size-12 rounded-2xl" class="group-hover:scale-105 transition-transform duration-200" />
+                                        @else
+                                            <x-brand-logo :name="$brand->name" size="lg" class="group-hover:scale-105 transition-transform duration-200" />
+                                        @endif
                                         <div class="min-w-0">
                                             <h3 class="text-base font-bold text-ink truncate group-hover:text-brand-500 transition-colors" title="{{ $brand->name }}">
                                                 {{ $brand->name }}
@@ -519,7 +528,7 @@
 
                                 @can('update', $brand)
                                     <button type="button"
-                                            @click="openEdit(@js(['id' => $brand->id, 'name' => $brand->name, 'note' => $brand->note, 'productCount' => $productCount]))"
+                                            @click="openEdit(@js(['id' => $brand->id, 'name' => $brand->name, 'note' => $brand->note, 'logoUrl' => $brand->logo_url, 'productCount' => $productCount]))"
                                             class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs hover:border-brand-500 hover:text-brand-500 hover:bg-soft transition-colors cursor-pointer"
                                             title="Update {{ $brand->name }}">
                                         <x-svg.pencil class="size-3.5 text-muted group-hover:text-brand-500" />
@@ -639,7 +648,11 @@
                             {{-- Brand Name Column --}}
                             <td x-show="columns.name" data-col="name" class="py-4 px-5 text-start">
                                 <div class="flex items-center gap-3">
-                                    <x-brand-logo :name="$brand->name" size="default" class="group-hover:scale-110 transition-transform duration-200" />
+                                    @if($brand->logo)
+                                        <x-thumbnail :src="$brand->logo_url" :alt="$brand->name . ' logo'" :label="$brand->name" size="size-10 rounded-xl" class="group-hover:scale-110 transition-transform duration-200" />
+                                    @else
+                                        <x-brand-logo :name="$brand->name" size="default" class="group-hover:scale-110 transition-transform duration-200" />
+                                    @endif
                                     <div>
                                         <span class="block text-sm font-semibold text-ink group-hover:text-brand-500 transition-colors">
                                             {{ $brand->name }}
@@ -698,7 +711,7 @@
 
                                         @can('update', $brand)
                                             <button type="button"
-                                                    @click="openEdit(@js(['id' => $brand->id, 'name' => $brand->name, 'note' => $brand->note, 'productCount' => $productCount]))"
+                                                    @click="openEdit(@js(['id' => $brand->id, 'name' => $brand->name, 'note' => $brand->note, 'logoUrl' => $brand->logo_url, 'productCount' => $productCount]))"
                                                     class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs hover:border-brand-500 hover:text-brand-500 hover:bg-soft transition-colors cursor-pointer"
                                                     title="Update {{ $brand->name }}">
                                                 <x-svg.pencil class="size-3.5 text-muted group-hover:text-brand-500" />
@@ -756,7 +769,6 @@
     <div x-show="modalOpen" x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-overlay backdrop-blur-xs overflow-y-auto"
          @keydown.escape.window="closeModal()">
-
         <div class="w-full max-w-lg rounded-3xl border border-line bg-surface shadow-card p-6 sm:p-7 relative my-8"
              @click.stop
              x-show="modalOpen"
@@ -767,7 +779,7 @@
              x-transition:leave-start="opacity-100 scale-100 translate-y-0"
              x-transition:leave-end="opacity-0 scale-95 -translate-y-2">
 
-            <form :action="formAction()" method="POST">
+            <form :action="formAction()" method="POST" enctype="multipart/form-data">
                 @csrf
                 <input type="hidden" name="_method" :value="editMode ? 'PATCH' : 'POST'">
                 <input type="hidden" name="_form_mode" :value="editMode ? 'edit' : 'add'">
@@ -839,6 +851,26 @@
                             <p class="mt-1 text-xs text-danger font-medium">{{ $message }}</p>
                         @enderror
                     </div>
+
+                    {{-- Brand Logo Field --}}
+                    <div>
+                        <label for="brand-logo" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                            Logo
+                        </label>
+                        <input type="file" id="brand-logo" name="logo" x-ref="logoInput"
+                               accept=".jpg,.jpeg,.png,.webp,.svg"
+                               class="w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-xs sm:text-sm text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-soft file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-ink hover:file:bg-line cursor-pointer shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('logo') border-danger @enderror">
+                        <p class="mt-1.5 text-xs text-muted">JPG, PNG, WEBP or SVG — max 2 MB.</p>
+                        <div x-show="logoUrl" x-cloak class="mt-2.5 flex items-center gap-2.5 rounded-xl border border-line bg-soft/50 p-2.5">
+                            <img :src="logoUrl" alt="Current brand logo"
+                                 class="size-10 rounded-lg border border-line bg-surface object-contain p-0.5 shrink-0"
+                                 onerror="this.remove()">
+                            <p class="text-xs text-muted">Current logo — leave empty to keep it.</p>
+                        </div>
+                        @error('logo')
+                            <p class="mt-1 text-xs text-danger font-medium">{{ $message }}</p>
+                        @enderror
+                    </div>
                 </div>
 
                 {{-- Modal Footer --}}
@@ -868,6 +900,7 @@
             modalOpen: state.hasErrors,
             editMode: state.mode === 'edit',
             brandId: state.brandId,
+            logoUrl: state.logoUrl,
             selectedProductCount: state.productCount ?? 0,
             form: {
                 name: state.name,
@@ -913,20 +946,30 @@
             openAdd() {
                 this.editMode = false;
                 this.brandId = null;
+                this.logoUrl = null;
                 this.selectedProductCount = 0;
                 this.form = { name: '', note: '' };
+                this.resetLogoInput();
                 this.modalOpen = true;
             },
 
             openEdit(brand) {
                 this.editMode = true;
                 this.brandId = brand.id;
+                this.logoUrl = brand.logoUrl ?? null;
                 this.selectedProductCount = brand.productCount ?? 0;
                 this.form = {
                     name: brand.name,
                     note: brand.note ?? ''
                 };
+                this.resetLogoInput();
                 this.modalOpen = true;
+            },
+
+            resetLogoInput() {
+                if (this.$refs.logoInput) {
+                    this.$refs.logoInput.value = '';
+                }
             },
 
             closeModal() {

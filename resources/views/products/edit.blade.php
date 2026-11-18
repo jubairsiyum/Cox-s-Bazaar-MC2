@@ -64,7 +64,7 @@
     @endif
 
     {{-- Main 3-Column Form + Live Preview Layout --}}
-    <form method="POST" action="{{ route('products.update', $product) }}" class="grid gap-6 xl:grid-cols-3 items-start">
+    <form method="POST" action="{{ route('products.update', $product) }}" enctype="multipart/form-data" class="grid gap-6 xl:grid-cols-3 items-start">
         @csrf
         @method('PATCH')
 
@@ -98,6 +98,30 @@
                                placeholder="e.g. iPhone 15 Pro Max, Galaxy S24 Ultra"
                                class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('name') border-danger @enderror">
                         @error('name')
+                            <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    {{-- Product Photo --}}
+                    <div class="sm:col-span-2">
+                        <div class="flex items-center justify-between mb-2">
+                            <label for="photo" class="block text-xs font-semibold uppercase tracking-wider text-ink">
+                                Photo
+                            </label>
+                            <span class="text-[11px] text-muted">Optional — JPG, PNG, WEBP or SVG, max 2 MB</span>
+                        </div>
+                        <input type="file"
+                               id="photo"
+                               name="photo"
+                               accept=".jpg,.jpeg,.png,.webp,.svg"
+                               class="w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-xs sm:text-sm text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-soft file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-ink hover:file:bg-line cursor-pointer shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('photo') border-danger @enderror">
+                        @if($product->photo)
+                            <div class="mt-2.5 flex items-center gap-2.5 rounded-xl border border-line bg-soft/50 p-2.5">
+                                <x-thumbnail :src="$product->photo_url" :alt="$product->name . ' photo'" :label="$product->name" size="size-10 rounded-lg" />
+                                <p class="text-xs text-muted">Current photo — leave empty to keep it.</p>
+                            </div>
+                        @endif
+                        @error('photo')
                             <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>
                         @enderror
                     </div>
@@ -395,7 +419,9 @@
 
                 <div class="rounded-2xl border border-line bg-canvas/40 p-4 space-y-3">
                     <div class="flex items-center gap-3">
-                        @if($product->brand)
+                        @if($product->photo)
+                            <x-thumbnail :src="$product->photo_url" :alt="$product->name . ' photo'" :label="$product->name" size="size-10 rounded-xl" />
+                        @elseif($product->brand)
                             <x-brand-logo :name="$product->brand->name" size="sm" />
                         @endif
                         <div class="min-w-0">

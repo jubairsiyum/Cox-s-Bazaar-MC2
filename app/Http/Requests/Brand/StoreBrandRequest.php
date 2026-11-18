@@ -23,6 +23,7 @@ class StoreBrandRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255', Rule::unique('brands', 'name')->whereNull('deleted_at')],
+            'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:2048'],
             'note' => ['nullable', 'string', 'max:500'],
         ];
     }
@@ -34,6 +35,7 @@ class StoreBrandRequest extends FormRequest
     {
         return [
             'name' => 'Brand name',
+            'logo' => 'Logo',
             'note' => 'Short description',
         ];
     }

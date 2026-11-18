@@ -30,6 +30,7 @@ class UpdateBrandRequest extends FormRequest
                 'max:255',
                 Rule::unique('brands', 'name')->whereNull('deleted_at')->ignore($this->route('brand')?->id),
             ],
+            'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:2048'],
             'note' => ['nullable', 'string', 'max:500'],
         ];
     }
@@ -41,6 +42,7 @@ class UpdateBrandRequest extends FormRequest
     {
         return [
             'name' => 'Brand name',
+            'logo' => 'Logo',
             'note' => 'Short description',
         ];
     }

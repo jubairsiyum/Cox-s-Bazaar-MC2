@@ -65,7 +65,7 @@
     @endif
 
     {{-- Main 3-Column Form + Live Preview Layout --}}
-    <form method="POST" action="{{ route('products.store') }}" class="grid gap-6 xl:grid-cols-3 items-start">
+    <form method="POST" action="{{ route('products.store') }}" enctype="multipart/form-data" class="grid gap-6 xl:grid-cols-3 items-start">
         @csrf
 
         {{-- Left 2 Columns: Structured Form Cards --}}
@@ -98,6 +98,24 @@
                                placeholder="e.g. iPhone 15 Pro Max, Galaxy S24 Ultra"
                                class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('name') border-danger @enderror">
                         @error('name')
+                            <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    {{-- Product Photo --}}
+                    <div class="sm:col-span-2">
+                        <div class="flex items-center justify-between mb-2">
+                            <label for="photo" class="block text-xs font-semibold uppercase tracking-wider text-ink">
+                                Photo
+                            </label>
+                            <span class="text-[11px] text-muted">Optional — JPG, PNG, WEBP or SVG, max 2 MB</span>
+                        </div>
+                        <input type="file"
+                               id="photo"
+                               name="photo"
+                               accept=".jpg,.jpeg,.png,.webp,.svg"
+                               class="w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-xs sm:text-sm text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-soft file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-ink hover:file:bg-line cursor-pointer shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('photo') border-danger @enderror">
+                        @error('photo')
                             <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>
                         @enderror
                     </div>
