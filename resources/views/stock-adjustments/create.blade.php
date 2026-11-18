@@ -45,6 +45,7 @@
             'stockAdjustment' => $stockAdjustment ?? new \App\Models\StockAdjustment,
             'types' => $types,
             'typeHints' => $typeHints,
+            'locations' => $locations,
             'items' => $items,
         ])
     </form>

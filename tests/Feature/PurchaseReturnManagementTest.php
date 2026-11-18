@@ -2,12 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Models\Location;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseReturn;
 use App\Models\Supplier;
 use App\Models\Unit;
+use App\Models\User;
+use App\Notifications\GenericDatabaseNotification;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\SettingsSeeder;
+use Illuminate\Support\Facades\Notification;
 
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
@@ -254,4 +258,89 @@ it('blocks approving a return that exceeds the stock on hand', function () {
 
     expect($return->fresh()->approval_status->value)->toBe('pending')
         ->and($unit->fresh()->quantity)->toBe(1);
+});
+
+/**
+ * A verified purchasing user with the given role and branch/location assignment.
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function purchaseReturnTeamUser(string $role, array $attributes = []): User
+{
+    $user = User::factory()->create($attributes);
+    $user->assignRole($role);
+
+    return $user;
+}
+
+it('notifies the branch managers when a return awaits approval', function () {
+    Notification::fake();
+
+    $admin = actingAsSuperAdmin();
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $order = returnParentOrder($unit);
+
+    $manager = purchaseReturnTeamUser('Outlet Manager', ['location_id' => $order->location_id]);
+    $elsewhere = purchaseReturnTeamUser('Outlet Manager', ['location_id' => Location::factory()->create()->id]);
+
+    $this->post(route('purchase-returns.store'), purchaseReturnPayload($order))
+        ->assertRedirect(route('purchase-returns.index'));
+
+    $return = PurchaseReturn::first();
+
+    Notification::assertSentTo($manager, GenericDatabaseNotification::class, fn (GenericDatabaseNotification $notification): bool => str_contains($notification->title, $return->reference_no)
+        && str_contains($notification->title, 'awaits your approval')
+        && $notification->type === 'warning');
+    Notification::assertNotSentTo($admin, GenericDatabaseNotification::class);
+    Notification::assertNotSentTo($elsewhere, GenericDatabaseNotification::class);
+});
+
+it('notifies the creator when a return is approved or rejected', function () {
+    Notification::fake();
+
+    $admin = actingAsSuperAdmin();
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $order = returnParentOrder($unit);
+
+    $this->post(route('purchase-returns.store'), purchaseReturnPayload($order))->assertRedirect();
+    $approved = PurchaseReturn::first();
+
+    $this->patch(route('purchase-returns.approve', $approved))
+        ->assertRedirect(route('purchase-returns.index'));
+
+    Notification::assertSentTo($admin, GenericDatabaseNotification::class, fn (GenericDatabaseNotification $notification): bool => str_contains($notification->title, 'approved')
+        && $notification->type === 'success');
+
+    $this->post(route('purchase-returns.store'), purchaseReturnPayload($order))->assertRedirect();
+    $rejected = PurchaseReturn::orderByDesc('id')->first();
+
+    $this->patch(route('purchase-returns.reject', $rejected))
+        ->assertRedirect(route('purchase-returns.index'));
+
+    Notification::assertSentTo($admin, GenericDatabaseNotification::class, fn (GenericDatabaseNotification $notification): bool => str_contains($notification->title, 'rejected')
+        && $notification->type === 'error');
+});
+
+it('re-notifies the managers when a rejected return is resubmitted', function () {
+    Notification::fake();
+
+    $admin = actingAsSuperAdmin();
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $order = returnParentOrder($unit);
+
+    $manager = purchaseReturnTeamUser('Outlet Manager', ['location_id' => $order->location_id]);
+
+    $this->post(route('purchase-returns.store'), purchaseReturnPayload($order))->assertRedirect();
+    $return = PurchaseReturn::first();
+
+    $this->patch(route('purchase-returns.reject', $return))->assertRedirect();
+    expect($return->fresh()->approval_status->value)->toBe('rejected');
+
+    $this->patch(route('purchase-returns.update', $return), purchaseReturnPayload($order, [
+        'reason' => 'Wrong Product Delivered',
+    ]))->assertRedirect(route('purchase-returns.index'));
+
+    expect($return->fresh()->approval_status->value)->toBe('pending');
+
+    Notification::assertSentToTimes($manager, GenericDatabaseNotification::class, 2);
 });

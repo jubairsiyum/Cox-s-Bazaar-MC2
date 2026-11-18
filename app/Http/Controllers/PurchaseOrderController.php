@@ -17,6 +17,7 @@ use App\Models\Supplier;
 use App\Models\Unit;
 use App\Services\AuditService;
 use App\Services\LocationScope;
+use App\Services\PurchaseApprovalNotifier;
 use App\Services\PurchaseOrderService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -132,6 +133,7 @@ class PurchaseOrderController extends Controller
         }
 
         AuditService::created($order, "Purchase order '{$order->reference_no}' created.");
+        PurchaseApprovalNotifier::awaitingApproval($order);
 
         return redirect()->route('purchase-invoices.index')
             ->with('success', "Purchase order '{$order->reference_no}' created successfully.");
@@ -280,6 +282,7 @@ class PurchaseOrderController extends Controller
         }
 
         AuditService::updated($purchaseOrder, $original, "Purchase order '{$purchaseOrder->reference_no}' approved and received.");
+        PurchaseApprovalNotifier::decided($purchaseOrder, true);
 
         return redirect()->route('purchase-invoices.index')
             ->with('success', "Purchase order '{$purchaseOrder->reference_no}' approved. Stock received and supplier due updated.");
@@ -312,6 +315,7 @@ class PurchaseOrderController extends Controller
         });
 
         AuditService::updated($purchaseOrder, $original, "Purchase order '{$purchaseOrder->reference_no}' rejected.");
+        PurchaseApprovalNotifier::decided($purchaseOrder, false);
 
         return redirect()->route('purchase-invoices.index')
             ->with('success', "Purchase order '{$purchaseOrder->reference_no}' rejected.");

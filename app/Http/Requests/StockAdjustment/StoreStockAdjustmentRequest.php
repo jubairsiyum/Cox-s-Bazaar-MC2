@@ -7,6 +7,7 @@ namespace App\Http\Requests\StockAdjustment;
 use App\Enums\StockAdjustmentType;
 use App\Models\StockAdjustment;
 use App\Models\Unit;
+use App\Services\LocationScope;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -26,6 +27,7 @@ class StoreStockAdjustmentRequest extends FormRequest
         return [
             'reference_no' => ['nullable', 'string', 'max:50', Rule::unique('stock_adjustments', 'reference_no')->whereNull('deleted_at')],
             'adjustment_date' => ['required', 'date'],
+            'location_id' => ['required', 'integer', Rule::exists('locations', 'id'), $this->accessibleLocationRule()],
             'type' => ['required', Rule::enum(StockAdjustmentType::class)],
             'reason' => ['required', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
@@ -43,6 +45,7 @@ class StoreStockAdjustmentRequest extends FormRequest
         return [
             'reference_no' => 'Reference No',
             'adjustment_date' => 'Date',
+            'location_id' => 'Location',
             'type' => 'Adjustment type',
             'reason' => 'Reason',
             'items' => 'Products',
@@ -50,6 +53,18 @@ class StoreStockAdjustmentRequest extends FormRequest
             'items.*.quantity' => 'Quantity',
             'items.*.unit_price' => 'Unit Price',
         ];
+    }
+
+    /**
+     * Outlet Managers may only book adjustments against their own location.
+     */
+    protected function accessibleLocationRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if ($this->user() === null || ! LocationScope::canAccess($this->user(), $value)) {
+                $fail('You may only book adjustments for your own location.');
+            }
+        };
     }
 
     /**

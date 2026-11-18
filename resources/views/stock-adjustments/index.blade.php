@@ -7,18 +7,25 @@
 @php
     $sortLink = fn (string $col) => route('stock-adjustments.index', array_filter([
         'search' => request('search'),
+        'branch' => request('branch'),
         'per_page' => request('per_page'),
         'sort' => $col,
         'direction' => $sort === $col && $direction === 'desc' ? 'asc' : 'desc',
     ]));
 
-    // Single lightweight aggregate query for KPI intelligence strip (zero N+1)
-    $adjStats = \App\Models\StockAdjustment::query()
+    // Single lightweight aggregate query for KPI intelligence strip (zero N+1),
+    // scoped to the manager's location like the list itself.
+    $adjStatsQuery = \App\Models\StockAdjustment::query();
+    \App\Services\LocationScope::scopeQuery($adjStatsQuery, auth()->user(), 'location_id');
+    $adjStats = $adjStatsQuery
         ->selectRaw("
             COUNT(*) as total_count,
             SUM(CASE WHEN type = 'add' THEN 1 ELSE 0 END) as add_count,
             SUM(CASE WHEN type = 'remove' THEN 1 ELSE 0 END) as remove_count,
             SUM(CASE WHEN type = 'set' THEN 1 ELSE 0 END) as set_count,
+            SUM(CASE WHEN approval_status = 'pending' THEN 1 ELSE 0 END) as pending_count,
+            SUM(CASE WHEN approval_status = 'approved' THEN 1 ELSE 0 END) as approved_count,
+            SUM(CASE WHEN approval_status = 'rejected' THEN 1 ELSE 0 END) as rejected_count,
             COALESCE(SUM(total_amount), 0) as total_value,
             SUM(CASE WHEN adjustment_date >= ? THEN 1 ELSE 0 END) as month_count
         ", [now()->startOfMonth()])
@@ -28,12 +35,16 @@
     $addCount = (int) ($adjStats?->add_count ?? 0);
     $removeCount = (int) ($adjStats?->remove_count ?? 0);
     $setCount = (int) ($adjStats?->set_count ?? 0);
+    $pendingCount = (int) ($adjStats?->pending_count ?? 0);
+    $approvedCount = (int) ($adjStats?->approved_count ?? 0);
+    $rejectedCount = (int) ($adjStats?->rejected_count ?? 0);
     $totalValue = (float) ($adjStats?->total_value ?? 0);
     $monthCount = (int) ($adjStats?->month_count ?? 0);
 
     $pageAddCount = $adjustments->filter(fn ($a) => $a->type === \App\Enums\StockAdjustmentType::Add)->count();
     $pageRemoveCount = $adjustments->filter(fn ($a) => $a->type === \App\Enums\StockAdjustmentType::Remove)->count();
     $pageSetCount = $adjustments->filter(fn ($a) => $a->type === \App\Enums\StockAdjustmentType::Set)->count();
+    $pagePendingCount = $adjustments->filter(fn ($a) => $a->isPending())->count();
 @endphp
 
 <div x-data="adjustmentsPage()" class="space-y-6">
@@ -225,6 +236,7 @@
                 <div class="flex flex-col sm:flex-row sm:items-center gap-3 flex-1 min-w-0">
                     <form method="GET" action="{{ route('stock-adjustments.index') }}" class="flex items-center gap-2 shrink-0">
                         @if(request('search'))<input type="hidden" name="search" value="{{ request('search') }}">@endif
+                        @if(request('branch'))<input type="hidden" name="branch" value="{{ request('branch') }}">@endif
                         @if(request('sort'))<input type="hidden" name="sort" value="{{ request('sort') }}">@endif
                         @if(request('direction'))<input type="hidden" name="direction" value="{{ request('direction') }}">@endif
                         <label class="text-muted flex items-center gap-1.5 text-xs font-medium">
@@ -242,6 +254,7 @@
 
                     <form method="GET" action="{{ route('stock-adjustments.index') }}" class="relative flex-1 max-w-md">
                         @if(request('per_page'))<input type="hidden" name="per_page" value="{{ request('per_page') }}">@endif
+                        @if(request('branch'))<input type="hidden" name="branch" value="{{ request('branch') }}">@endif
                         @if(request('sort'))<input type="hidden" name="sort" value="{{ request('sort') }}">@endif
                         @if(request('direction'))<input type="hidden" name="direction" value="{{ request('direction') }}">@endif
 
@@ -253,13 +266,50 @@
                                    placeholder="Search reference no, reason, or type..."
                                    class="w-full rounded-xl border border-line bg-surface pl-10 pr-9 py-2 text-xs text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 transition-colors">
                             @if(request('search'))
-                                <a href="{{ route('stock-adjustments.index', array_filter(['per_page' => request('per_page'), 'sort' => request('sort'), 'direction' => request('direction')])) }}"
+                                <a href="{{ route('stock-adjustments.index', array_filter(['branch' => request('branch'), 'per_page' => request('per_page'), 'sort' => request('sort'), 'direction' => request('direction')])) }}"
                                    class="absolute inset-y-0 right-0 pr-3 flex items-center text-muted hover:text-ink cursor-pointer"
                                    title="Clear search">
                                     <x-svg.x class="size-3.5" />
                                 </a>
                             @endif
                         </div>
+                    </form>
+
+                    <form method="GET" action="{{ route('stock-adjustments.index') }}" class="flex items-center gap-2 shrink-0">
+                        @if(request('per_page'))<input type="hidden" name="per_page" value="{{ request('per_page') }}">@endif
+                        @if(request('search'))<input type="hidden" name="search" value="{{ request('search') }}">@endif
+                        @if(request('sort'))<input type="hidden" name="sort" value="{{ request('sort') }}">@endif
+                        @if(request('direction'))<input type="hidden" name="direction" value="{{ request('direction') }}">@endif
+                        <select name="status" onchange="this.form.submit()"
+                                class="rounded-xl border border-line bg-surface py-2 px-2.5 text-xs font-semibold text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 cursor-pointer">
+                            <option value="">All statuses</option>
+                            @foreach($statuses as $value => $label)
+                                <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        @unless(\App\Services\LocationScope::isRestricted(auth()->user()))
+                            <select name="location_id" onchange="this.form.submit()"
+                                    class="rounded-xl border border-line bg-surface py-2 px-2.5 text-xs font-semibold text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 cursor-pointer">
+                                <option value="">All locations</option>
+                                @foreach($locations as $location)
+                                    <option value="{{ $location->id }}" @selected(request('location_id') == $location->id)>{{ $location->name }}</option>
+                                @endforeach
+                            </select>
+                            <select name="branch" onchange="this.form.submit()"
+                                    class="rounded-xl border border-line bg-surface py-2 px-2.5 text-xs font-semibold text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 cursor-pointer">
+                                <option value="">All Branches</option>
+                                @foreach($branches as $branch)
+                                    <option value="{{ $branch->id }}" @selected(request('branch') == $branch->id)>{{ $branch->name }}</option>
+                                @endforeach
+                            </select>
+                        @endunless
+                        @if(request('status') || request('location_id') || request('branch'))
+                            <a href="{{ route('stock-adjustments.index', array_filter(['per_page' => request('per_page'), 'search' => request('search'), 'sort' => request('sort'), 'direction' => request('direction')])) }}"
+                               class="inline-flex items-center rounded-xl border border-line bg-surface px-2.5 py-2 text-xs font-semibold text-muted hover:text-ink hover:bg-soft transition-colors"
+                               title="Clear filters">
+                                <x-svg.x class="size-3.5" />
+                            </a>
+                        @endif
                     </form>
                 </div>
 
@@ -370,6 +420,7 @@
                                 <span class="text-[10px] text-brand-500 font-black">{{ $sort === 'type' ? ($direction === 'asc' ? '▲' : '▼') : '⇅' }}</span>
                             </a>
                         </th>
+                        <th x-show="columns.status" scope="col" class="py-3.5 px-5 text-start text-xs font-bold text-ink">Status</th>
                         <th x-show="columns.total_amount" scope="col" class="py-3.5 px-5 text-end">
                             <a href="{{ $sortLink('total_amount') }}" class="inline-flex items-center gap-1.5 font-bold text-ink hover:text-brand-500 transition-colors">
                                 <span>Total Amount</span>
@@ -401,6 +452,7 @@
                                 \App\Enums\StockAdjustmentType::Remove => 'bg-danger',
                                 \App\Enums\StockAdjustmentType::Set => 'bg-brand-500',
                             };
+                            $displayStatus = $adjustment->displayStatus();
                         @endphp
                         <tr x-show="typeFilter === 'all' || typeFilter === @js($adjustment->type->value)" class="hover:bg-soft/40 transition-colors duration-150 group">
                             <td x-show="columns.adjustment_date" data-col="adjustment_date" class="py-4 px-5 text-xs text-muted whitespace-nowrap tabular-nums">
@@ -418,6 +470,12 @@
                                     {{ $adjustment->type->label() }}
                                 </span>
                             </td>
+                            <td x-show="columns.status" data-col="status" class="py-4 px-5 text-start whitespace-nowrap">
+                                <x-status-badge :status="$displayStatus['value']" :label="$displayStatus['label']" />
+                                <span class="mt-1 block text-[11px] text-muted">
+                                    {{ $adjustment->location?->name ?? 'No location' }}
+                                </span>
+                            </td>
                             <td x-show="columns.total_amount" data-col="total_amount" class="py-4 px-5 text-end text-sm font-bold text-ink tabular-nums money whitespace-nowrap">
                                 {{ \App\Helpers\Money::format($adjustment->total_amount) }}
                             </td>
@@ -430,6 +488,26 @@
                             @can('stock-adjustments.manage')
                                 <td class="py-4 px-5 text-end whitespace-nowrap">
                                     <div class="inline-flex items-center justify-end gap-2">
+                                        @if($adjustment->isPending())
+                                            @can('approve', $adjustment)
+                                                <button type="button"
+                                                        @click="openActionModal('approve', @js(route('stock-adjustments.approve', $adjustment)), @js($adjustment->reference_no))"
+                                                        class="btn-scale inline-flex items-center gap-1.5 rounded-xl bg-success px-3 py-1.5 text-xs font-semibold text-on-brand shadow-2xs hover:opacity-95 transition-opacity cursor-pointer"
+                                                        title="Approve and apply this adjustment">
+                                                    <x-icon name="check" class="size-3.5" />
+                                                    <span>Approve</span>
+                                                </button>
+                                            @endcan
+                                            @can('reject', $adjustment)
+                                                <button type="button"
+                                                        @click="openActionModal('reject', @js(route('stock-adjustments.reject', $adjustment)), @js($adjustment->reference_no))"
+                                                        class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-danger/30 bg-danger/10 px-3 py-1.5 text-xs font-semibold text-danger hover:bg-danger hover:text-on-brand transition-colors cursor-pointer"
+                                                        title="Reject this adjustment request">
+                                                    <x-svg.x class="size-3.5" />
+                                                    <span>Reject</span>
+                                                </button>
+                                            @endcan
+                                        @endif
                                         @can('update', $adjustment)
                                             <a href="{{ route('stock-adjustments.edit', $adjustment) }}"
                                                class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs hover:border-brand-500 hover:text-brand-500 hover:bg-soft transition-colors">
@@ -439,7 +517,7 @@
                                         @endcan
                                         @can('delete', $adjustment)
                                             <button type="button"
-                                                    @click="confirmDelete(@js(route('stock-adjustments.destroy', $adjustment)), @js($adjustment->reference_no))"
+                                                    @click="openActionModal('delete', @js(route('stock-adjustments.destroy', $adjustment)), @js($adjustment->reference_no))"
                                                     class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-danger/30 bg-danger/10 px-3 py-1.5 text-xs font-semibold text-danger hover:bg-danger hover:text-on-brand transition-colors cursor-pointer">
                                                 <x-svg.trash-bin class="size-3.5" />
                                                 <span>Delete</span>
@@ -492,34 +570,50 @@
         </div>
     </div>
 
-    {{-- Delete Confirmation Modal --}}
-    <div x-show="deleteModalOpen" x-cloak
+    {{-- Approve / Reject / Delete Confirmation Modal --}}
+    <div x-show="actionModal.open" x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay backdrop-blur-xs"
-         @keydown.escape.window="deleteModalOpen = false">
+         @keydown.escape.window="actionModal.open = false">
         <div class="w-full max-w-md rounded-3xl border border-line bg-surface shadow-card p-6" @click.stop>
             <div class="flex items-start gap-3.5">
-                <div class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-danger/10 text-danger ring-1 ring-danger/20">
-                    <x-icon name="alert-triangle" class="size-5" />
+                <div class="flex size-11 shrink-0 items-center justify-center rounded-2xl ring-1"
+                     :class="actionModal.kind === 'approve' ? 'bg-success/10 text-success ring-success/20' : 'bg-danger/10 text-danger ring-danger/20'">
+                    <template x-if="actionModal.kind === 'approve'">
+                        <x-icon name="check" class="size-5" />
+                    </template>
+                    <template x-if="actionModal.kind !== 'approve'">
+                        <x-icon name="alert-triangle" class="size-5" />
+                    </template>
                 </div>
                 <div class="min-w-0 flex-1">
-                    <h3 class="text-base font-bold text-ink">Delete stock adjustment?</h3>
+                    <h3 class="text-base font-bold text-ink"
+                        x-text="actionModal.kind === 'approve' ? 'Approve & apply adjustment?' : (actionModal.kind === 'reject' ? 'Reject adjustment request?' : 'Delete stock adjustment?')"></h3>
                     <p class="mt-1.5 text-xs text-muted leading-relaxed">
-                        Are you sure you want to delete <strong class="text-ink" x-text="deleteRef"></strong>? Its stock effect will be automatically reversed if no subsequent movements occurred.
+                        <template x-if="actionModal.kind === 'approve'">
+                            <span>Approve <strong class="text-ink" x-text="actionModal.ref"></strong>? Its stock effect will be posted to the ledger and applied to the quantities.</span>
+                        </template>
+                        <template x-if="actionModal.kind === 'reject'">
+                            <span>Reject <strong class="text-ink" x-text="actionModal.ref"></strong>? The request is turned down and no stock is changed.</span>
+                        </template>
+                        <template x-if="actionModal.kind === 'delete'">
+                            <span>Are you sure you want to delete <strong class="text-ink" x-text="actionModal.ref"></strong>? Its stock effect will be automatically reversed if no subsequent movements occurred.</span>
+                        </template>
                     </p>
                 </div>
             </div>
             <div class="mt-6 flex items-center justify-end gap-2.5 pt-4 border-t border-line">
-                <button type="button" @click="deleteModalOpen = false"
+                <button type="button" @click="actionModal.open = false"
                         class="btn-scale rounded-xl border border-line bg-surface px-4 py-2 text-xs font-semibold text-ink hover:bg-soft transition-colors cursor-pointer">
                     Cancel
                 </button>
-                <form :action="deleteAction" method="POST">
+                <form :action="actionModal.url" method="POST">
                     @csrf
-                    @method('DELETE')
+                    <input type="hidden" name="_method" :value="actionModal.kind === 'delete' ? 'DELETE' : 'PATCH'">
                     <button type="submit"
-                            class="btn-scale inline-flex items-center gap-1.5 rounded-xl bg-danger px-4 py-2 text-xs font-semibold text-on-brand shadow-sm hover:opacity-95 transition-opacity cursor-pointer">
-                        <x-svg.trash-bin class="size-3.5" />
-                        <span>Delete & Reverse</span>
+                            class="btn-scale inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold text-on-brand shadow-sm hover:opacity-95 transition-opacity cursor-pointer"
+                            :class="actionModal.kind === 'approve' ? 'bg-success' : 'bg-danger'">
+                        <x-icon name="check" class="size-3.5" />
+                        <span x-text="actionModal.kind === 'approve' ? 'Approve & Apply' : (actionModal.kind === 'reject' ? 'Confirm Rejection' : 'Delete & Reverse')"></span>
                     </button>
                 </form>
             </div>
@@ -532,15 +626,19 @@
 function adjustmentsPage() {
     return {
         typeFilter: 'all',
-        deleteModalOpen: false,
-        deleteAction: '',
-        deleteRef: '',
+        actionModal: {
+            open: false,
+            kind: 'approve',
+            url: '',
+            ref: ''
+        },
 
         columnsDropdownOpen: false,
         columns: {
             adjustment_date: true,
             reference_no: true,
             type: true,
+            status: true,
             total_amount: true,
             reason: true,
             creator: true
@@ -549,6 +647,7 @@ function adjustmentsPage() {
             { key: 'adjustment_date', label: 'Date' },
             { key: 'reference_no', label: 'Reference No' },
             { key: 'type', label: 'Adjustment type' },
+            { key: 'status', label: 'Status' },
             { key: 'total_amount', label: 'Total Amount' },
             { key: 'reason', label: 'Reason' },
             { key: 'creator', label: 'Added By' }
@@ -556,10 +655,8 @@ function adjustmentsPage() {
 
         searchQuery: @js((string) request('search', '')),
 
-        confirmDelete(action, ref) {
-            this.deleteAction = action;
-            this.deleteRef = ref;
-            this.deleteModalOpen = true;
+        openActionModal(kind, url, ref) {
+            this.actionModal = { open: true, kind, url, ref };
         },
 
         toggleColumn(key) {

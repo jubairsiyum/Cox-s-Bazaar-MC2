@@ -76,6 +76,23 @@
                     <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
                 @enderror
             </div>
+
+            <div>
+                <label for="location_id" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                    Location <span class="text-danger">*</span>
+                </label>
+                <select id="location_id" name="location_id" required
+                        class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all cursor-pointer @error('location_id') border-danger @enderror">
+                    <option value="">Please Select</option>
+                    @foreach($locations as $location)
+                        <option value="{{ $location->id }}" @selected((string) old('location_id', $isEdit ? $stockAdjustment->location_id : (auth()->user()->location_id ?? '')) === (string) $location->id)>{{ $location->name }}</option>
+                    @endforeach
+                </select>
+                <p class="mt-1.5 text-xs text-muted leading-snug">The location this adjustment is booked against. It is applied to stock only after approval.</p>
+                @error('location_id')
+                    <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
+                @enderror
+            </div>
         </div>
     </div>
 

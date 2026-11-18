@@ -7,6 +7,7 @@
 @php
     $sortLink = fn (string $col) => route('stock-transfers.index', array_filter([
         'search' => request('search'),
+        'branch' => request('branch'),
         'per_page' => request('per_page'),
         'sort' => $col,
         'direction' => $sort === $col && $direction === 'desc' ? 'asc' : 'desc',
@@ -24,6 +25,7 @@
             SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) as draft_count,
             SUM(CASE WHEN status = 'in-transit' THEN 1 ELSE 0 END) as in_transit_count,
             SUM(CASE WHEN status = 'received' THEN 1 ELSE 0 END) as received_count,
+            SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected_count,
             SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled_count,
             COALESCE(SUM(total_amount), 0) as total_value,
             COALESCE(SUM(shipping_charges), 0) as total_shipping
@@ -34,6 +36,7 @@
     $draftCount = (int) ($transferStats?->draft_count ?? 0);
     $inTransitCount = (int) ($transferStats?->in_transit_count ?? 0);
     $receivedCount = (int) ($transferStats?->received_count ?? 0);
+    $rejectedCount = (int) ($transferStats?->rejected_count ?? 0);
     $cancelledCount = (int) ($transferStats?->cancelled_count ?? 0);
     $totalValue = (float) ($transferStats?->total_value ?? 0);
     $totalShipping = (float) ($transferStats?->total_shipping ?? 0);
@@ -42,6 +45,7 @@
     $pageDraftCount = $transfers->filter(fn ($t) => $t->status === \App\Enums\StockTransferStatus::Draft)->count();
     $pageTransitCount = $transfers->filter(fn ($t) => $t->status === \App\Enums\StockTransferStatus::InTransit)->count();
     $pageReceivedCount = $transfers->filter(fn ($t) => $t->status === \App\Enums\StockTransferStatus::Received)->count();
+    $pageRejectedCount = $transfers->filter(fn ($t) => $t->status === \App\Enums\StockTransferStatus::Rejected)->count();
     $pageCancelledCount = $transfers->filter(fn ($t) => $t->status === \App\Enums\StockTransferStatus::Cancelled)->count();
 @endphp
 
@@ -78,7 +82,7 @@
         </div>
 
         <div class="flex items-center gap-2.5 flex-wrap shrink-0">
-            @if(request('search') || request('sort'))
+            @if(request('search') || request('sort') || request('branch'))
                 <a href="{{ route('stock-transfers.index') }}"
                    class="btn-scale inline-flex items-center gap-1.5 rounded-2xl border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-muted hover:text-ink hover:bg-soft transition-colors shadow-2xs">
                     <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -234,6 +238,18 @@
                         {{ $pageDraftCount }}
                     </span>
                 </button>
+                @if($pageRejectedCount > 0)
+                    <button type="button"
+                            @click="statusFilter = 'rejected'"
+                            :class="statusFilter === 'rejected' ? 'bg-brand-500 text-on-brand shadow-xs' : 'bg-soft text-muted hover:text-ink'"
+                            class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer">
+                        <span>Rejected</span>
+                        <span class="rounded-full px-1.5 py-0.5 text-[10px]"
+                              :class="statusFilter === 'rejected' ? 'bg-surface/20 text-on-brand' : 'bg-surface text-danger'">
+                            {{ $pageRejectedCount }}
+                        </span>
+                    </button>
+                @endif
                 @if($pageCancelledCount > 0)
                     <button type="button"
                             @click="statusFilter = 'cancelled'"
@@ -256,6 +272,7 @@
                 <div class="flex flex-col sm:flex-row sm:items-center gap-3 flex-1 min-w-0">
                     <form method="GET" action="{{ route('stock-transfers.index') }}" class="flex items-center gap-2 shrink-0">
                         @if(request('search'))<input type="hidden" name="search" value="{{ request('search') }}">@endif
+                        @if(request('branch'))<input type="hidden" name="branch" value="{{ request('branch') }}">@endif
                         @if(request('sort'))<input type="hidden" name="sort" value="{{ request('sort') }}">@endif
                         @if(request('direction'))<input type="hidden" name="direction" value="{{ request('direction') }}">@endif
                         <label class="text-muted flex items-center gap-1.5 text-xs font-medium">
@@ -273,6 +290,7 @@
 
                     <form method="GET" action="{{ route('stock-transfers.index') }}" class="relative flex-1 max-w-md">
                         @if(request('per_page'))<input type="hidden" name="per_page" value="{{ request('per_page') }}">@endif
+                        @if(request('branch'))<input type="hidden" name="branch" value="{{ request('branch') }}">@endif
                         @if(request('sort'))<input type="hidden" name="sort" value="{{ request('sort') }}">@endif
                         @if(request('direction'))<input type="hidden" name="direction" value="{{ request('direction') }}">@endif
 
@@ -284,7 +302,7 @@
                                    placeholder="Search reference no, location, or notes..."
                                    class="w-full rounded-xl border border-line bg-surface pl-10 pr-9 py-2 text-xs text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 transition-colors">
                             @if(request('search'))
-                                <a href="{{ route('stock-transfers.index', array_filter(['per_page' => request('per_page'), 'sort' => request('sort'), 'direction' => request('direction')])) }}"
+                                <a href="{{ route('stock-transfers.index', array_filter(['branch' => request('branch'), 'per_page' => request('per_page'), 'sort' => request('sort'), 'direction' => request('direction')])) }}"
                                    class="absolute inset-y-0 right-0 pr-3 flex items-center text-muted hover:text-ink cursor-pointer"
                                    title="Clear search">
                                     <x-svg.x class="size-3.5" />
@@ -292,6 +310,22 @@
                             @endif
                         </div>
                     </form>
+
+                    @unless(\App\Services\LocationScope::isRestricted(auth()->user()))
+                        <form method="GET" action="{{ route('stock-transfers.index') }}" class="flex items-center gap-2 shrink-0">
+                            @if(request('search'))<input type="hidden" name="search" value="{{ request('search') }}">@endif
+                            @if(request('per_page'))<input type="hidden" name="per_page" value="{{ request('per_page') }}">@endif
+                            @if(request('sort'))<input type="hidden" name="sort" value="{{ request('sort') }}">@endif
+                            @if(request('direction'))<input type="hidden" name="direction" value="{{ request('direction') }}">@endif
+                            <select name="branch" onchange="this.form.submit()"
+                                    class="rounded-xl border border-line bg-surface py-2 px-2.5 text-xs font-semibold text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 cursor-pointer">
+                                <option value="">All Branches</option>
+                                @foreach($branches as $branch)
+                                    <option value="{{ $branch->id }}" @selected(request('branch') == $branch->id)>{{ $branch->name }}</option>
+                                @endforeach
+                            </select>
+                        </form>
+                    @endunless
                 </div>
 
                 {{-- Right: Segmented Export Bar + Column Visibility Dropdown --}}
@@ -421,9 +455,9 @@
                                 <span class="text-[10px] text-brand-500 font-black">{{ $sort === 'additional_notes' ? ($direction === 'asc' ? '▲' : '▼') : '⇅' }}</span>
                             </a>
                         </th>
-                        @can('stock-transfers.manage')
+                        @canany(['stock-transfers.manage', 'stock-transfers.approve'])
                             <th scope="col" class="py-3.5 px-5 text-end text-xs font-bold text-ink">Action</th>
-                        @endcan
+                        @endcanany
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-line bg-surface">
@@ -465,18 +499,18 @@
                             <td x-show="columns.additional_notes" data-col="additional_notes" class="py-4 px-5 text-start text-xs text-muted max-w-44 truncate" title="{{ $transfer->additional_notes }}">
                                 {{ $transfer->additional_notes ?: '—' }}
                             </td>
-                            @can('stock-transfers.manage')
+                            @canany(['stock-transfers.manage', 'stock-transfers.approve'])
                                 <td class="py-4 px-5 text-end whitespace-nowrap">
                                     <div class="inline-flex items-center justify-end gap-1.5">
-                                        {{-- Prominent Approve button when eligible --}}
+                                        {{-- Prominent Accept button when eligible --}}
                                         @can('approve', $transfer)
-                                            @if($transfer->status === \App\Enums\StockTransferStatus::InTransit)
+                                            @if(in_array($transfer->status, [\App\Enums\StockTransferStatus::Draft, \App\Enums\StockTransferStatus::InTransit], true))
                                                 <button type="button"
                                                         @click="openActionModal('approve', @js(route('stock-transfers.approve', $transfer)), @js($transfer->reference_no))"
                                                         class="btn-scale inline-flex items-center gap-1 rounded-xl bg-success px-2.5 py-1.5 text-xs font-semibold text-on-brand shadow-2xs hover:opacity-95 transition-opacity cursor-pointer"
-                                                        title="Approve and receive this transfer">
+                                                        title="Accept and receive this transfer">
                                                     <x-icon name="check" class="size-3.5" />
-                                                    <span>Approve</span>
+                                                    <span>Accept</span>
                                                 </button>
                                             @endif
                                         @endcan
@@ -490,6 +524,19 @@
                                                         title="Reject this transfer">
                                                     <x-svg.x class="size-3.5" />
                                                     <span>Reject</span>
+                                                </button>
+                                            @endif
+                                        @endcan
+
+                                        {{-- Cancel button for the sending side --}}
+                                        @can('cancel', $transfer)
+                                            @if(in_array($transfer->status, [\App\Enums\StockTransferStatus::Draft, \App\Enums\StockTransferStatus::InTransit], true))
+                                                <button type="button"
+                                                        @click="openActionModal('cancel', @js(route('stock-transfers.cancel', $transfer)), @js($transfer->reference_no))"
+                                                        class="btn-scale inline-flex items-center gap-1 rounded-xl border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-muted hover:text-ink hover:bg-soft transition-colors cursor-pointer"
+                                                        title="Cancel this transfer">
+                                                    <x-svg.x class="size-3.5" />
+                                                    <span>Cancel</span>
                                                 </button>
                                             @endif
                                         @endcan
@@ -531,7 +578,7 @@
                                         @endcan
                                     </div>
                                 </td>
-                            @endcan
+                            @endcanany
                         </tr>
                     @empty
                         <tr>
@@ -583,7 +630,7 @@
         <div class="w-full max-w-md rounded-3xl border border-line bg-surface shadow-card p-6" @click.stop>
             <div class="flex items-start gap-3.5">
                 <div class="flex size-11 shrink-0 items-center justify-center rounded-2xl ring-1"
-                     :class="actionModal.kind === 'approve' ? 'bg-success/10 text-success ring-success/20' : 'bg-danger/10 text-danger ring-danger/20'">
+                     :class="actionModal.kind === 'approve' ? 'bg-success/10 text-success ring-success/20' : (actionModal.kind === 'cancel' ? 'bg-soft text-muted ring-line' : 'bg-danger/10 text-danger ring-danger/20')">
                     <template x-if="actionModal.kind === 'approve'">
                         <x-icon name="check" class="size-5" />
                     </template>
@@ -593,13 +640,16 @@
                 </div>
                 <div class="min-w-0 flex-1">
                     <h3 class="text-base font-bold text-ink"
-                        x-text="actionModal.kind === 'approve' ? 'Approve & receive transfer?' : (actionModal.kind === 'reject' ? 'Reject stock transfer?' : 'Delete stock transfer?')"></h3>
+                        x-text="actionModal.kind === 'approve' ? 'Accept & receive transfer?' : (actionModal.kind === 'reject' ? 'Reject stock transfer?' : (actionModal.kind === 'cancel' ? 'Cancel stock transfer?' : 'Delete stock transfer?'))"></h3>
                     <p class="mt-1.5 text-xs text-muted leading-relaxed">
                         <template x-if="actionModal.kind === 'approve'">
                             <span>Confirm receipt of transfer <strong class="text-ink" x-text="actionModal.ref"></strong>. Stock will be posted as received at the destination location.</span>
                         </template>
                         <template x-if="actionModal.kind === 'reject'">
-                            <span>Reject transfer <strong class="text-ink" x-text="actionModal.ref"></strong>? It will be marked cancelled and any dispatched stock will return to the sender.</span>
+                            <span>Reject transfer <strong class="text-ink" x-text="actionModal.ref"></strong>? It will be marked rejected and any dispatched stock will return to the sender.</span>
+                        </template>
+                        <template x-if="actionModal.kind === 'cancel'">
+                            <span>Cancel transfer <strong class="text-ink" x-text="actionModal.ref"></strong>? The receiving side will be notified and any dispatched stock will return to the source.</span>
                         </template>
                         <template x-if="actionModal.kind === 'delete'">
                             <span>Are you sure you want to delete transfer <strong class="text-ink" x-text="actionModal.ref"></strong>?</span>
@@ -610,15 +660,15 @@
             <div class="mt-6 flex items-center justify-end gap-2.5 pt-4 border-t border-line">
                 <button type="button" @click="actionModal.open = false"
                         class="btn-scale rounded-xl border border-line bg-surface px-4 py-2 text-xs font-semibold text-ink hover:bg-soft transition-colors cursor-pointer">
-                    Cancel
+                    Close
                 </button>
                 <form :action="actionModal.url" method="POST">
                     @csrf
                     <input type="hidden" name="_method" :value="actionModal.kind === 'delete' ? 'DELETE' : 'PATCH'">
                     <button type="submit"
                             class="btn-scale inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold text-on-brand shadow-sm hover:opacity-95 transition-opacity cursor-pointer"
-                            :class="actionModal.kind === 'approve' ? 'bg-success' : 'bg-danger'">
-                        <span x-text="actionModal.kind === 'approve' ? 'Approve / Receive' : (actionModal.kind === 'reject' ? 'Reject Transfer' : 'Delete Transfer')"></span>
+                            :class="actionModal.kind === 'approve' ? 'bg-success' : (actionModal.kind === 'cancel' ? 'bg-soft text-ink' : 'bg-danger')">
+                        <span x-text="actionModal.kind === 'approve' ? 'Accept / Receive' : (actionModal.kind === 'reject' ? 'Reject Transfer' : (actionModal.kind === 'cancel' ? 'Cancel Transfer' : 'Delete Transfer'))"></span>
                     </button>
                 </form>
             </div>

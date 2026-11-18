@@ -6,6 +6,8 @@ namespace App\Http\Requests\StockTransfer;
 
 use App\Enums\StockTransferStatus;
 use App\Models\StockTransfer;
+use App\Services\LocationScope;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -24,8 +26,8 @@ class StoreStockTransferRequest extends FormRequest
         return [
             'transfer_date' => ['required', 'date'],
             'reference_no' => ['nullable', 'string', 'max:50', Rule::unique('stock_transfers', 'reference_no')->whereNull('deleted_at')],
-            'status' => ['required', Rule::enum(StockTransferStatus::class)],
-            'from_location_id' => ['required', 'integer', 'exists:locations,id'],
+            'status' => ['required', Rule::in(collect(StockTransferStatus::creatable())->map(fn (StockTransferStatus $status) => $status->value)->all())],
+            'from_location_id' => ['required', 'integer', 'exists:locations,id', $this->accessibleFromLocationRule()],
             'to_location_id' => ['required', 'integer', 'exists:locations,id', 'different:from_location_id'],
             'shipping_charges' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'additional_notes' => ['nullable', 'string', 'max:1000'],
@@ -34,6 +36,18 @@ class StoreStockTransferRequest extends FormRequest
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
         ];
+    }
+
+    /**
+     * Outlet Managers may only dispatch stock from their own location.
+     */
+    protected function accessibleFromLocationRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if ($this->user() === null || ! LocationScope::canAccess($this->user(), $value)) {
+                $fail('You may only dispatch stock from your own location.');
+            }
+        };
     }
 
     /**

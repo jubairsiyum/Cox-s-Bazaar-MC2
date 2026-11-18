@@ -17,10 +17,10 @@ it('renders the dashboard for authenticated users', function () {
     $this->actingAs($user)
         ->get(route('dashboard'))
         ->assertOk()
-        ->assertSee('Welcome back')
-        ->assertSee('Total Users')
-        ->assertSee('Active Users')
-        ->assertSee('Recently Added Users');
+        ->assertSee('Total Stock Value')
+        ->assertSee('Sales & Collection Trend')
+        ->assertSee('Low Stock & Reorder Alerts')
+        ->assertSee('Recent Distribution Invoices');
 });
 
 it('renders tailadmin showcase routes for authenticated users', function () {

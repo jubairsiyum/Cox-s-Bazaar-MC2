@@ -17,6 +17,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Services\AuditService;
 use App\Services\LocationScope;
+use App\Services\PurchaseApprovalNotifier;
 use App\Services\PurchaseReturnService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -129,6 +130,7 @@ class PurchaseReturnController extends Controller
         }
 
         AuditService::created($return, "Purchase return '{$return->reference_no}' created.");
+        PurchaseApprovalNotifier::awaitingApproval($return);
 
         return redirect()->route('purchase-returns.index')
             ->with('success', "Purchase return '{$return->reference_no}' submitted for approval.");
@@ -182,6 +184,7 @@ class PurchaseReturnController extends Controller
         $original = $purchaseReturn->getOriginal();
         $originalQuantities = $purchaseReturn->items->pluck('quantity', 'unit_id')->all();
         $wasApproved = $purchaseReturn->approval_status === ApprovalStatus::Approved;
+        $wasRejected = $purchaseReturn->approval_status === ApprovalStatus::Rejected;
         $validated = $request->validated();
         $order = PurchaseOrder::query()->with('items')->findOrFail($validated['purchase_order_id']);
         $items = $this->returnableItems($validated['items']);
@@ -220,6 +223,11 @@ class PurchaseReturnController extends Controller
         $this->deleteReplacedDocument($request, $original);
 
         AuditService::updated($purchaseReturn, $original, "Purchase return '{$purchaseReturn->reference_no}' updated.");
+
+        // A resubmitted return is back in the approval queue.
+        if ($wasRejected && $purchaseReturn->approval_status === ApprovalStatus::Pending) {
+            PurchaseApprovalNotifier::awaitingApproval($purchaseReturn);
+        }
 
         return redirect()->route('purchase-returns.index')
             ->with('success', "Purchase return '{$purchaseReturn->reference_no}' updated successfully.");
@@ -287,6 +295,7 @@ class PurchaseReturnController extends Controller
         }
 
         AuditService::updated($purchaseReturn, $original, "Purchase return '{$purchaseReturn->reference_no}' approved.");
+        PurchaseApprovalNotifier::decided($purchaseReturn, true);
 
         return redirect()->route('purchase-returns.index')
             ->with('success', "Purchase return '{$purchaseReturn->reference_no}' approved. Stock and supplier return due updated.");
@@ -316,6 +325,7 @@ class PurchaseReturnController extends Controller
         });
 
         AuditService::updated($purchaseReturn, $original, "Purchase return '{$purchaseReturn->reference_no}' rejected.");
+        PurchaseApprovalNotifier::decided($purchaseReturn, false);
 
         return redirect()->route('purchase-returns.index')
             ->with('success', "Purchase return '{$purchaseReturn->reference_no}' rejected.");

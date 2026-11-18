@@ -89,6 +89,28 @@ it('stores the uploaded photo path when creating a product', function () {
     Storage::disk('public')->assertExists($product->photo);
 });
 
+it('allows uploading an svg photo when creating a product', function () {
+    actingAsSuperAdmin();
+    Storage::fake('public');
+
+    $svgContent = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40"/></svg>';
+
+    $response = $this->post(route('products.store'), [
+        'name' => 'Pixel 9 Pro Svg',
+        'photo' => UploadedFile::fake()->createWithContent('pixel.svg', $svgContent)->mimeType('image/svg+xml'),
+    ]);
+
+    $response->assertSessionHasNoErrors();
+    $response->assertRedirect(route('products.index'));
+
+    $product = Product::where('name', 'Pixel 9 Pro Svg')->first();
+
+    expect($product)->not->toBeNull()
+        ->and($product->photo)->toStartWith('product-photos/');
+
+    Storage::disk('public')->assertExists($product->photo);
+});
+
 it('creates a product without a photo since the field is optional', function () {
     actingAsSuperAdmin();
     Storage::fake('public');

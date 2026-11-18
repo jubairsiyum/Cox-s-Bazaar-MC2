@@ -9,6 +9,7 @@ enum StockTransferStatus: string
     case Draft = 'draft';
     case InTransit = 'in-transit';
     case Received = 'received';
+    case Rejected = 'rejected';
     case Cancelled = 'cancelled';
 
     public function label(): string
@@ -17,6 +18,7 @@ enum StockTransferStatus: string
             self::Draft => 'Draft',
             self::InTransit => 'In Transit',
             self::Received => 'Received',
+            self::Rejected => 'Rejected',
             self::Cancelled => 'Cancelled',
         };
     }
@@ -48,8 +50,19 @@ enum StockTransferStatus: string
             self::Draft => [self::Draft, self::InTransit, self::Received, self::Cancelled],
             self::InTransit => [self::InTransit, self::Received, self::Cancelled],
             self::Received => [self::Received, self::Cancelled],
+            self::Rejected => [self::Rejected],
             self::Cancelled => [self::Cancelled],
         };
+    }
+
+    /**
+     * Statuses a transfer may be created with (the sender picks one of these).
+     *
+     * @return array<int, self>
+     */
+    public static function creatable(): array
+    {
+        return [self::Draft, self::InTransit, self::Cancelled];
     }
 
     /**

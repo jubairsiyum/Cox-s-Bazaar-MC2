@@ -4,12 +4,18 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\Branch;
 use App\Models\Brand;
 use App\Models\Category;
+use App\Models\Location;
 use App\Models\Setting;
+use App\Models\StockMovement;
 use App\Models\Unit;
+use App\Services\LocationScope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 class InventoryController extends Controller
@@ -24,6 +30,12 @@ class InventoryController extends Controller
     /**
      * Stock overview: every product variant with its quantity, valuation and
      * low/out-of-stock alerts (threshold from settings).
+     *
+     * Stock rows are shared across locations (one row per product variant),
+     * so the location and branch filters scope the ledger activity shown on
+     * the page and in the movement modal. Restricted users see their own
+     * scope only; Super Admins get the full overview plus the location and
+     * branch filters.
      */
     public function index(Request $request): View
     {
@@ -40,6 +52,9 @@ class InventoryController extends Controller
             ? $request->string('sort')->toString()
             : 'product_name';
         $direction = $request->string('direction')->toString() === 'desc' ? 'desc' : 'asc';
+
+        $locationFilter = $this->resolveLocationFilter($request);
+        $branchLocationIds = $this->resolveBranchLocationIds($request);
 
         $base = Unit::query()
             ->with(['product.brand', 'product.category'])
@@ -82,18 +97,27 @@ class InventoryController extends Controller
             'direction' => $direction,
             'brands' => Brand::orderBy('name')->get(),
             'categories' => Category::orderBy('name')->get(),
+            'locations' => Location::query()->active()->orderBy('name')->get(),
+            'locationFilter' => $locationFilter,
+            'branches' => Branch::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
+            'scopedMovements' => $this->scopedMovements($locationFilter, $branchLocationIds, $base),
         ]);
     }
 
     /**
      * Stock ledger history for one product variant (modal data).
      */
-    public function movements(Unit $unit): JsonResponse
+    public function movements(Request $request, Unit $unit): JsonResponse
     {
         $this->authorize('inventory.view');
 
+        $locationFilter = $this->resolveLocationFilter($request);
+        $branchLocationIds = $this->resolveBranchLocationIds($request);
+
         $movements = $unit->stockMovements()
             ->latest('id')
+            ->when($locationFilter !== null, fn ($q) => $q->where('location_id', $locationFilter))
+            ->when($branchLocationIds !== null, fn ($q) => $q->whereIn('location_id', $branchLocationIds))
             ->limit(50)
             ->get()
             ->map(fn ($movement) => [
@@ -109,5 +133,63 @@ class InventoryController extends Controller
             'product_name' => $unit->displayName(),
             'items' => $movements,
         ]);
+    }
+
+    /**
+     * The location the current view is scoped to, or null for the shared
+     * overview. Restricted users are locked to their own location; a
+     * restricted user without one matches nothing until the branch-aware
+     * scope lands centrally.
+     */
+    private function resolveLocationFilter(Request $request): ?int
+    {
+        $user = $request->user();
+
+        if (LocationScope::isRestricted($user)) {
+            return $user->location_id !== null ? (int) $user->location_id : -1;
+        }
+
+        return $request->filled('location_id') ? $request->integer('location_id') : null;
+    }
+
+    /**
+     * Location ids of the branch picked in the overview filter, or null when no
+     * branch filter applies. Only unrestricted users may filter by branch;
+     * restricted users keep their automatic location scoping. A branch without
+     * locations resolves to an empty list and therefore matches nothing.
+     *
+     * @return array<int, int>|null
+     */
+    private function resolveBranchLocationIds(Request $request): ?array
+    {
+        if (LocationScope::isRestricted($request->user()) || ! $request->filled('branch')) {
+            return null;
+        }
+
+        return Location::query()
+            ->where('branch_id', $request->integer('branch'))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /**
+     * Recent stock movements of the selected scope (latest first), limited to
+     * the stock lines matching the current table filters.
+     *
+     * @param  Builder<int, Unit>  $stockQuery
+     * @param  array<int, int>|null  $branchLocationIds
+     * @return Collection<int, StockMovement>
+     */
+    private function scopedMovements(?int $locationFilter, ?array $branchLocationIds, $stockQuery): Collection
+    {
+        return StockMovement::query()
+            ->with(['unit.product', 'location'])
+            ->whereIn('unit_id', (clone $stockQuery)->select('units.id'))
+            ->when($locationFilter !== null, fn ($q) => $q->where('location_id', $locationFilter))
+            ->when($branchLocationIds !== null, fn ($q) => $q->whereIn('location_id', $branchLocationIds))
+            ->latest('id')
+            ->limit(15)
+            ->get();
     }
 }
