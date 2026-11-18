@@ -42,6 +42,17 @@ it('creates a user and assigns roles', function () {
     $this->assertTrue($user->hasRole('Manager'));
 });
 
+it('automatically verifies provisioned accounts created outside the admin UI', function () {
+    // e.g. created via tinker or an ad-hoc seeder: still trusted, never walled.
+    $user = User::create([
+        'name' => 'Outlet Manager X',
+        'email' => 'outlet-x@example.com',
+        'password' => 'secret-password',
+    ]);
+
+    expect($user->fresh()->email_verified_at)->not->toBeNull();
+});
+
 it('rejects creating a user with a duplicate email', function () {
     actingAsSuperAdmin();
 

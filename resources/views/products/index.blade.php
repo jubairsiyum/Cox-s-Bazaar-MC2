@@ -125,6 +125,7 @@
                     <thead>
                         <tr style="background-color: var(--brand-500);">
                             <th class="p-2.5 font-bold text-xs tracking-wider" style="color: var(--on-brand) !important;">PRODUCT ID</th>
+                            <th class="p-2.5 font-bold text-xs tracking-wider" style="color: var(--on-brand) !important;">PHOTO</th>
                             <th class="p-2.5 font-bold text-xs tracking-wider" style="color: var(--on-brand) !important;">PRODUCT</th>
                             <th class="p-2.5 font-bold text-xs tracking-wider" style="color: var(--on-brand) !important;">MODEL</th>
                             <th class="p-2.5 font-bold text-xs tracking-wider" style="color: var(--on-brand) !important;">BARCODE / IMEI</th>
@@ -137,6 +138,13 @@
                         @forelse($products as $product)
                             <tr class="hover:bg-soft/60 transition">
                                 <td class="p-2.5 text-muted font-mono text-xs">{{ $product->product_id }}</td>
+                                <td class="p-2.5">
+                                    @if($product->photo)
+                                        <x-thumbnail :src="$product->photo_url" :alt="$product->name . ' photo'" :label="$product->name" />
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
                                 <td class="p-2.5">
                                     <div class="font-semibold text-ink">{{ $product->name }}</div>
                                     <div class="text-xs text-muted">
@@ -197,7 +205,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="p-8 text-center text-muted font-medium">
+                                <td colspan="8" class="p-8 text-center text-muted font-medium">
                                     No products found.
                                 </td>
                             </tr>

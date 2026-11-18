@@ -6,6 +6,8 @@ use App\Models\Unit;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\SettingsSeeder;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
@@ -68,6 +70,64 @@ it('creates a product and automatically assigns a PRD code', function () {
     ]);
 });
 
+it('stores the uploaded photo path when creating a product', function () {
+    actingAsSuperAdmin();
+    Storage::fake('public');
+
+    $response = $this->post(route('products.store'), [
+        'name' => 'iPhone 15 Pro Max',
+        'photo' => UploadedFile::fake()->image('iphone.png'),
+    ]);
+
+    $response->assertRedirect(route('products.index'));
+
+    $product = Product::where('name', 'iPhone 15 Pro Max')->first();
+
+    expect($product)->not->toBeNull()
+        ->and($product->photo)->toStartWith('product-photos/');
+
+    Storage::disk('public')->assertExists($product->photo);
+});
+
+it('creates a product without a photo since the field is optional', function () {
+    actingAsSuperAdmin();
+    Storage::fake('public');
+
+    $this->post(route('products.store'), [
+        'name' => 'iPhone 15 Pro Max',
+    ])->assertRedirect(route('products.index'));
+
+    $product = Product::where('name', 'iPhone 15 Pro Max')->first();
+
+    expect($product)->not->toBeNull()
+        ->and($product->photo)->toBeNull();
+});
+
+it('fails validation when the product photo is not an image', function () {
+    actingAsSuperAdmin();
+    Storage::fake('public');
+
+    $this->post(route('products.store'), [
+        'name' => 'iPhone 15 Pro Max',
+        'photo' => UploadedFile::fake()->createWithContent('photo.txt', 'not an image'),
+    ])->assertSessionHasErrors('photo');
+
+    expect(Product::where('name', 'iPhone 15 Pro Max')->first())->toBeNull();
+});
+
+it('shows the product photo in the products list', function () {
+    actingAsSuperAdmin();
+
+    Product::factory()->create([
+        'name' => 'iPhone 15 Pro Max',
+        'photo' => 'product-photos/iphone.png',
+    ]);
+
+    $this->get(route('products.index'))
+        ->assertOk()
+        ->assertSee('product-photos/iphone.png', false);
+});
+
 it('fails validation when product name is missing', function () {
     actingAsSuperAdmin();
 
@@ -99,6 +159,51 @@ it('updates an existing product', function () {
 
     expect($product->fresh()->name)->toBe('Updated Phone Name')
         ->and($product->fresh()->barcode)->toBe('998877665544332');
+});
+
+it('keeps the current photo when updating a product without a new upload', function () {
+    actingAsSuperAdmin();
+    Storage::fake('public');
+
+    $product = Product::factory()->create([
+        'name' => 'Old Phone Name',
+        'photo' => 'product-photos/old.png',
+    ]);
+
+    Storage::disk('public')->put('product-photos/old.png', 'old-photo');
+
+    $this->patch(route('products.update', $product), [
+        'name' => 'Updated Phone Name',
+    ])->assertRedirect(route('products.index'));
+
+    expect($product->fresh()->photo)->toBe('product-photos/old.png');
+
+    Storage::disk('public')->assertExists('product-photos/old.png');
+});
+
+it('replaces the product photo and removes the previous file on update', function () {
+    actingAsSuperAdmin();
+    Storage::fake('public');
+
+    $product = Product::factory()->create([
+        'name' => 'Old Phone Name',
+        'photo' => 'product-photos/old.png',
+    ]);
+
+    Storage::disk('public')->put('product-photos/old.png', 'old-photo');
+
+    $this->patch(route('products.update', $product), [
+        'name' => 'Updated Phone Name',
+        'photo' => UploadedFile::fake()->image('new-photo.png'),
+    ])->assertRedirect(route('products.index'));
+
+    $photo = $product->fresh()->photo;
+
+    expect($photo)->not->toBe('product-photos/old.png')
+        ->and($photo)->toStartWith('product-photos/');
+
+    Storage::disk('public')->assertExists($photo);
+    Storage::disk('public')->assertMissing('product-photos/old.png');
 });
 
 it('soft deletes a product', function () {

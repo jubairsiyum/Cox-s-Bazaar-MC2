@@ -11,6 +11,7 @@
         'brandId' => (int) old('brand_id', 0) ?: null,
         'name' => (string) old('name', ''),
         'note' => (string) old('note', ''),
+        'logoUrl' => null,
     ];
 
     $sortLink = fn (string $col) => route('brands.index', array_filter([
@@ -147,6 +148,7 @@
                                     <span class="text-xs opacity-70">{{ $sort === 'name' ? ($direction === 'asc' ? '↑' : '↓') : '⇅' }}</span>
                                 </a>
                             </th>
+                            <th x-show="columns.logo" class="p-3 text-sm font-bold text-ink">Logo</th>
                             <th x-show="columns.note" class="p-3">
                                 <a href="{{ $sortLink('note') }}" class="flex items-center gap-1 text-sm font-bold text-ink hover:text-brand-500">
                                     Note
@@ -164,6 +166,13 @@
                                 <td x-show="columns.name" data-col="name" class="p-3 text-sm font-medium text-ink">
                                     {{ $brand->name }}
                                 </td>
+                                <td x-show="columns.logo" data-col="logo" class="p-3">
+                                    @if($brand->logo)
+                                        <x-thumbnail :src="$brand->logo_url" :alt="$brand->name . ' logo'" :label="$brand->name" />
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
                                 <td x-show="columns.note" data-col="note" class="p-3 text-sm text-muted">
                                     {{ $brand->note ?: '—' }}
                                 </td>
@@ -172,7 +181,7 @@
                                         <div class="flex items-center gap-2">
                                             @can('update', $brand)
                                                 <button type="button"
-                                                        @click="openEdit(@js(['id' => $brand->id, 'name' => $brand->name, 'note' => $brand->note]))"
+                                                        @click="openEdit(@js(['id' => $brand->id, 'name' => $brand->name, 'note' => $brand->note, 'logoUrl' => $brand->logo_url]))"
                                                         class="inline-flex items-center gap-1 rounded-full border border-brand-500/60 px-3 py-1 text-xs font-medium text-brand-500 transition hover:bg-soft cursor-pointer">
                                                     <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -221,7 +230,7 @@
          class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-overlay py-10"
          @keydown.escape.window="closeModal()">
         <div class="w-full max-w-xl rounded-lg bg-surface shadow-2xl mx-4" @click.stop>
-            <form :action="formAction()" method="POST">
+            <form :action="formAction()" method="POST" enctype="multipart/form-data">
                 @csrf
                 <input type="hidden" name="_method" :value="editMode ? 'PATCH' : 'POST'">
                 <input type="hidden" name="_form_mode" :value="editMode ? 'edit' : 'add'">
@@ -264,6 +273,25 @@
                             <p class="mt-1 text-xs text-danger">{{ $message }}</p>
                         @enderror
                     </div>
+
+                    <div>
+                        <label for="brand-logo" class="mb-1.5 block text-sm font-bold text-ink">
+                            Logo:
+                        </label>
+                        <input type="file" id="brand-logo" name="logo" x-ref="logoInput"
+                               accept=".jpg,.jpeg,.png,.webp,.svg"
+                               class="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink file:mr-3 file:rounded file:border-0 file:bg-soft file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-ink cursor-pointer focus:outline-hidden focus:border-brand-500 @error('logo') border-danger @enderror">
+                        <p class="mt-1 text-xs text-muted">JPG, PNG, WEBP or SVG — max 2 MB.</p>
+                        <div x-show="logoUrl" class="mt-2 flex items-center gap-2">
+                            <img :src="logoUrl" alt="Current brand logo"
+                                 class="size-10 rounded border border-line bg-surface object-contain p-0.5"
+                                 onerror="this.remove()">
+                            <p class="text-xs text-muted">Current logo — leave empty to keep it.</p>
+                        </div>
+                        @error('logo')
+                            <p class="mt-1 text-xs text-danger">{{ $message }}</p>
+                        @enderror
+                    </div>
                 </div>
 
                 {{-- Modal Footer --}}
@@ -290,6 +318,7 @@ function brandsPage(state) {
         modalOpen: state.hasErrors,
         editMode: state.mode === 'edit',
         brandId: state.brandId,
+        logoUrl: state.logoUrl,
         form: {
             name: state.name,
             note: state.note
@@ -298,10 +327,12 @@ function brandsPage(state) {
         columnsDropdownOpen: false,
         columns: {
             name: true,
+            logo: true,
             note: true
         },
         columnList: [
             { key: 'name', label: 'Brands' },
+            { key: 'logo', label: 'Logo' },
             { key: 'note', label: 'Note' }
         ],
 
@@ -314,15 +345,25 @@ function brandsPage(state) {
         openAdd() {
             this.editMode = false;
             this.brandId = null;
+            this.logoUrl = null;
             this.form = { name: '', note: '' };
+            this.resetLogoInput();
             this.modalOpen = true;
         },
 
         openEdit(brand) {
             this.editMode = true;
             this.brandId = brand.id;
+            this.logoUrl = brand.logoUrl ?? null;
             this.form = { name: brand.name, note: brand.note ?? '' };
+            this.resetLogoInput();
             this.modalOpen = true;
+        },
+
+        resetLogoInput() {
+            if (this.$refs.logoInput) {
+                this.$refs.logoInput.value = '';
+            }
         },
 
         closeModal() {

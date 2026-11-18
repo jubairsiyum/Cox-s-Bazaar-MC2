@@ -8,11 +8,13 @@ use App\Services\DuplicateCheckService;
 use App\Services\NumberingService;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 
 class Product extends Model
 {
@@ -21,6 +23,7 @@ class Product extends Model
     protected $fillable = [
         'product_id',
         'name',
+        'photo',
         'brand_id',
         'category_id',
         'model',
@@ -74,6 +77,18 @@ class Product extends Model
     public function stockRow(): HasOne
     {
         return $this->hasOne(Unit::class);
+    }
+
+    // ── Accessors ────────────────────────────────────────────
+
+    /**
+     * Public URL of the stored product photo, or null when none is set.
+     */
+    protected function photoUrl(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): ?string => $this->photo ? Storage::disk('public')->url($this->photo) : null,
+        );
     }
 
     // ── Mutators ─────────────────────────────────────────────────────

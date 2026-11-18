@@ -35,7 +35,7 @@
         @endif
 
         <div class="card-body">
-            <form method="POST" action="{{ route('products.store') }}">
+            <form method="POST" action="{{ route('products.store') }}" enctype="multipart/form-data">
                 @csrf
 
                 <div class="max-w-3xl space-y-4">
@@ -49,6 +49,21 @@
                                 class="form-control @error('name') is-invalid @enderror"
                                 placeholder="e.g. iPhone 15 Pro Max, Galaxy S24 Ultra">
                             @error('name')
+                                <div class="form-error">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 items-center gap-2">
+                        <label for="photo"
+                            class="text-sm font-semibold text-ink sm:text-right">
+                            Photo
+                        </label>
+                        <div class="sm:col-span-2">
+                            <input type="file" id="photo" name="photo" accept=".jpg,.jpeg,.png,.webp,.svg"
+                                class="form-control @error('photo') is-invalid @enderror">
+                            <div class="mt-1 text-xs text-muted">Optional — JPG, PNG, WEBP or SVG, max 2 MB.</div>
+                            @error('photo')
                                 <div class="form-error">{{ $message }}</div>
                             @enderror
                         </div>

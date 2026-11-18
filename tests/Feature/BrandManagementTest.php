@@ -4,6 +4,8 @@ use App\Models\Brand;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\SettingsSeeder;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
@@ -66,6 +68,7 @@ it('shows the add brand modal on the brands list page', function () {
         ->assertSee('Add brand')
         ->assertSee('Brand name')
         ->assertSee('Short description')
+        ->assertSee('Logo')
         ->assertSee('Save');
 });
 
@@ -89,6 +92,51 @@ it('creates a brand from the add brand form', function () {
         'auditable_type' => Brand::class,
         'auditable_id' => $brand->id,
     ]);
+});
+
+it('stores the uploaded logo path when creating a brand', function () {
+    actingAsSuperAdmin();
+    Storage::fake('public');
+
+    $response = $this->post(route('brands.store'), [
+        'name' => 'OnePlus',
+        'note' => 'OnePlus flagship smartphones',
+        'logo' => UploadedFile::fake()->image('oneplus.png'),
+    ]);
+
+    $response->assertRedirect(route('brands.index'));
+
+    $brand = Brand::where('name', 'OnePlus')->first();
+
+    expect($brand)->not->toBeNull()
+        ->and($brand->logo)->toStartWith('brand-logos/');
+
+    Storage::disk('public')->assertExists($brand->logo);
+});
+
+it('fails validation when the logo is not an image', function () {
+    actingAsSuperAdmin();
+    Storage::fake('public');
+
+    $this->post(route('brands.store'), [
+        'name' => 'OnePlus',
+        'logo' => UploadedFile::fake()->createWithContent('logo.txt', 'not an image'),
+    ])->assertSessionHasErrors('logo');
+
+    expect(Brand::where('name', 'OnePlus')->first())->toBeNull();
+});
+
+it('shows the brand logo in the brands list', function () {
+    actingAsSuperAdmin();
+
+    Brand::factory()->create([
+        'name' => 'Samsung',
+        'logo' => 'brand-logos/samsung.png',
+    ]);
+
+    $this->get(route('brands.index'))
+        ->assertOk()
+        ->assertSee('brand-logos/samsung.png', false);
 });
 
 it('fails validation when brand name is missing', function () {
@@ -153,6 +201,51 @@ it('updates an existing brand', function () {
         'auditable_type' => Brand::class,
         'auditable_id' => $brand->id,
     ]);
+});
+
+it('keeps the current logo when updating a brand without a new upload', function () {
+    actingAsSuperAdmin();
+    Storage::fake('public');
+
+    $brand = Brand::factory()->create([
+        'name' => 'Old Brand Name',
+        'logo' => 'brand-logos/old.png',
+    ]);
+
+    Storage::disk('public')->put('brand-logos/old.png', 'old-logo');
+
+    $this->patch(route('brands.update', $brand), [
+        'name' => 'Updated Brand Name',
+    ])->assertRedirect(route('brands.index'));
+
+    expect($brand->fresh()->logo)->toBe('brand-logos/old.png');
+
+    Storage::disk('public')->assertExists('brand-logos/old.png');
+});
+
+it('replaces the logo and removes the previous file on update', function () {
+    actingAsSuperAdmin();
+    Storage::fake('public');
+
+    $brand = Brand::factory()->create([
+        'name' => 'Old Brand Name',
+        'logo' => 'brand-logos/old.png',
+    ]);
+
+    Storage::disk('public')->put('brand-logos/old.png', 'old-logo');
+
+    $this->patch(route('brands.update', $brand), [
+        'name' => 'Updated Brand Name',
+        'logo' => UploadedFile::fake()->image('new-logo.png'),
+    ])->assertRedirect(route('brands.index'));
+
+    $logo = $brand->fresh()->logo;
+
+    expect($logo)->not->toBe('brand-logos/old.png')
+        ->and($logo)->toStartWith('brand-logos/');
+
+    Storage::disk('public')->assertExists($logo);
+    Storage::disk('public')->assertMissing('brand-logos/old.png');
 });
 
 it('soft deletes a brand', function () {
