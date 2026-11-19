@@ -6,8 +6,47 @@
 @php
   // Safe Dynamic Data Resolution with Fallbacks
   try {
-      // 1. Stock Metrics from Units and Products
-      $totalStockUnits = (int) (\App\Models\Unit::sum('quantity') ?: 384);
+      // 1. Live Sales Metrics from SalesInvoices
+      $todaySales = (float) \App\Models\SalesInvoice::whereDate('invoice_date', today())
+          ->where('status', \App\Enums\SalesInvoiceStatus::Posted)
+          ->sum('grand_total');
+
+      $yesterdaySales = (float) \App\Models\SalesInvoice::whereDate('invoice_date', today()->subDay())
+          ->where('status', \App\Enums\SalesInvoiceStatus::Posted)
+          ->sum('grand_total');
+
+      $salesChangePct = $yesterdaySales > 0
+          ? (int) round((($todaySales - $yesterdaySales) / $yesterdaySales) * 100)
+          : ($todaySales > 0 ? 100 : 0);
+
+      $todayInvoicesCount = (int) \App\Models\SalesInvoice::whereDate('invoice_date', today())
+          ->where('status', \App\Enums\SalesInvoiceStatus::Posted)
+          ->count();
+
+      // 2. Collections (Recorded payments on sales invoices)
+      $todayCollection = (float) \App\Models\SalesInvoice::whereDate('invoice_date', today())
+          ->sum('paid_amount');
+
+      $yesterdayCollection = (float) \App\Models\SalesInvoice::whereDate('invoice_date', today()->subDay())
+          ->sum('paid_amount');
+
+      $collectionChangePct = $yesterdayCollection > 0
+          ? (int) round((($todayCollection - $yesterdayCollection) / $yesterdayCollection) * 100)
+          : ($todayCollection > 0 ? 100 : 0);
+
+      // 3. Retailer Dues (Total Outstanding Receivables on posted invoices)
+      $totalReceivableDue = (float) \App\Models\SalesInvoice::where('status', \App\Enums\SalesInvoiceStatus::Posted)
+          ->sum('due_amount');
+
+      $overdueReceivable = (float) \App\Models\SalesInvoice::where('status', \App\Enums\SalesInvoiceStatus::Posted)
+          ->whereDate('invoice_date', '<', today()->subDays(30))
+          ->where('due_amount', '>', 0)
+          ->sum('due_amount');
+
+      $activeRetailersCount = (int) \App\Models\Customer::where('status', 'active')->count();
+
+      // 4. Stock Valuation & Inventory Units
+      $totalStockUnits = (int) \App\Models\Unit::sum('quantity');
 
       $rawStockValue = \Illuminate\Support\Facades\DB::table('units')
           ->join('products', 'units.product_id', '=', 'products.id')
@@ -15,54 +54,186 @@
           ->whereNull('units.deleted_at')
           ->selectRaw('SUM(units.quantity * COALESCE(products.purchase_price, products.sale_price, 0)) as total_val')
           ->value('total_val');
-      $totalStockValue = $rawStockValue ? (float) $rawStockValue : 8650000;
+      $totalStockValue = $rawStockValue ? (float) $rawStockValue : 0;
 
-      // Primary active warehouse
+      // Primary active warehouse / central location
       $primaryWarehouse = \App\Models\Location::where('status', 'active')
           ->where('type', \App\Enums\LocationType::Warehouse->value ?? 'warehouse')
           ->value('name')
           ?? \App\Models\Location::where('status', 'active')->value('name')
           ?? 'Central Warehouse';
 
-      // 2. Active Retailers Count
-      $activeRetailersCount = \App\Models\Customer::where('status', 'active')->count() ?: 48;
-
-      // 3. Low Stock & Reorder Alerts (Products with stock <= 10)
-      $lowStockProducts = \App\Models\Product::with(['brand', 'stockRow'])
-          ->where('status', 'active')
-          ->whereHas('stockRow', fn ($q) => $q->where('quantity', '<=', 10))
-          ->take(5)
-          ->get();
-
-      if ($lowStockProducts->isNotEmpty()) {
-          $dynamicAlertItems = $lowStockProducts->map(function ($p) {
-              $stock = (int) ($p->stockRow?->quantity ?? 0);
-              $brandName = $p->brand?->name ?? 'Brand';
-              $modelName = $p->model
-                  ? "{$p->name} ({$p->model})"
-                  : ($p->storage ? "{$p->name} ({$p->storage})" : $p->name);
-
-              return [
-                  'sku' => $p->product_id ?? ('PRD-' . str_pad((string) $p->id, 4, '0', STR_PAD_LEFT)),
-                  'brand' => $brandName,
-                  'model' => $modelName,
-                  'color' => $p->color ?? 'Standard',
-                  'stock' => $stock,
-                  'min' => 10,
-                  'status' => $stock <= 3 ? 'critical' : 'low',
-              ];
-          })->all();
-      } else {
-          $dynamicAlertItems = null;
-      }
-
-      // 4. Dispatched stock today (from stock transfers if available)
+      // 5. Stock Transfers & Field Placement
       $todayDispatched = (int) \App\Models\StockTransfer::whereDate('transfer_date', today())
           ->join('stock_transfer_items', 'stock_transfers.id', '=', 'stock_transfer_items.stock_transfer_id')
           ->sum('stock_transfer_items.quantity');
-      $dispatchedCount = $todayDispatched > 0 ? $todayDispatched : 32;
 
-      // 5. Stocked Brands Share (single lightweight aggregate query — only brands with available stock)
+      $todayPlaced = (int) \App\Models\StockTransfer::whereDate('transfer_date', today())
+          ->where('status', \App\Enums\StockTransferStatus::Received ?? 'received')
+          ->join('stock_transfer_items', 'stock_transfers.id', '=', 'stock_transfer_items.stock_transfer_id')
+          ->sum('stock_transfer_items.quantity');
+
+      $todayInTransit = max(0, $todayDispatched - $todayPlaced);
+      $activeRoutes = (int) \App\Models\Location::where('status', 'active')->count();
+
+      // Fallback captions
+      $todaySalesCaption = $todayInvoicesCount > 0
+          ? $todayInvoicesCount . ' ' . \Illuminate\Support\Str::plural('Invoice', $todayInvoicesCount) . ' Posted Today'
+          : ($todayDispatched > 0 ? $todayDispatched . ' Handsets Dispatched' : 'No invoices posted yet today');
+
+      $todayCollectionCaption = $todayCollection > 0
+          ? 'Collected today against invoices'
+          : 'No invoice collections today';
+
+      $retailerDuesCaption = $overdueReceivable > 0
+          ? 'Overdue ৳' . number_format($overdueReceivable) . ' · ' . $activeRetailersCount . ' Retailers'
+          : ($activeRetailersCount . ' Active ' . \Illuminate\Support\Str::plural('Retailer', $activeRetailersCount));
+
+      $stockValueCaption = $totalStockUnits > 0
+          ? number_format($totalStockUnits) . ' Units in ' . $primaryWarehouse
+          : '0 units registered in inventory';
+
+      // 6. Dynamic Low Stock & Reorder Alerts
+      $lowStockThreshold = (int) \App\Models\Setting::get('low_stock_threshold', 10);
+      $lowStockProducts = \App\Models\Product::with(['brand', 'stockRow'])
+          ->where('status', 'active')
+          ->whereHas('stockRow', fn ($q) => $q->where('quantity', '<=', $lowStockThreshold))
+          ->take(5)
+          ->get();
+
+      $dynamicAlertItems = $lowStockProducts->map(function ($p) use ($lowStockThreshold) {
+          $stock = (int) ($p->stockRow?->quantity ?? 0);
+          $brandName = $p->brand?->name ?? 'Brand';
+          $modelName = $p->model
+              ? "{$p->name} ({$p->model})"
+              : ($p->storage ? "{$p->name} ({$p->storage})" : $p->name);
+
+          return [
+              'sku' => $p->product_id ?? ('PRD-' . str_pad((string) $p->id, 4, '0', STR_PAD_LEFT)),
+              'brand' => $brandName,
+              'model' => $modelName,
+              'color' => $p->color ?? 'Standard',
+              'stock' => $stock,
+              'min' => $lowStockThreshold,
+              'status' => $stock <= 3 ? 'critical' : 'low',
+          ];
+      })->all();
+
+      // 7. Dynamic Sales & Collection Trend Chart Data
+      $start7d = today()->subDays(6);
+      $invoices7d = \App\Models\SalesInvoice::whereDate('invoice_date', '>=', $start7d)
+          ->selectRaw("DATE(invoice_date) as d, 
+                       SUM(CASE WHEN status = 'posted' THEN grand_total ELSE 0 END) as s_total, 
+                       SUM(paid_amount) as c_total")
+          ->groupBy('d')
+          ->get()
+          ->keyBy('d');
+
+      $days7Categories = [];
+      $days7Sales = [];
+      $days7Collections = [];
+      for ($i = 6; $i >= 0; $i--) {
+          $targetDay = today()->subDays($i);
+          $dStr = $targetDay->toDateString();
+          $days7Categories[] = $targetDay->format('D');
+          $days7Sales[] = round((float) ($invoices7d[$dStr]->s_total ?? 0), 2);
+          $days7Collections[] = round((float) ($invoices7d[$dStr]->c_total ?? 0), 2);
+      }
+
+      // 30d (Last 4 weeks aggregated)
+      $weeksCategories = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+      $weeksSales = [0, 0, 0, 0];
+      $weeksCollections = [0, 0, 0, 0];
+      $start30d = today()->subDays(27);
+      $invoices30d = \App\Models\SalesInvoice::whereDate('invoice_date', '>=', $start30d)
+          ->selectRaw("DATE(invoice_date) as d, 
+                       SUM(CASE WHEN status = 'posted' THEN grand_total ELSE 0 END) as s_total, 
+                       SUM(paid_amount) as c_total")
+          ->groupBy('d')
+          ->get()
+          ->keyBy('d');
+
+      for ($w = 0; $w < 4; $w++) {
+          $wStart = today()->subDays(27 - ($w * 7));
+          for ($offset = 0; $offset < 7; $offset++) {
+              $curDateStr = (clone $wStart)->addDays($offset)->toDateString();
+              if (isset($invoices30d[$curDateStr])) {
+                  $weeksSales[$w] += (float) $invoices30d[$curDateStr]->s_total;
+                  $weeksCollections[$w] += (float) $invoices30d[$curDateStr]->c_total;
+              }
+          }
+          $weeksSales[$w] = round($weeksSales[$w], 2);
+          $weeksCollections[$w] = round($weeksCollections[$w], 2);
+      }
+
+      // Year (Current year, 12 months)
+      $yearMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      $yearSales = array_fill(0, 12, 0);
+      $yearCollections = array_fill(0, 12, 0);
+      $invoicesYear = \App\Models\SalesInvoice::whereYear('invoice_date', now()->year)
+          ->selectRaw("MONTH(invoice_date) as m, 
+                       SUM(CASE WHEN status = 'posted' THEN grand_total ELSE 0 END) as s_total, 
+                       SUM(paid_amount) as c_total")
+          ->groupBy('m')
+          ->get()
+          ->keyBy('m');
+
+      for ($m = 1; $m <= 12; $m++) {
+          if (isset($invoicesYear[$m])) {
+              $yearSales[$m - 1] = round((float) $invoicesYear[$m]->s_total, 2);
+              $yearCollections[$m - 1] = round((float) $invoicesYear[$m]->c_total, 2);
+          }
+      }
+
+      $dynamicChartPeriods = [
+          '7d' => [
+              'label' => 'Last 7 Days',
+              'categories' => $days7Categories,
+              'sales' => $days7Sales,
+              'collections' => $days7Collections,
+          ],
+          '30d' => [
+              'label' => 'This Month',
+              'categories' => $weeksCategories,
+              'sales' => $weeksSales,
+              'collections' => $weeksCollections,
+          ],
+          'year' => [
+              'label' => 'This Year',
+              'categories' => $yearMonths,
+              'sales' => $yearSales,
+              'collections' => $yearCollections,
+          ],
+      ];
+
+      // 8. Dynamic Recent Invoices
+      $recentInvoicesList = \App\Models\SalesInvoice::with(['customer', 'items.unit', 'creator', 'location'])
+          ->latest('invoice_date')
+          ->take(5)
+          ->get();
+
+      $dynamicRecentInvoices = $recentInvoicesList->map(function ($inv) {
+          $customer = $inv->customer;
+          $items = $inv->items;
+          $itemsSummary = $items->isEmpty()
+              ? '—'
+              : $items->take(2)->map(fn ($it) => ($it->unit?->displayName() ?? 'Handset') . ' (' . $it->quantity . 'x)')->implode(', ')
+                . ($items->count() > 2 ? ' +' . ($items->count() - 2) . ' more' : '');
+
+          return [
+              'invoice_no' => $inv->invoice_no,
+              'retailer' => $customer?->name ?? 'Walk-in Customer',
+              'location' => filled($customer?->city) ? $customer->city : ($inv->location?->name ?? 'Main Outlet'),
+              'items' => $itemsSummary,
+              'sr' => $inv->creator?->name ?? 'Sales Staff',
+              'amount' => (float) $inv->grand_total,
+              'status' => $inv->payment_status?->value ?? 'due',
+              'date' => $inv->invoice_date ? $inv->invoice_date->format('d M, h:i A') : 'Today',
+              'url' => route('sales-invoices.show', $inv),
+          ];
+      })->all();
+
+      // 9. Stocked Brands Share
       $totalRegisteredBrands = (int) \App\Models\Brand::query()->count();
       $stockedBrandRows = \Illuminate\Support\Facades\DB::table('brands')
           ->join('products', function ($join) {
@@ -107,10 +278,9 @@
           $sumValue = (float) $stockedBrandRows->sum('stock_value');
           $sumUnits = (int) $stockedBrandRows->sum('stock_units');
           $useValueMetric = $sumValue > 0;
-          $monthMultipliers = [0.84, 0.87, 0.89, 0.88, 0.91, 0.94, 0.93, 0.96, 0.95, 0.97, 0.98, 1.00];
 
           $dynamicBrandShares = $stockedBrandRows->values()->map(function ($row, $idx) use (
-              $sumValue, $sumUnits, $useValueMetric, $brandPalette, $formatCompactBdt, $monthMultipliers
+              $sumValue, $sumUnits, $useValueMetric, $brandPalette, $formatCompactBdt
           ) {
               $val = (float) $row->stock_value;
               $units = (int) $row->stock_units;
@@ -119,16 +289,10 @@
                   : round(($units / max(1, $sumUnits)) * 100, 1);
 
               $color = $brandPalette[$idx % count($brandPalette)];
-              $waveShift = (($idx % 4) - 1.5) * 0.03;
 
-              $shareSeries = [];
-              $volumeSeries = [];
-              foreach ($monthMultipliers as $mIdx => $mult) {
-                  $isLast = $mIdx === count($monthMultipliers) - 1;
-                  $factor = $isLast ? 1.0 : max(0.5, $mult + (($mIdx % 3 === 0 ? 1 : -1) * $waveShift));
-                  $shareSeries[] = $isLast ? $share : round($share * $factor, 1);
-                  $volumeSeries[] = $isLast ? round($val, 2) : round($val * $factor, 2);
-              }
+              // 12-month share distribution initialized with current baseline
+              $shareSeries = array_fill(0, 12, $share);
+              $volumeSeries = array_fill(0, 12, round($val, 2));
 
               return [
                   'id' => (int) $row->id,
@@ -143,19 +307,34 @@
               ];
           })->all();
       } elseif ($totalRegisteredBrands > 0) {
-          // Brands are registered, none stocked yet -> show empty state until stock arrives
           $dynamicBrandShares = [];
       }
 
   } catch (\Throwable $e) {
-      $totalStockUnits = 384;
-      $totalStockValue = 8650000;
+      $todaySales = 0;
+      $salesChangePct = 0;
+      $todayInvoicesCount = 0;
+      $todayCollection = 0;
+      $collectionChangePct = 0;
+      $totalReceivableDue = 0;
+      $overdueReceivable = 0;
+      $activeRetailersCount = 0;
+      $totalStockUnits = 0;
+      $totalStockValue = 0;
       $primaryWarehouse = 'Central Warehouse';
-      $activeRetailersCount = 48;
-      $dynamicAlertItems = null;
-      $dispatchedCount = 32;
+      $todayDispatched = 0;
+      $todayPlaced = 0;
+      $todayInTransit = 0;
+      $activeRoutes = 1;
+      $todaySalesCaption = 'No sales recorded yet';
+      $todayCollectionCaption = 'No collections today';
+      $retailerDuesCaption = '0 Retailers';
+      $stockValueCaption = '0 Units registered';
+      $dynamicAlertItems = [];
+      $dynamicChartPeriods = null;
+      $dynamicRecentInvoices = [];
       $totalRegisteredBrands = 0;
-      $dynamicBrandShares = null;
+      $dynamicBrandShares = [];
   }
 
   $hour = (int) now()->format('H');
@@ -228,6 +407,11 @@
               <x-icon name="truck" class="size-4 text-muted" />
               <span>Add Supplier</span>
             </a>
+            <a href="{{ route('pos.index') }}"
+               class="flex items-center gap-2 rounded-xl px-3 py-2 font-medium text-ink transition-colors hover:bg-soft hover:text-brand-500">
+              <x-icon name="cart" class="size-4 text-muted" />
+              <span>POS Terminal</span>
+            </a>
           </div>
         </div>
       </div>
@@ -238,9 +422,9 @@
       <div class="flex flex-col">
         <x-dashboard.stat-card 
           title="Today's Sales" 
-          :amount="184500" 
-          :change="18" 
-          :caption="$dispatchedCount . ' Handsets Dispatched'" 
+          :amount="$todaySales" 
+          :change="$salesChangePct" 
+          :caption="$todaySalesCaption" 
           icon="cart"
           class="rv mv-blur lift"
           style="--i:1; --stagger:160ms; --d:80ms"
@@ -249,9 +433,9 @@
       <div class="flex flex-col">
         <x-dashboard.stat-card 
           title="Today's Collection" 
-          :amount="125000" 
-          :change="24" 
-          caption="Cash ৳75k / Bank ৳50k" 
+          :amount="$todayCollection" 
+          :change="$collectionChangePct" 
+          :caption="$todayCollectionCaption" 
           icon="wallet"
           class="rv mv-blur lift"
           style="--i:2; --stagger:160ms; --d:80ms"
@@ -260,9 +444,9 @@
       <div class="flex flex-col">
         <x-dashboard.stat-card 
           title="Retailer Dues (Receivable)" 
-          :amount="1420000" 
-          :change="-8" 
-          :caption="'Overdue ৳1,45,000 / ' . $activeRetailersCount . ' Retailers'" 
+          :amount="$totalReceivableDue" 
+          :change="0" 
+          :caption="$retailerDuesCaption" 
           icon="store"
           class="rv mv-blur lift"
           style="--i:3; --stagger:160ms; --d:80ms"
@@ -272,8 +456,8 @@
         <x-dashboard.stat-card 
           title="Total Stock Value" 
           :amount="$totalStockValue" 
-          :change="12" 
-          :caption="$totalStockUnits . ' Units in ' . $primaryWarehouse" 
+          :change="0" 
+          :caption="$stockValueCaption" 
           icon="box"
           class="rv mv-blur lift"
           style="--i:4; --stagger:160ms; --d:80ms"
@@ -284,21 +468,28 @@
     {{-- 2. Middle Row: Sales vs. Collection Trend (2 Cols) + SR Field Distribution (1 Col) --}}
     <div class="grid gap-5 xl:grid-cols-3 items-stretch">
       <div class="xl:col-span-2 flex flex-col">
-        <x-dashboard.sales-chart class="rv" style="--i:5; --stagger:130ms; --d:100ms" />
+        @if ($dynamicChartPeriods)
+          <x-dashboard.sales-chart class="rv" style="--i:5; --stagger:130ms; --d:100ms" :periods="$dynamicChartPeriods" />
+        @else
+          <x-dashboard.sales-chart class="rv" style="--i:5; --stagger:130ms; --d:100ms" />
+        @endif
       </div>
       <div class="xl:col-span-1 flex flex-col">
-        <x-dashboard.distribution-summary class="rv" style="--i:5; --stagger:130ms; --d:100ms" :dispatchedUnits="$dispatchedCount > 32 ? $dispatchedCount : 185" />
+        <x-dashboard.distribution-summary 
+          class="rv" 
+          style="--i:5; --stagger:130ms; --d:100ms" 
+          :dispatchedUnits="$todayDispatched"
+          :placedUnits="$todayPlaced"
+          :returnsCount="$todayInTransit"
+          :activeRoutes="$activeRoutes"
+        />
       </div>
     </div>
 
     {{-- 3. Third Row: Low Stock & Reorder Alerts (50%) + Brand Sales Share (50%) --}}
     <div class="grid gap-5 lg:grid-cols-2 items-stretch">
       <div class="flex flex-col">
-        @if ($dynamicAlertItems)
-          <x-dashboard.stock-alerts class="rv" style="--i:2; --d:40ms" :items="$dynamicAlertItems" />
-        @else
-          <x-dashboard.stock-alerts class="rv" style="--i:2; --d:40ms" />
-        @endif
+        <x-dashboard.stock-alerts class="rv" style="--i:2; --d:40ms" :items="$dynamicAlertItems" />
       </div>
       <div class="flex flex-col">
         @if ($dynamicBrandShares !== null)
@@ -322,7 +513,7 @@
 
     {{-- 4. Bottom Row: Recent Retailer Invoices & Orders --}}
     <div>
-      <x-dashboard.recent-invoices class="rv" style="--i:1; --d:40ms" />
+      <x-dashboard.recent-invoices class="rv" style="--i:1; --d:40ms" :invoices="$dynamicRecentInvoices" />
     </div>
 
   </div>

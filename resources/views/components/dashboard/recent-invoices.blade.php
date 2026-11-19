@@ -89,7 +89,7 @@
         </tr>
       </thead>
       <tbody class="divide-y divide-line">
-        @foreach ($invoices as $inv)
+        @forelse ($invoices as $inv)
           <tr style="--row-i: {{ $loop->index }}" class="transition-colors hover:bg-soft/25">
             {{-- Invoice No & Date --}}
             <td class="py-3.5 pr-4 whitespace-nowrap">
@@ -137,14 +137,42 @@
 
             {{-- Action --}}
             <td class="py-3.5 pl-4 text-right whitespace-nowrap">
-              <button type="button" 
-                      class="grid size-8 place-items-center rounded-xl border border-line bg-surface text-muted transition hover:bg-soft hover:text-brand-500 shadow-2xs ml-auto"
-                      title="View Details">
-                <x-icon name="arrow-up-right" class="size-3.5" />
-              </button>
+              @if (!empty($inv['url']))
+                <a href="{{ $inv['url'] }}"
+                   class="grid size-8 place-items-center rounded-xl border border-line bg-surface text-muted transition hover:bg-soft hover:text-brand-500 shadow-2xs ml-auto"
+                   title="View Invoice">
+                  <x-icon name="arrow-up-right" class="size-3.5" />
+                </a>
+              @else
+                <a href="{{ route('collections.index') }}"
+                   class="grid size-8 place-items-center rounded-xl border border-line bg-surface text-muted transition hover:bg-soft hover:text-brand-500 shadow-2xs ml-auto"
+                   title="View Details">
+                  <x-icon name="arrow-up-right" class="size-3.5" />
+                </a>
+              @endif
             </td>
           </tr>
-        @endforeach
+        @empty
+          <tr>
+            <td colspan="7" class="py-8 text-center text-muted">
+              <div class="flex flex-col items-center justify-center gap-2">
+                <span class="grid size-10 place-items-center rounded-2xl bg-soft text-muted">
+                  <x-icon name="cart" class="size-5" />
+                </span>
+                <p class="text-sm font-semibold text-ink">No sales invoices recorded yet</p>
+                <p class="text-xs text-muted">Orders and POS sales will appear here automatically.</p>
+                <div class="mt-2 flex items-center gap-2">
+                  <a href="{{ route('sales-orders.create') }}" class="btn-scale rounded-xl bg-brand-500 px-3.5 py-1.5 text-xs font-semibold text-on-brand shadow-xs hover:bg-brand-600 transition-colors">
+                    New Order
+                  </a>
+                  <a href="{{ route('pos.index') }}" class="btn-scale rounded-xl border border-line bg-surface px-3.5 py-1.5 text-xs font-semibold text-ink hover:bg-soft transition-colors">
+                    POS Sale
+                  </a>
+                </div>
+              </div>
+            </td>
+          </tr>
+        @endforelse
       </tbody>
     </table>
   </div>

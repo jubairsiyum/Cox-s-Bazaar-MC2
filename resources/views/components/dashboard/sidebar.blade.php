@@ -327,10 +327,11 @@ $isTailAdminActive = true;
 
   {{-- Bottom Utilities --}}
   <div class="mt-auto shrink-0 space-y-1 border-t border-line pt-4">
-    <!-- @php
+    @php
       $sidebarSettingsUrl = Route::has('settings.index') ? route('settings.index') : (Route::has('admin.settings.index') ? route('admin.settings.index') : null);
+      $canManageSettings = auth()->user()?->can('settings.manage') ?? false;
     @endphp
-    @if ($sidebarSettingsUrl)
+    @if ($sidebarSettingsUrl && $canManageSettings)
       <a href="{{ $sidebarSettingsUrl }}"
          class="flex items-center gap-3 rounded-full px-3 py-2 text-sm font-medium text-muted transition hover:bg-soft/60 hover:text-ink">
         <x-icon name="settings" class="size-4.5" /> Settings
@@ -339,7 +340,7 @@ $isTailAdminActive = true;
          class="flex items-center gap-3 rounded-full px-3 py-2 text-sm font-medium text-muted transition hover:bg-soft/60 hover:text-ink">
         <x-icon name="palette" class="size-4.5 text-brand-500" /> Themes
       </a>
-    @endif -->
+    @endif
 
     <form method="POST" action="{{ Route::has('logout') ? route('logout') : '#' }}">
       @csrf
