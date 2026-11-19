@@ -42,6 +42,16 @@ class User extends Authenticatable implements MustVerifyEmail
         ];
     }
 
+    protected static function booted(): void
+    {
+        // Every account here is provisioned by an administrator, seeder or test
+        // factory (there is no self-registration), so new accounts are trusted
+        // and must never be blocked by the email verification wall.
+        static::creating(function (User $user) {
+            $user->email_verified_at ??= now();
+        });
+    }
+
     // ── Relationships ──────────────────────────────────────
 
     public function branch(): BelongsTo

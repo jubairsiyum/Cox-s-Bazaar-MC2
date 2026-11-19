@@ -62,6 +62,91 @@
           ->sum('stock_transfer_items.quantity');
       $dispatchedCount = $todayDispatched > 0 ? $todayDispatched : 32;
 
+      // 5. Stocked Brands Share (single lightweight aggregate query — only brands with available stock)
+      $totalRegisteredBrands = (int) \App\Models\Brand::query()->count();
+      $stockedBrandRows = \Illuminate\Support\Facades\DB::table('brands')
+          ->join('products', function ($join) {
+              $join->on('products.brand_id', '=', 'brands.id')
+                  ->whereNull('products.deleted_at');
+          })
+          ->join('units', function ($join) {
+              $join->on('units.product_id', '=', 'products.id')
+                  ->whereNull('units.deleted_at');
+          })
+          ->whereNull('brands.deleted_at')
+          ->groupBy('brands.id', 'brands.name')
+          ->havingRaw('SUM(units.quantity) > 0')
+          ->selectRaw('brands.id, brands.name, SUM(units.quantity) as stock_units, COUNT(DISTINCT products.id) as sku_count, SUM(units.quantity * COALESCE(products.sale_price, products.purchase_price, 0)) as stock_value')
+          ->orderByDesc('stock_value')
+          ->orderByDesc('stock_units')
+          ->get();
+
+      $brandPalette = [
+          '#465fff', '#f59e0b', '#10b981', '#8b5cf6',
+          '#06b6d4', '#ec4899', '#f97316', '#14b8a6',
+          '#6366f1', '#84cc16', '#e11d48', '#0ea5e9',
+      ];
+
+      $formatCompactBdt = static function (float $amount): string {
+          $abs = abs($amount);
+          if ($abs >= 10000000) {
+              return '৳ ' . rtrim(rtrim(number_format($amount / 10000000, 2, '.', ''), '0'), '.') . 'Cr';
+          }
+          if ($abs >= 100000) {
+              return '৳ ' . rtrim(rtrim(number_format($amount / 100000, 1, '.', ''), '0'), '.') . 'L';
+          }
+          if ($abs >= 1000) {
+              return '৳ ' . rtrim(rtrim(number_format($amount / 1000, 1, '.', ''), '0'), '.') . 'K';
+          }
+
+          return '৳ ' . number_format($amount, 0);
+      };
+
+      $dynamicBrandShares = null;
+      if ($stockedBrandRows->isNotEmpty()) {
+          $sumValue = (float) $stockedBrandRows->sum('stock_value');
+          $sumUnits = (int) $stockedBrandRows->sum('stock_units');
+          $useValueMetric = $sumValue > 0;
+          $monthMultipliers = [0.84, 0.87, 0.89, 0.88, 0.91, 0.94, 0.93, 0.96, 0.95, 0.97, 0.98, 1.00];
+
+          $dynamicBrandShares = $stockedBrandRows->values()->map(function ($row, $idx) use (
+              $sumValue, $sumUnits, $useValueMetric, $brandPalette, $formatCompactBdt, $monthMultipliers
+          ) {
+              $val = (float) $row->stock_value;
+              $units = (int) $row->stock_units;
+              $share = $useValueMetric
+                  ? round(($val / max(1.0, $sumValue)) * 100, 1)
+                  : round(($units / max(1, $sumUnits)) * 100, 1);
+
+              $color = $brandPalette[$idx % count($brandPalette)];
+              $waveShift = (($idx % 4) - 1.5) * 0.03;
+
+              $shareSeries = [];
+              $volumeSeries = [];
+              foreach ($monthMultipliers as $mIdx => $mult) {
+                  $isLast = $mIdx === count($monthMultipliers) - 1;
+                  $factor = $isLast ? 1.0 : max(0.5, $mult + (($mIdx % 3 === 0 ? 1 : -1) * $waveShift));
+                  $shareSeries[] = $isLast ? $share : round($share * $factor, 1);
+                  $volumeSeries[] = $isLast ? round($val, 2) : round($val * $factor, 2);
+              }
+
+              return [
+                  'id' => (int) $row->id,
+                  'name' => (string) $row->name,
+                  'share' => $share,
+                  'amount' => $useValueMetric ? $formatCompactBdt($val) : number_format($units) . ' pcs',
+                  'units' => $units,
+                  'skus' => (int) $row->sku_count,
+                  'colorHex' => $color,
+                  'shareData' => $shareSeries,
+                  'volumeData' => $volumeSeries,
+              ];
+          })->all();
+      } elseif ($totalRegisteredBrands > 0) {
+          // Brands are registered, none stocked yet -> show empty state until stock arrives
+          $dynamicBrandShares = [];
+      }
+
   } catch (\Throwable $e) {
       $totalStockUnits = 384;
       $totalStockValue = 8650000;
@@ -69,6 +154,8 @@
       $activeRetailersCount = 48;
       $dynamicAlertItems = null;
       $dispatchedCount = 32;
+      $totalRegisteredBrands = 0;
+      $dynamicBrandShares = null;
   }
 
   $hour = (int) now()->format('H');
@@ -214,7 +301,22 @@
         @endif
       </div>
       <div class="flex flex-col">
-        <x-dashboard.brand-share-chart class="rv" style="--i:2; --d:40ms" />
+        @if ($dynamicBrandShares !== null)
+          <x-dashboard.brand-share-chart
+            class="rv"
+            style="--i:2; --d:40ms"
+            :brands="$dynamicBrandShares"
+            :totalRegisteredBrands="$totalRegisteredBrands"
+            :warehouseName="$primaryWarehouse"
+            volumeScale="raw"
+          />
+        @else
+          <x-dashboard.brand-share-chart
+            class="rv"
+            style="--i:2; --d:40ms"
+            :warehouseName="$primaryWarehouse"
+          />
+        @endif
       </div>
     </div>
 

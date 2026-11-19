@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Policies\RolePolicy;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Spatie\Permission\Models\Role;
+use Throwable;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -27,11 +30,37 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->ensureStorageLinkExists();
         $this->registerSuperAdminGateBypass();
         $this->registerPasswordDefaults();
         $this->registerPolicies();
         $this->registerTailAdminComponents();
         $this->enforceHttpsInProduction();
+    }
+
+    /**
+     * Create the public/storage symlink when it is missing so uploaded files
+     * (brand logos, product photos, purchase documents) render right after a
+     * fresh clone, without requiring a manual `php artisan storage:link`.
+     */
+    private function ensureStorageLinkExists(): void
+    {
+        if (file_exists(public_path('storage')) || ! is_dir(storage_path('app/public'))) {
+            return;
+        }
+
+        // Only attempt occasionally: environments that forbid symlinks must
+        // never pay the cost on every request.
+        if (! Cache::add('storage_link_attempted', true, 21600)) {
+            return;
+        }
+
+        try {
+            Artisan::call('storage:link');
+        } catch (Throwable) {
+            // A missing link degrades gracefully (thumbnails fall back to
+            // initials), so never let it break the application.
+        }
     }
 
     /**

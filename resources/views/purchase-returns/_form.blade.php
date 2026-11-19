@@ -27,232 +27,310 @@
         purchases: @js($purchases),
         rows: @js($rows),
         purchase: @js($purchaseInfo)
-    })">
+    })" class="space-y-6">
 
+    {{-- Validation Errors Alert --}}
     @if ($errors->any())
-        <div class="card mb-4 border-t-4 border-t-red-500 shadow-sm">
-            <div class="card-body p-4">
-                <p class="text-sm font-semibold text-red-600 dark:text-red-400 mb-2">Please Enter Valid Data</p>
-                <ul class="list-disc list-inside space-y-1 text-sm text-gray-700 dark:text-gray-300">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
+        <div class="rounded-3xl border border-danger/30 bg-danger/10 p-5 shadow-2xs">
+            <div class="flex items-start gap-3.5">
+                <div class="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-danger/15 text-danger ring-1 ring-danger/25">
+                    <x-icon name="alert-triangle" class="size-5" />
+                </div>
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-bold text-danger">Please Enter Valid Data</p>
+                    <ul class="mt-2 list-disc list-inside space-y-1 text-xs sm:text-sm text-ink/90">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
             </div>
         </div>
     @endif
 
-    {{-- Return Details --}}
-    <div class="card border-t-4 border-t-cyan-500 shadow-sm mb-4">
-        <div class="card-body p-5">
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                    <label for="supplier_id" class="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-1.5">
-                        Distributor<span class="text-red-500 font-bold">*</span>:
-                    </label>
-                    <select id="supplier_id" name="supplier_id" required x-model="supplierId" @change="onSupplierChange()"
-                            class="form-control @error('supplier_id') is-invalid @enderror">
-                        <option value="">Please Select</option>
-                        @foreach($suppliers as $supplier)
-                            <option value="{{ $supplier->id }}">{{ $supplier->name }}</option>
-                        @endforeach
-                    </select>
-                    @error('supplier_id')
-                        <div class="form-error">{{ $message }}</div>
-                    @enderror
-                </div>
+    {{-- Card 1: Return Details & Cascading Invoice Selector --}}
+    <div class="rounded-3xl border border-line bg-surface p-5 sm:p-6 shadow-card">
+        <div class="flex items-center gap-3 pb-4 mb-5 border-b border-line">
+            <div class="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-500 ring-1 ring-brand-500/20">
+                <x-icon name="enquiries" class="size-5" />
+            </div>
+            <div>
+                <h2 class="text-base sm:text-lg font-bold text-ink">Return Authorization Details</h2>
+                <p class="text-xs text-muted">Choose the supplier distributor and link the original purchase invoice.</p>
+            </div>
+        </div>
 
-                <div>
-                    <label for="purchase_order_id" class="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-1.5">
-                        Invoice Reference<span class="text-red-500 font-bold">*</span>
-                        <span title="Recent purchases of the selected distributor"
-                              class="inline-flex items-center justify-center size-4 rounded-full bg-blue-500 text-white text-[10px] font-bold cursor-help align-middle">i</span>:
-                    </label>
-                    <select id="purchase_order_id" name="purchase_order_id" required x-model="orderId" @change="onPurchaseChange()"
-                            class="form-control @error('purchase_order_id') is-invalid @enderror">
-                        <option value="">Please Select</option>
-                        <template x-for="purchase in purchases" :key="purchase.id">
-                            <option :value="purchase.id"
-                                    x-text="`${purchase.reference_no} · ${purchase.order_date}`"></option>
-                        </template>
-                    </select>
-                    @error('purchase_order_id')
-                        <div class="form-error">{{ $message }}</div>
-                    @enderror
-                </div>
-
-                <div>
-                    <label for="reference_no" class="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-1.5">
-                        Reference No:
-                    </label>
-                    <input type="text" id="reference_no" name="reference_no" value="{{ old('reference_no', $isEdit ? $purchaseReturn->reference_no : '') }}"
-                           class="form-control @error('reference_no') is-invalid @enderror"
-                           placeholder="Leave blank to auto-generate">
-                    @error('reference_no')
-                        <div class="form-error">{{ $message }}</div>
-                    @enderror
-                </div>
-
-                <div>
-                    <label for="return_date" class="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-1.5">
-                        Date<span class="text-red-500 font-bold">*</span>:
-                    </label>
-                    <input type="datetime-local" id="return_date" name="return_date" value="{{ $dateValue }}" required
-                           class="form-control @error('return_date') is-invalid @enderror">
-                    @error('return_date')
-                        <div class="form-error">{{ $message }}</div>
-                    @enderror
-                </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div>
+                <label for="supplier_id" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                    Distributor<span class="text-danger">*</span>
+                </label>
+                <select id="supplier_id" name="supplier_id" required x-model="supplierId" @change="onSupplierChange()"
+                        class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('supplier_id') border-danger @enderror">
+                    <option value="">Please Select</option>
+                    @foreach($suppliers as $supplier)
+                        <option value="{{ $supplier->id }}">{{ $supplier->name }}</option>
+                    @endforeach
+                </select>
+                @error('supplier_id')
+                    <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>
+                @enderror
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                <div>
-                    <label for="reason" class="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-1.5">
-                        Reason for Return<span class="text-red-500 font-bold">*</span>:
-                    </label>
-                    <select id="reason" name="reason" required class="form-control @error('reason') is-invalid @enderror">
-                        <option value="">Please Select</option>
-                        @foreach($reasons as $reason)
-                            <option value="{{ $reason }}" @selected($reasonValue === $reason)>{{ $reason }}</option>
-                        @endforeach
-                    </select>
-                    @error('reason')
-                        <div class="form-error">{{ $message }}</div>
-                    @enderror
-                </div>
+            <div>
+                <label for="purchase_order_id" class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                    <span>Invoice Reference<span class="text-danger">*</span></span>
+                    <span title="Recent purchases of the selected distributor"
+                          class="inline-flex size-4 items-center justify-center rounded-full bg-brand-500/15 text-brand-500 text-[10px] font-bold cursor-help">i</span>
+                    <span x-show="loadingPurchases" x-cloak class="ml-auto size-3.5 rounded-full border-2 border-brand-500/30 border-t-brand-500 animate-spin"></span>
+                </label>
+                <select id="purchase_order_id" name="purchase_order_id" required x-model="orderId" @change="onPurchaseChange()"
+                        :disabled="loadingPurchases"
+                        class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all disabled:opacity-60 @error('purchase_order_id') border-danger @enderror">
+                    <option value="">Please Select</option>
+                    <template x-for="purchase in purchases" :key="purchase.id">
+                        <option :value="purchase.id"
+                                x-text="`${purchase.reference_no} · ${purchase.order_date}`"></option>
+                    </template>
+                </select>
+                @error('purchase_order_id')
+                    <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>
+                @enderror
+            </div>
 
-                <div>
-                    <label for="document" class="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-1.5">
-                        Attach Document:
-                    </label>
-                    <input type="file" id="document" name="document"
-                           class="form-control @error('document') is-invalid @enderror"
-                           accept=".pdf,.csv,.zip,.doc,.docx,.jpeg,.jpg,.png">
-                    @if($isEdit && $purchaseReturn->document)
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            Current: <a href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($purchaseReturn->document) }}" target="_blank" class="text-indigo-600 hover:underline">View document</a>
-                        </p>
-                    @endif
-                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Max File size: 5MB<br>Allowed File: .pdf, .csv, .zip, .doc, .docx, .jpeg, .jpg, .png</p>
-                    @error('document')
-                        <div class="form-error">{{ $message }}</div>
-                    @enderror
-                </div>
+            <div>
+                <label for="reference_no" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                    Reference No
+                </label>
+                <input type="text" id="reference_no" name="reference_no"
+                       value="{{ old('reference_no', $isEdit ? $purchaseReturn->reference_no : '') }}"
+                       placeholder="Leave blank to auto-generate"
+                       class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('reference_no') border-danger @enderror">
+                @error('reference_no')
+                    <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div>
+                <label for="return_date" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                    Date<span class="text-danger">*</span>
+                </label>
+                <input type="datetime-local" id="return_date" name="return_date" value="{{ $dateValue }}" required
+                       class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('return_date') border-danger @enderror">
+                @error('return_date')
+                    <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>
+                @enderror
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5 pt-5 border-t border-line">
+            <div>
+                <label for="reason" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                    Reason for Return<span class="text-danger">*</span>
+                </label>
+                <select id="reason" name="reason" required
+                        class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('reason') border-danger @enderror">
+                    <option value="">Please Select</option>
+                    @foreach($reasons as $reason)
+                        <option value="{{ $reason }}" @selected($reasonValue === $reason)>{{ $reason }}</option>
+                    @endforeach
+                </select>
+                @error('reason')
+                    <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div>
+                <label for="document" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                    Attach Document
+                </label>
+                <input type="file" id="document" name="document"
+                       accept=".pdf,.csv,.zip,.doc,.docx,.jpeg,.jpg,.png"
+                       class="w-full rounded-xl border border-line bg-surface px-3 py-2 text-xs sm:text-sm text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-brand-500/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-brand-500 hover:file:bg-brand-500/15 shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('document') border-danger @enderror">
+                @if($isEdit && $purchaseReturn->document)
+                    <div class="mt-2 inline-flex items-center gap-2 rounded-xl bg-soft px-3 py-1.5 text-xs border border-line">
+                        <x-svg.paper-clip class="size-3.5 text-brand-500" />
+                        <span class="text-muted">Current:</span>
+                        <a href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($purchaseReturn->document) }}" target="_blank"
+                           class="font-semibold text-brand-500 hover:underline">View document</a>
+                    </div>
+                @endif
+                <p class="mt-1.5 text-xs text-muted">Max 5MB · Allowed: PDF, CSV, ZIP, DOC, DOCX, JPEG, PNG</p>
+                @error('document')
+                    <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>
+                @enderror
             </div>
         </div>
     </div>
 
-    {{-- Purchase Details (loaded dynamically) --}}
-    <div class="card border-t-4 border-t-indigo-500 shadow-sm mb-4" x-show="purchase" x-cloak>
-        <div class="card-body p-5">
-            <h3 class="text-base font-semibold text-gray-800 dark:text-gray-100 mb-4">Purchase Details</h3>
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
-                <div>
-                    <div class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Invoice Reference</div>
-                    <div class="font-medium text-gray-900 dark:text-gray-100" x-text="purchase?.reference_no ?? '—'"></div>
+    {{-- Card 2: Purchase Details Snapshot (Dynamically Loaded) --}}
+    <div class="rounded-3xl border border-brand-500/20 bg-surface p-5 sm:p-6 shadow-card" x-show="purchase" x-cloak>
+        <div class="flex items-center justify-between gap-3 pb-4 mb-4 border-b border-line">
+            <div class="flex items-center gap-3">
+                <div class="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-500 ring-1 ring-brand-500/20">
+                    <x-icon name="store" class="size-5" />
                 </div>
                 <div>
-                    <div class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Purchase Date</div>
-                    <div class="font-medium text-gray-900 dark:text-gray-100" x-text="purchase?.order_date ?? '—'"></div>
+                    <h3 class="text-base font-bold text-ink">Purchase Details</h3>
+                    <p class="text-xs text-muted">Financial snapshot of the linked original purchase invoice</p>
                 </div>
-                <div>
-                    <div class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Business Location</div>
-                    <div class="font-medium text-gray-900 dark:text-gray-100" x-text="purchase?.location ?? '—'"></div>
-                </div>
-                <div>
-                    <div class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Grand Total</div>
-                    <div class="font-medium text-gray-900 dark:text-gray-100" x-text="fmt(purchase?.grand_total)"></div>
-                </div>
-                <div>
-                    <div class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Amount Paid</div>
-                    <div class="font-bold text-green-600 dark:text-green-400" x-text="fmt(purchase?.paid_amount)"></div>
-                </div>
-                <div>
-                    <div class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Amount Due</div>
-                    <div class="font-bold text-red-500 dark:text-red-400" x-text="fmt(purchase?.payment_due)"></div>
-                </div>
+            </div>
+            <span class="inline-flex items-center rounded-full bg-brand-500/10 px-3 py-1 text-xs font-bold text-brand-500 ring-1 ring-brand-500/20 tabular-nums"
+                  x-text="purchase?.reference_no ?? '—'"></span>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 text-sm">
+            <div class="rounded-2xl bg-soft/60 border border-line/70 p-3.5">
+                <div class="text-[11px] font-semibold uppercase tracking-wider text-muted">Invoice Reference</div>
+                <div class="mt-1 font-bold text-ink tabular-nums truncate" x-text="purchase?.reference_no ?? '—'"></div>
+            </div>
+            <div class="rounded-2xl bg-soft/60 border border-line/70 p-3.5">
+                <div class="text-[11px] font-semibold uppercase tracking-wider text-muted">Purchase Date</div>
+                <div class="mt-1 font-semibold text-ink tabular-nums" x-text="purchase?.order_date ?? '—'"></div>
+            </div>
+            <div class="rounded-2xl bg-soft/60 border border-line/70 p-3.5">
+                <div class="text-[11px] font-semibold uppercase tracking-wider text-muted">Business Location</div>
+                <div class="mt-1 font-semibold text-ink truncate" x-text="purchase?.location ?? '—'"></div>
+            </div>
+            <div class="rounded-2xl bg-soft/60 border border-line/70 p-3.5">
+                <div class="text-[11px] font-semibold uppercase tracking-wider text-muted">Grand Total</div>
+                <div class="mt-1 font-bold text-ink tabular-nums" x-text="formatMoney(purchase?.grand_total)"></div>
+            </div>
+            <div class="rounded-2xl bg-success/5 border border-success/20 p-3.5">
+                <div class="text-[11px] font-semibold uppercase tracking-wider text-muted">Amount Paid</div>
+                <div class="mt-1 font-bold text-success tabular-nums" x-text="formatMoney(purchase?.paid_amount)"></div>
+            </div>
+            <div class="rounded-2xl bg-danger/5 border border-danger/20 p-3.5">
+                <div class="text-[11px] font-semibold uppercase tracking-wider text-muted">Amount Due</div>
+                <div class="mt-1 font-bold text-danger tabular-nums" x-text="formatMoney(purchase?.payment_due)"></div>
             </div>
         </div>
     </div>
 
-    {{-- Products Brought In --}}
-    <div class="card border-t-4 border-t-cyan-500 shadow-sm mb-4">
-        <div class="card-body p-5">
-            <h3 class="text-base font-semibold text-gray-800 dark:text-gray-100 mb-4">Products Brought In</h3>
+    {{-- Card 3: Products Brought In (Interactive Return Grid) --}}
+    <div class="rounded-3xl border border-line bg-surface shadow-card overflow-hidden">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-5 sm:px-6 py-4 sm:py-5 border-b border-line bg-surface">
+            <div class="flex items-center gap-3">
+                <div class="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-warning/10 text-warning ring-1 ring-warning/20">
+                    <x-icon name="box" class="size-5" />
+                </div>
+                <div>
+                    <h3 class="text-base sm:text-lg font-bold text-ink">Products Brought In</h3>
+                    <p class="text-xs text-muted">Enter the quantity to return for each eligible item (cannot exceed units purchased).</p>
+                </div>
+            </div>
 
-            <div class="table-wrap border border-gray-200 dark:border-gray-700 rounded-md">
-                <table class="data-table w-full text-left">
-                    <thead>
-                        <tr class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-                            <th class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">Product</th>
-                            <th class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">Units Purchased</th>
-                            <th class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">Return Quantity</th>
-                            <th class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">Unit Price</th>
-                            <th class="p-3 text-sm font-bold text-gray-800 dark:text-gray-100">Subtotal</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-gray-900">
-                        <template x-for="(row, index) in rows" :key="row.unit_id">
-                            <tr>
-                                <td class="p-3">
-                                    <div class="text-sm font-medium text-gray-900 dark:text-gray-100" x-text="row.product_name"></div>
-                                    <div class="text-xs text-gray-500 dark:text-gray-400" x-text="row.unit"></div>
-                                    <input type="hidden" :name="`items[${index}][unit_id]`" :value="row.unit_id">
-                                </td>
-                                <td class="p-3">
-                                    <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-800 px-2.5 py-0.5 text-xs font-semibold text-gray-700 dark:text-gray-200"
-                                          x-text="row.purchased"></span>
-                                </td>
-                                <td class="p-3">
+            <div class="flex items-center gap-2 flex-wrap">
+                <span x-show="loadingDetails" x-cloak class="inline-flex items-center gap-1.5 rounded-full bg-soft px-3 py-1 text-xs font-medium text-muted border border-line">
+                    <span class="size-3 rounded-full border-2 border-brand-500/30 border-t-brand-500 animate-spin"></span>
+                    Loading items...
+                </span>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-soft px-3 py-1 text-xs font-semibold text-ink border border-line tabular-nums"
+                      x-text="returningUnitsCount + (returningUnitsCount === 1 ? ' unit returning' : ' units returning')"></span>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-xs font-bold text-brand-500 ring-1 ring-brand-500/20 tabular-nums"
+                      x-text="formatMoney(totalAmount)"></span>
+            </div>
+        </div>
+
+        <div class="max-w-full overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="border-b border-line bg-canvas/40 text-xs font-semibold uppercase tracking-wider text-muted">
+                        <th class="py-3.5 px-5 w-12">#</th>
+                        <th class="py-3.5 px-5">Product</th>
+                        <th class="py-3.5 px-5 text-center w-40">Units Purchased</th>
+                        <th class="py-3.5 px-5 w-52">Return Quantity</th>
+                        <th class="py-3.5 px-5 text-right w-36">Unit Price</th>
+                        <th class="py-3.5 px-5 text-right w-40">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-line bg-surface">
+                    <template x-for="(row, index) in rows" :key="row.unit_id">
+                        <tr :class="(parseInt(row.return_qty, 10) || 0) > 0 ? 'bg-brand-500/5' : 'hover:bg-soft/40'" class="transition-colors">
+                            <td class="py-3.5 px-5 text-xs font-semibold text-muted tabular-nums" x-text="index + 1"></td>
+                            <td class="py-3.5 px-5">
+                                <div class="text-sm font-semibold text-ink" x-text="row.product_name"></div>
+                                <div class="mt-0.5 inline-flex items-center rounded-md bg-soft px-2 py-0.5 text-[11px] font-medium text-muted border border-line"
+                                     x-text="row.unit"></div>
+                                <input type="hidden" :name="`items[${index}][unit_id]`" :value="row.unit_id">
+                            </td>
+                            <td class="py-3.5 px-5 text-center">
+                                <span class="inline-flex items-center rounded-full bg-soft px-3 py-1 text-xs font-bold text-ink border border-line tabular-nums"
+                                      x-text="row.purchased + ' max'"></span>
+                            </td>
+                            <td class="py-3.5 px-5">
+                                <div class="flex items-center gap-2">
                                     <input type="number" min="0" :max="row.purchased" step="1"
-                                           :name="`items[${index}][quantity]`" x-model="row.return_qty"
-                                           class="form-control w-24">
-                                </td>
-                                <td class="p-3 text-sm text-gray-600 dark:text-gray-300" x-text="fmt(row.unit_price)"></td>
-                                <td class="p-3 text-sm text-gray-900 dark:text-gray-100"
-                                    x-text="((parseFloat(row.return_qty) || 0) * (parseFloat(row.unit_price) || 0)).toFixed(2)"></td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
-            </div>
+                                           :name="`items[${index}][quantity]`"
+                                           x-model.number="row.return_qty"
+                                           class="w-24 rounded-xl border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink tabular-nums shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20">
+                                    <button type="button" @click="row.return_qty = row.purchased"
+                                            class="rounded-lg border border-line bg-soft px-2 py-1 text-[11px] font-semibold text-muted hover:border-brand-500 hover:text-brand-500 transition-colors cursor-pointer"
+                                            title="Return all purchased units">
+                                        Max
+                                    </button>
+                                </div>
+                            </td>
+                            <td class="py-3.5 px-5 text-right text-sm text-muted tabular-nums whitespace-nowrap" x-text="formatMoney(row.unit_price)"></td>
+                            <td class="py-3.5 px-5 text-right text-sm font-bold text-ink tabular-nums whitespace-nowrap"
+                                x-text="formatMoney((parseFloat(row.return_qty) || 0) * (parseFloat(row.unit_price) || 0))"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
 
-            <p x-show="rows.length === 0" x-cloak class="mt-3 text-sm text-gray-500 dark:text-gray-400 text-center">
-                Select a distributor and invoice reference above to load the products brought in.
-            </p>
-
-            @error('items')
-                <div class="form-error mt-2">{{ $message }}</div>
-            @enderror
-            @foreach ($errors->get('items.*') as $messages)
-                @foreach ($messages as $message)
-                    <div class="form-error mt-1">{{ $message }}</div>
-                @endforeach
-            @endforeach
-
-            <div class="mt-4 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">
-                Total Amount: <span x-text="totalAmount.toFixed(2)"></span>
+        {{-- Empty State --}}
+        <div x-show="rows.length === 0" x-cloak class="py-12 px-6 text-center bg-canvas/20">
+            <div class="max-w-sm mx-auto flex flex-col items-center">
+                <div class="flex size-14 items-center justify-center rounded-2xl bg-soft text-brand-500 ring-1 ring-line mb-3.5">
+                    <x-icon name="enquiries" class="size-7" />
+                </div>
+                <p class="text-sm font-bold text-ink">No invoice selected yet</p>
+                <p class="text-xs text-muted mt-1 leading-relaxed">
+                    Select a distributor and invoice reference above to load the products brought in.
+                </p>
             </div>
         </div>
-    </div>
 
-    {{-- Action Buttons --}}
-    <div class="card border-t-4 border-t-cyan-500 shadow-sm">
-        <div class="card-body p-5">
-            <div class="flex justify-center items-center gap-4">
-                <button type="submit"
-                    class="px-8 py-2.5 rounded-md text-white font-medium text-sm transition-all shadow-sm flex items-center gap-2"
-                    style="background-color: #00a65a;">
-                    <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                    {{ $isEdit ? 'Save' : 'Apply Return' }}
-                </button>
-                <a href="{{ route('purchase-returns.index') }}"
-                    class="px-8 py-2.5 rounded-md text-white font-medium text-sm transition-all shadow-sm flex items-center gap-2"
-                    style="background-color: #f39c12;">
-                    Close
-                </a>
+        {{-- Line Item Validation Errors --}}
+        @if($errors->has('items') || $errors->has('items.*'))
+            <div class="px-5 sm:px-6 py-3 border-t border-danger/20 bg-danger/5 space-y-1">
+                @error('items')
+                    <p class="text-xs font-medium text-danger">{{ $message }}</p>
+                @enderror
+                @foreach ($errors->get('items.*') as $messages)
+                    @foreach ($messages as $message)
+                        <p class="text-xs font-medium text-danger">{{ $message }}</p>
+                    @endforeach
+                @endforeach
+            </div>
+        @endif
+
+        {{-- Return Total & Action Footer --}}
+        <div class="border-t border-line bg-canvas/30 px-5 sm:px-6 py-5">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div class="flex items-center gap-4">
+                    <div class="rounded-2xl border border-brand-500/20 bg-surface px-4 py-3 shadow-2xs">
+                        <span class="block text-[11px] font-semibold uppercase tracking-wider text-muted">Total Return Amount</span>
+                        <span class="block text-2xl font-extrabold text-brand-500 tabular-nums mt-0.5" x-text="formatMoney(totalAmount)"></span>
+                    </div>
+                    <p class="text-xs text-muted max-w-xs hidden md:block">
+                        Stock and supplier return due credits update the moment this return is submitted.
+                    </p>
+                </div>
+
+                <div class="flex items-center justify-end gap-2.5">
+                    <a href="{{ route('purchase-returns.index') }}"
+                       class="btn-scale inline-flex items-center justify-center rounded-2xl border border-line bg-surface px-5 py-2.5 text-xs sm:text-sm font-semibold text-ink hover:bg-soft transition-colors">
+                        Cancel
+                    </a>
+                    <button type="submit"
+                            class="btn-scale inline-flex items-center justify-center gap-2 rounded-2xl bg-brand-500 hover:bg-brand-600 px-6 py-2.5 text-xs sm:text-sm font-semibold text-on-brand shadow-sm transition-colors cursor-pointer">
+                        <x-icon name="check" class="size-4" />
+                        <span>{{ $isEdit ? 'Save Changes' : 'Apply Return' }}</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -266,6 +344,15 @@ function purchaseReturnForm(state) {
         purchases: state.purchases || [],
         rows: state.rows || [],
         purchase: state.purchase || null,
+        loadingPurchases: false,
+        loadingDetails: false,
+
+        formatMoney(value) {
+            if (typeof window.formatBDT === 'function') {
+                return window.formatBDT(value);
+            }
+            return '৳' + (parseFloat(value) || 0).toFixed(2);
+        },
 
         async onSupplierChange() {
             this.orderId = null;
@@ -277,6 +364,8 @@ function purchaseReturnForm(state) {
                 return;
             }
 
+            this.loadingPurchases = true;
+
             try {
                 const response = await fetch(@js(route('purchase-returns.supplier-purchases')) + '?supplier_id=' + encodeURIComponent(this.supplierId), {
                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
@@ -285,6 +374,8 @@ function purchaseReturnForm(state) {
                 this.purchases = data.purchases || [];
             } catch (error) {
                 this.purchases = [];
+            } finally {
+                this.loadingPurchases = false;
             }
         },
 
@@ -296,6 +387,8 @@ function purchaseReturnForm(state) {
                 return;
             }
 
+            this.loadingDetails = true;
+
             try {
                 const response = await fetch(@js(route('purchase-returns.purchase-details')) + '?purchase_order_id=' + encodeURIComponent(this.orderId), {
                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
@@ -305,11 +398,17 @@ function purchaseReturnForm(state) {
                 this.rows = (data.items || []).map(item => ({ ...item, return_qty: 0 }));
             } catch (error) {
                 this.rows = [];
+            } finally {
+                this.loadingDetails = false;
             }
         },
 
         fmt(value) {
             return Number(value || 0).toFixed(2);
+        },
+
+        get returningUnitsCount() {
+            return this.rows.reduce((sum, row) => sum + (parseInt(row.return_qty, 10) || 0), 0);
         },
 
         get totalAmount() {

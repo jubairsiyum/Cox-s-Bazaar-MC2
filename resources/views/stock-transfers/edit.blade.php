@@ -1,28 +1,55 @@
 @extends('layouts.app')
 
-@section('title', 'Edit Stock Transfer')
+@section('title', 'Edit Stock Transfer — ' . config('app.name', "Cox's Bazaar Mobile Center"))
 @section('page_title', 'Stock Transfers')
 
 @section('content')
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+<div class="space-y-6">
+
+    {{-- Top Breadcrumb & Executive Header --}}
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-            <div class="flex items-baseline gap-2">
-                <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Stock Transfers</h1>
-                <span class="text-sm text-gray-500 dark:text-gray-400">Edit Stock Transfer — {{ $stockTransfer->reference_no }}</span>
+            <nav class="flex items-center gap-1.5 text-xs text-muted mb-2" aria-label="Breadcrumb">
+                <a href="{{ route('dashboard') }}" class="inline-flex items-center gap-1 hover:text-brand-500 transition-colors">
+                    <x-icon name="dashboard" class="size-3.5" />
+                    <span>Home</span>
+                </a>
+                <span class="text-muted/60">/</span>
+                <span class="text-muted">Inventory</span>
+                <span class="text-muted/60">/</span>
+                <a href="{{ route('stock-transfers.index') }}" class="hover:text-brand-500 transition-colors">Stock Transfers</a>
+                <span class="text-muted/60">/</span>
+                <span class="font-medium text-ink">Edit Stock Transfer</span>
+            </nav>
+
+            <div class="flex items-center gap-3 flex-wrap">
+                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink">Edit Stock Transfer</h1>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-xs font-semibold text-brand-500 ring-1 ring-brand-500/20 tabular-nums">
+                    {{ $stockTransfer->reference_no }}
+                </span>
+                @php($editStatus = $stockTransfer->displayStatusFor(auth()->user()))
+                <x-status-badge :status="$editStatus['value']" :label="$editStatus['label']" />
             </div>
+            <p class="text-xs sm:text-sm text-muted mt-1">
+                @if($itemsEditable)
+                    Update transfer route, status, or line items before dispatch.
+                @else
+                    Line items are locked after dispatch; you may still update status, shipping charges, or notes.
+                @endif
+            </p>
         </div>
-        <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-            <a href="{{ route('dashboard') }}" class="hover:text-brand-500 flex items-center gap-1">
-                <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                </svg>
-                Home
+
+        <div class="flex items-center gap-2 shrink-0">
+            <a href="{{ route('stock-transfers.show', $stockTransfer) }}"
+               class="btn-scale inline-flex items-center gap-1.5 rounded-2xl border border-line bg-surface px-4 py-2.5 text-xs sm:text-sm font-semibold text-ink shadow-2xs hover:bg-soft hover:text-brand-500 transition-colors">
+                <x-svg.eye class="size-4 text-muted" />
+                <span>View Invoice</span>
             </a>
-            <span>&rsaquo;</span>
-            <a href="{{ route('stock-transfers.index') }}" class="hover:text-brand-500">Stock Transfers List</a>
-            <span>&rsaquo;</span>
-            <span class="text-gray-700 dark:text-gray-300 font-medium">Edit Stock Transfer</span>
+            <a href="{{ route('stock-transfers.index') }}"
+               class="btn-scale inline-flex items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-2.5 text-xs sm:text-sm font-semibold text-ink shadow-2xs hover:bg-soft hover:text-brand-500 transition-colors">
+                <x-svg.arrow-left class="size-4" />
+                <span>Back</span>
+            </a>
         </div>
     </div>
 
@@ -39,4 +66,6 @@
             'itemsEditable' => $itemsEditable,
         ])
     </form>
+
+</div>
 @endsection

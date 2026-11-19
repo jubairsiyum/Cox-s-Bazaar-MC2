@@ -27,62 +27,62 @@ class StockService
     /**
      * Product sold: stock goes out.
      */
-    public static function sell(Unit $unit, int $quantity, ?Model $reference = null, ?string $note = null): StockMovement
+    public static function sell(Unit $unit, int $quantity, ?Model $reference = null, ?string $note = null, ?int $locationId = null): StockMovement
     {
-        return self::apply($unit, -self::positiveAmount($quantity), StockMovementType::Sale, $reference, $note);
+        return self::apply($unit, -self::positiveAmount($quantity), StockMovementType::Sale, $reference, $note, $locationId);
     }
 
     /**
      * Sold product returned by the customer: stock comes back in.
      */
-    public static function saleReturn(Unit $unit, int $quantity, ?Model $reference = null, ?string $note = null): StockMovement
+    public static function saleReturn(Unit $unit, int $quantity, ?Model $reference = null, ?string $note = null, ?int $locationId = null): StockMovement
     {
-        return self::apply($unit, self::positiveAmount($quantity), StockMovementType::SaleReturn, $reference, $note);
+        return self::apply($unit, self::positiveAmount($quantity), StockMovementType::SaleReturn, $reference, $note, $locationId);
     }
 
     /**
      * New stock arrived (e.g. bulk delivery from a supplier): stock goes up.
      */
-    public static function restock(Unit $unit, int $quantity, ?Model $reference = null, ?string $note = null): StockMovement
+    public static function restock(Unit $unit, int $quantity, ?Model $reference = null, ?string $note = null, ?int $locationId = null): StockMovement
     {
-        return self::apply($unit, self::positiveAmount($quantity), StockMovementType::Restock, $reference, $note);
+        return self::apply($unit, self::positiveAmount($quantity), StockMovementType::Restock, $reference, $note, $locationId);
     }
 
     /**
      * Stock returned to the supplier: stock goes out.
      */
-    public static function purchaseReturn(Unit $unit, int $quantity, ?Model $reference = null, ?string $note = null): StockMovement
+    public static function purchaseReturn(Unit $unit, int $quantity, ?Model $reference = null, ?string $note = null, ?int $locationId = null): StockMovement
     {
-        return self::apply($unit, -self::positiveAmount($quantity), StockMovementType::PurchaseReturn, $reference, $note);
+        return self::apply($unit, -self::positiveAmount($quantity), StockMovementType::PurchaseReturn, $reference, $note, $locationId);
     }
 
     /**
      * Stock dispatched from the source location of a transfer: stock goes out.
      */
-    public static function transferOut(Unit $unit, int $quantity, ?Model $reference = null, ?string $note = null): StockMovement
+    public static function transferOut(Unit $unit, int $quantity, ?Model $reference = null, ?string $note = null, ?int $locationId = null): StockMovement
     {
-        return self::apply($unit, -self::positiveAmount($quantity), StockMovementType::TransferOut, $reference, $note);
+        return self::apply($unit, -self::positiveAmount($quantity), StockMovementType::TransferOut, $reference, $note, $locationId);
     }
 
     /**
      * Stock arrived at the destination location of a transfer: stock comes back in.
      */
-    public static function transferIn(Unit $unit, int $quantity, ?Model $reference = null, ?string $note = null): StockMovement
+    public static function transferIn(Unit $unit, int $quantity, ?Model $reference = null, ?string $note = null, ?int $locationId = null): StockMovement
     {
-        return self::apply($unit, self::positiveAmount($quantity), StockMovementType::TransferIn, $reference, $note);
+        return self::apply($unit, self::positiveAmount($quantity), StockMovementType::TransferIn, $reference, $note, $locationId);
     }
 
     /**
      * Set the stock to an absolute quantity (stock count / correction).
      * Returns null when the quantity is already correct.
      */
-    public static function adjust(Unit $unit, int $quantity, ?string $note = null): ?StockMovement
+    public static function adjust(Unit $unit, int $quantity, ?string $note = null, ?int $locationId = null): ?StockMovement
     {
         if ($quantity < 0) {
             throw new InvalidArgumentException('Adjusted quantity cannot be negative.');
         }
 
-        return DB::transaction(function () use ($unit, $quantity, $note) {
+        return DB::transaction(function () use ($unit, $quantity, $note, $locationId) {
             $locked = self::lock($unit);
             $current = (int) $locked->quantity;
             $delta = $quantity - $current;
@@ -93,16 +93,16 @@ class StockService
 
             $locked->updateQuietly(['quantity' => $quantity]);
 
-            return self::record($locked, StockMovementType::Adjustment, $delta, $current, $quantity, null, $note ?? 'Stock adjusted');
+            return self::record($locked, StockMovementType::Adjustment, $delta, $current, $quantity, null, $note ?? 'Stock adjusted', $locationId);
         });
     }
 
     /**
      * Apply a signed quantity delta atomically.
      */
-    private static function apply(Unit $unit, int $delta, StockMovementType $type, ?Model $reference, ?string $note): StockMovement
+    private static function apply(Unit $unit, int $delta, StockMovementType $type, ?Model $reference, ?string $note, ?int $locationId = null): StockMovement
     {
-        return DB::transaction(function () use ($unit, $delta, $type, $reference, $note) {
+        return DB::transaction(function () use ($unit, $delta, $type, $reference, $note, $locationId) {
             $locked = self::lock($unit);
             $current = (int) $locked->quantity;
             $new = $current + $delta;
@@ -113,7 +113,7 @@ class StockService
 
             $locked->updateQuietly(['quantity' => $new]);
 
-            return self::record($locked, $type, $delta, $current, $new, $reference, $note);
+            return self::record($locked, $type, $delta, $current, $new, $reference, $note, $locationId);
         });
     }
 
@@ -128,9 +128,10 @@ class StockService
     /**
      * Write the ledger entry and the audit log line for a stock change.
      */
-    private static function record(Unit $unit, StockMovementType $type, int $delta, int $old, int $new, ?Model $reference, ?string $note): StockMovement
+    private static function record(Unit $unit, StockMovementType $type, int $delta, int $old, int $new, ?Model $reference, ?string $note, ?int $locationId = null): StockMovement
     {
         $movement = $unit->stockMovements()->create([
+            'location_id' => $locationId,
             'type' => $type,
             'quantity' => $delta,
             'quantity_after' => $new,

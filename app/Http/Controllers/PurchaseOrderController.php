@@ -36,6 +36,12 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
  * The "Add" form lives in the Purchase Orders section; the register listing
  * the records (with view / edit / delete actions) lives in the Purchase
  * Invoices section, so the index and record routes are mounted there.
+ *
+ * Lifecycle: a purchase takes effect the moment the branch manager creates
+ * it — it is recorded as received, signed off by its creator (the responsible
+ * manager), stock posts and the supplier payable registers immediately.
+ * There is no approval step to walk through afterwards; approve/reject remain
+ * only as a legacy cleanup for documents created before this lifecycle.
  */
 class PurchaseOrderController extends Controller
 {
@@ -89,13 +95,16 @@ class PurchaseOrderController extends Controller
         return view('purchase-orders.create', [
             'suppliers' => Supplier::query()->orderBy('name')->get(),
             'locations' => $this->scopedLocations(),
-            'statuses' => $this->creationStatusOptions(),
             'items' => $this->hydrateItems(collect(old('items', []))->all()),
         ]);
     }
 
     /**
      * Store a newly created purchase order in storage.
+     *
+     * Creation is effective: the purchase is recorded as received and signed
+     * off by its creator, so stock and the supplier payable register in the
+     * same transaction. There is no separate approval step.
      */
     public function store(StorePurchaseOrderRequest $request): RedirectResponse
     {
@@ -109,7 +118,10 @@ class PurchaseOrderController extends Controller
                     'order_date' => $validated['order_date'],
                     'supplier_id' => $validated['supplier_id'],
                     'location_id' => $validated['location_id'],
-                    'purchase_status' => $validated['purchase_status'],
+                    'purchase_status' => PurchaseStatus::Received,
+                    'approval_status' => ApprovalStatus::Approved,
+                    'approved_by' => $request->user()->id,
+                    'approved_at' => now(),
                     'subtotal' => 0,
                     'tax_rate' => $this->taxRate($validated),
                     'tax_amount' => 0,
@@ -134,7 +146,7 @@ class PurchaseOrderController extends Controller
         AuditService::created($order, "Purchase order '{$order->reference_no}' created.");
 
         return redirect()->route('purchase-invoices.index')
-            ->with('success', "Purchase order '{$order->reference_no}' created successfully.");
+            ->with('success', "Purchase order '{$order->reference_no}' created. Stock received and supplier due updated.");
     }
 
     /**
@@ -249,15 +261,19 @@ class PurchaseOrderController extends Controller
     }
 
     /**
-     * Approve (receive) a purchase: the responsible manager signs off and the
-     * purchase takes effect — stock is received and the supplier due registers.
+     * Legacy cleanup: receive a purchase created before purchases became
+     * effective at creation.
+     *
+     * New documents are recorded as approved on creation and never pass
+     * through here. Only legacy rows still sitting on "pending" carry an
+     * approval step, and completing one posts stock and the supplier due.
      */
     public function approve(PurchaseOrder $purchaseOrder): RedirectResponse
     {
         $this->authorize('approve', $purchaseOrder);
 
-        if ($purchaseOrder->approval_status === ApprovalStatus::Approved) {
-            return back()->with('error', "Purchase order '{$purchaseOrder->reference_no}' is already approved.");
+        if ($purchaseOrder->approval_status !== ApprovalStatus::Pending) {
+            return back()->with('error', "Purchase order '{$purchaseOrder->reference_no}' does not await sign-off.");
         }
 
         $original = $purchaseOrder->getOriginal();
@@ -286,14 +302,15 @@ class PurchaseOrderController extends Controller
     }
 
     /**
-     * Reject a purchase: it never takes effect and is marked cancelled.
+     * Legacy cleanup: reject a purchase created before purchases became
+     * effective at creation. It never takes effect and is marked cancelled.
      */
     public function reject(PurchaseOrder $purchaseOrder): RedirectResponse
     {
         $this->authorize('reject', $purchaseOrder);
 
-        if ($purchaseOrder->approval_status === ApprovalStatus::Approved) {
-            return back()->with('error', "Purchase order '{$purchaseOrder->reference_no}' is already approved. Cancel it instead.");
+        if ($purchaseOrder->approval_status !== ApprovalStatus::Pending) {
+            return back()->with('error', "Purchase order '{$purchaseOrder->reference_no}' does not await sign-off.");
         }
 
         $original = $purchaseOrder->getOriginal();
@@ -414,22 +431,10 @@ class PurchaseOrderController extends Controller
     }
 
     /**
-     * Purchase statuses selectable when creating a purchase.
-     *
-     * @return array<string, string>
-     */
-    private function creationStatusOptions(): array
-    {
-        return array_filter(
-            PurchaseStatus::options(),
-            fn (string $value) => in_array($value, [PurchaseStatus::Pending->value, PurchaseStatus::Ordered->value], true),
-            ARRAY_FILTER_USE_KEY
-        );
-    }
-
-    /**
-     * Purchase statuses selectable when editing a purchase. "Received" is only
-     * reachable through the approval action.
+     * Purchase statuses selectable when editing a purchase. Effective
+     * (approved) purchases — every document created under the current
+     * lifecycle — may only stay received or be cancelled; legacy documents
+     * still awaiting sign-off keep their pre-receipt options.
      *
      * @return array<string, string>
      */

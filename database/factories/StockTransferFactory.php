@@ -43,6 +43,13 @@ class StockTransferFactory extends Factory
         ]);
     }
 
+    public function rejected(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'status' => StockTransferStatus::Rejected->value,
+        ]);
+    }
+
     public function cancelled(): static
     {
         return $this->state(fn (array $attributes): array => [

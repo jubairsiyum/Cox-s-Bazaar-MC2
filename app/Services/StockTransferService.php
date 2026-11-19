@@ -44,19 +44,19 @@ class StockTransferService
             }
 
             if ($leftNow && ! $leftBefore) {
-                StockService::transferOut($unit, $quantity, $transfer, self::note($transfer, 'dispatched'));
+                StockService::transferOut($unit, $quantity, $transfer, self::note($transfer, 'dispatched'), $transfer->from_location_id !== null ? (int) $transfer->from_location_id : null);
             }
 
             if ($arrivedNow && ! $arrivedBefore) {
-                StockService::transferIn($unit, $quantity, $transfer, self::note($transfer, 'received'));
+                StockService::transferIn($unit, $quantity, $transfer, self::note($transfer, 'received'), $transfer->to_location_id !== null ? (int) $transfer->to_location_id : null);
             }
 
             if ($leftBefore && ! $leftNow) {
-                StockService::transferIn($unit, $quantity, $transfer, self::note($transfer, 'returned'));
+                StockService::transferIn($unit, $quantity, $transfer, self::note($transfer, 'returned'), $transfer->from_location_id !== null ? (int) $transfer->from_location_id : null);
             }
 
             if ($arrivedBefore && ! $arrivedNow) {
-                StockService::transferOut($unit, $quantity, $transfer, self::note($transfer, 'receipt reversed'));
+                StockService::transferOut($unit, $quantity, $transfer, self::note($transfer, 'receipt reversed'), $transfer->to_location_id !== null ? (int) $transfer->to_location_id : null);
             }
         }
     }

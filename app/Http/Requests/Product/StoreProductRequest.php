@@ -23,6 +23,7 @@ class StoreProductRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255', Product::uniqueVariantRule($this->input('storage'), $this->input('color'))],
+            'photo' => ['nullable', 'image:allow_svg', 'mimes:jpg,jpeg,png,webp,svg', 'max:2048'],
             'brand_id' => ['nullable', 'integer', 'exists:brands,id'],
             'category_id' => ['nullable', 'integer', 'exists:categories,id'],
             'model' => ['nullable', 'string', 'max:100'],
@@ -45,6 +46,7 @@ class StoreProductRequest extends FormRequest
     {
         return [
             'name' => 'Product Name',
+            'photo' => 'Photo',
             'brand_id' => 'Brand',
             'category_id' => 'Category',
             'barcode' => 'Barcode / IMEI',

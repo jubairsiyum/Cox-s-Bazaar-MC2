@@ -2,12 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Enums\ApprovalStatus;
+use App\Models\Location;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseReturn;
 use App\Models\Supplier;
 use App\Models\Unit;
+use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\SettingsSeeder;
+use Illuminate\Support\Facades\Notification;
 
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
@@ -57,6 +61,31 @@ function purchaseReturnPayload(PurchaseOrder $order, array $overrides = []): arr
             ['unit_id' => $order->items->first()->unit_id, 'quantity' => 2],
         ],
     ], $overrides);
+}
+
+/**
+ * A return from before returns became effective at submission: a pending
+ * return whose stock and supplier return due effects were never posted.
+ */
+function legacyPendingReturn(PurchaseOrder $order, int $quantity = 2, float $unitPrice = 200.0): PurchaseReturn
+{
+    $return = PurchaseReturn::factory()->forPurchase($order)->create([
+        'approval_status' => ApprovalStatus::Pending->value,
+    ]);
+
+    $return->items()->create([
+        'unit_id' => $order->items->first()->unit_id,
+        'quantity' => $quantity,
+        'unit_price' => $unitPrice,
+        'subtotal' => $quantity * $unitPrice,
+    ]);
+
+    $return->update([
+        'subtotal' => $quantity * $unitPrice,
+        'grand_total' => $quantity * $unitPrice,
+    ]);
+
+    return $return->fresh();
 }
 
 it('lists purchase returns with the parent purchase and an Apply Return button', function () {
@@ -112,7 +141,7 @@ it('lists the distributor purchases and their details for the return form', func
         ->assertJsonPath('items.0.purchased', 5);
 });
 
-it('creates a return awaiting approval without touching stock', function () {
+it('applies the return at submission, moving stock and the supplier return due', function () {
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 50]);
@@ -130,39 +159,45 @@ it('creates a return awaiting approval without touching stock', function () {
         ->and($return->reason)->toBe('Defective or Damaged')
         ->and((float) $return->grand_total)->toBe(400.0)
         ->and((float) $return->payment_due)->toBe(400.0)
-        ->and($return->approval_status->value)->toBe('pending')
+        ->and($return->approval_status->value)->toBe('approved')
+        ->and($return->approved_by)->not->toBeNull()
+        ->and($return->approved_at)->not->toBeNull()
         ->and($return->items)->toHaveCount(1);
 
-    // Nothing takes effect before the responsible manager approves.
-    expect($unit->fresh()->quantity)->toBe(50)
-        ->and((float) $return->supplier->fresh()->purchase_return_due)->toBe(0.0);
-});
-
-it('deducts stock and tracks the supplier return due on approval', function () {
-    actingAsSuperAdmin();
-
-    $unit = Unit::factory()->create(['quantity' => 50]);
-    $order = returnParentOrder($unit);
-
-    $this->post(route('purchase-returns.store'), purchaseReturnPayload($order))->assertRedirect();
-    $return = PurchaseReturn::first();
-
-    $this->patch(route('purchase-returns.approve', $return))
-        ->assertRedirect(route('purchase-returns.index'));
-
-    $return->refresh();
-
-    expect($return->approval_status->value)->toBe('approved')
-        ->and($return->approved_by)->not->toBeNull()
-        ->and($unit->fresh()->quantity)->toBe(48);
+    // Submission is effective: stock leaves and the supplier return due
+    // registers immediately.
+    expect($unit->fresh()->quantity)->toBe(48)
+        ->and((float) $return->supplier->fresh()->purchase_return_due)->toBe(400.0);
 
     $this->assertDatabaseHas('stock_movements', [
         'unit_id' => $unit->id,
         'type' => 'purchase_return',
         'quantity' => -2,
     ]);
+});
 
-    expect((float) $return->supplier->fresh()->purchase_return_due)->toBe(400.0);
+it("applies the creating manager's own return right away with no self-approval step", function () {
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $order = returnParentOrder($unit);
+    $manager = purchaseReturnTeamUser('Outlet Manager', ['location_id' => $order->location_id]);
+
+    $this->actingAs($manager)
+        ->post(route('purchase-returns.store'), purchaseReturnPayload($order))
+        ->assertRedirect(route('purchase-returns.index'));
+
+    $return = PurchaseReturn::first();
+
+    expect($return->approval_status->value)->toBe('approved')
+        ->and($return->approved_by)->toBe($manager->id)
+        ->and($return->approved_at)->not->toBeNull()
+        ->and($unit->fresh()->quantity)->toBe(48)
+        ->and((float) $return->supplier->fresh()->purchase_return_due)->toBe(400.0);
+
+    // No approve / reject UI is offered for the manager's own return.
+    $this->get(route('purchase-returns.show', $return))
+        ->assertOk()
+        ->assertDontSee('Approve Return', false)
+        ->assertDontSee('Confirm Reject', false);
 });
 
 it('validates the return against the chosen purchase', function () {
@@ -203,7 +238,6 @@ it('syncs stock and totals when the return quantities change', function () {
     $this->post(route('purchase-returns.store'), purchaseReturnPayload($order))->assertRedirect();
     $return = PurchaseReturn::first();
 
-    $this->patch(route('purchase-returns.approve', $return))->assertRedirect();
     expect($unit->fresh()->quantity)->toBe(48);
 
     $this->patch(route('purchase-returns.update', $return), purchaseReturnPayload($order, [
@@ -223,8 +257,6 @@ it('restores stock and clears the supplier return due when a return is deleted',
     $this->post(route('purchase-returns.store'), purchaseReturnPayload($order))->assertRedirect();
     $return = PurchaseReturn::first();
 
-    $this->patch(route('purchase-returns.approve', $return))->assertRedirect();
-
     expect($unit->fresh()->quantity)->toBe(48)
         ->and((float) $return->supplier->fresh()->purchase_return_due)->toBe(400.0);
 
@@ -237,21 +269,99 @@ it('restores stock and clears the supplier return due when a return is deleted',
         ->and((float) $return->supplier->fresh()->purchase_return_due)->toBe(0.0);
 });
 
-it('blocks approving a return that exceeds the stock on hand', function () {
+it('blocks submitting a return that exceeds the stock on hand', function () {
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 1]);
     $order = returnParentOrder($unit);
 
     $this->post(route('purchase-returns.store'), purchaseReturnPayload($order))
-        ->assertRedirect(route('purchase-returns.index'));
-
-    $return = PurchaseReturn::first();
-
-    $this->patch(route('purchase-returns.approve', $return))
         ->assertRedirect()
         ->assertSessionHas('error');
 
-    expect($return->fresh()->approval_status->value)->toBe('pending')
+    expect(PurchaseReturn::count())->toBe(0)
         ->and($unit->fresh()->quantity)->toBe(1);
+});
+
+/**
+ * A verified purchasing user with the given role and branch/location assignment.
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function purchaseReturnTeamUser(string $role, array $attributes = []): User
+{
+    $user = User::factory()->create($attributes);
+    $user->assignRole($role);
+
+    return $user;
+}
+
+it('sends no approval notifications anywhere in the return flow', function () {
+    Notification::fake();
+
+    actingAsSuperAdmin();
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $order = returnParentOrder($unit);
+
+    // The old awaiting-approval audience still exists, but nothing awaits
+    // approval anymore: a submitted return is already applied.
+    purchaseReturnTeamUser('Outlet Manager', ['location_id' => $order->location_id]);
+    purchaseReturnTeamUser('Outlet Manager', ['location_id' => Location::factory()->create()->id]);
+
+    $this->post(route('purchase-returns.store'), purchaseReturnPayload($order))
+        ->assertRedirect(route('purchase-returns.index'));
+
+    // Completing or refusing a legacy pending return is silent as well.
+    $legacy = legacyPendingReturn($order);
+    $this->patch(route('purchase-returns.approve', $legacy))->assertRedirect(route('purchase-returns.index'));
+
+    $otherLegacy = legacyPendingReturn($order);
+    $this->patch(route('purchase-returns.reject', $otherLegacy))->assertRedirect(route('purchase-returns.index'));
+
+    Notification::assertNothingSent();
+});
+
+it('completes a legacy pending return through the cleanup action', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $order = returnParentOrder($unit);
+    $return = legacyPendingReturn($order);
+
+    expect($unit->fresh()->quantity)->toBe(50)
+        ->and((float) $return->supplier->fresh()->purchase_return_due)->toBe(0.0);
+
+    $this->patch(route('purchase-returns.approve', $return))
+        ->assertRedirect(route('purchase-returns.index'));
+
+    $return->refresh();
+
+    expect($return->approval_status->value)->toBe('approved')
+        ->and($return->approved_by)->not->toBeNull()
+        ->and($unit->fresh()->quantity)->toBe(48)
+        ->and((float) $return->supplier->fresh()->purchase_return_due)->toBe(400.0);
+});
+
+it('keeps a rejected legacy return rejected when it is edited', function () {
+    Notification::fake();
+
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $order = returnParentOrder($unit);
+    $return = legacyPendingReturn($order);
+
+    $this->patch(route('purchase-returns.reject', $return))->assertRedirect(route('purchase-returns.index'));
+    expect($return->fresh()->approval_status->value)->toBe('rejected');
+
+    // There is no approval queue to resubmit into: editing a rejected return
+    // leaves it rejected and nothing moves.
+    $this->patch(route('purchase-returns.update', $return), purchaseReturnPayload($order, [
+        'reason' => 'Wrong Product Delivered',
+    ]))->assertRedirect(route('purchase-returns.index'));
+
+    expect($return->fresh()->approval_status->value)->toBe('rejected')
+        ->and($unit->fresh()->quantity)->toBe(50);
+
+    Notification::assertNothingSent();
 });

@@ -1,0 +1,2048 @@
+{
+    "info": {
+        "_postman_id": "cberp-collection-2026",
+        "name": "Cox's Bazaar ERP - API Collection",
+        "description": "Postman API Collection for testing all sections of Cox's Bazaar Distribution ERP (Customers, Suppliers, Products, Brands, Categories, Units, Transfers, Adjustments, Sales, Purchases, Users, etc.).\n\n### How to Use:\n1. Import this file into Postman.\n2. Ensure the collection variable `base_url` is set to your local server (default: `http://127.0.0.1:8000`).\n3. Run **Authentication > 1. Get CSRF Cookie** first.\n4. Run **Authentication > 2. Login** (uses demo superadmin credentials).\n5. Test any endpoint in the collection! Session cookies and CSRF tokens are handled automatically.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://127.0.0.1:8000",
+            "type": "string"
+        },
+        {
+            "key": "admin_email",
+            "value": "admin@cberp.local",
+            "type": "string"
+        },
+        {
+            "key": "admin_password",
+            "value": "Admin@1234",
+            "type": "string"
+        }
+    ],
+    "event": [
+        {
+            "listen": "prerequest",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    "// Automatically send XSRF token from cookies if present",
+                    "let xsrfCookie = pm.cookies.get('XSRF-TOKEN');",
+                    "if (xsrfCookie) {",
+                    "    pm.request.headers.upsert({",
+                    "        key: 'X-XSRF-TOKEN',",
+                    "        value: decodeURIComponent(xsrfCookie)",
+                    "    });",
+                    "}",
+                    "",
+                    "// Ensure JSON API responses",
+                    "pm.request.headers.upsert({ key: 'Accept', value: 'application/json' });",
+                    "pm.request.headers.upsert({ key: 'X-Requested-With', value: 'XMLHttpRequest' });"
+                ]
+            }
+        }
+    ],
+    "item": [
+        {
+            "name": "1. Authentication",
+            "item": [
+                {
+                    "name": "1. Initialize Session & CSRF Cookie",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('CSRF cookie received', function () {",
+                                    "    pm.expect(pm.cookies.has('XSRF-TOKEN')).to.be.true;",
+                                    "});"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "login"
+                            ]
+                        },
+                        "description": "Loads the login endpoint to initialize Laravel session cookies and XSRF-TOKEN."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "2. Login",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status code is 200 or 302', function () {",
+                                    "    pm.expect(pm.response.code).to.be.oneOf([200, 302]);",
+                                    "});"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"{{admin_email}}\",\n    \"password\": \"{{admin_password}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "login"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "3. Logout",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/logout",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "logout"
+                            ]
+                        },
+                        "description": "Ends the authenticated user session."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "2. Customers",
+            "item": [
+                {
+                    "name": "List Customers",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/customers?search=&status=active&per_page=10",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "customers"
+                            ],
+                            "query": [
+                                {
+                                    "key": "search",
+                                    "value": "",
+                                    "description": ""
+                                },
+                                {
+                                    "key": "status",
+                                    "value": "active",
+                                    "description": ""
+                                },
+                                {
+                                    "key": "per_page",
+                                    "value": "10",
+                                    "description": ""
+                                }
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Customer",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/customers",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "customers"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Rahim Enterprise\",\n    \"mobile\": \"01711223344\",\n    \"tel_no\": \"029876543\",\n    \"email\": \"rahim@enterprise.com\",\n    \"country\": \"Bangladesh\",\n    \"city\": \"Cox's Bazar\",\n    \"state\": \"Chittagong\",\n    \"postcode\": \"4700\",\n    \"address\": \"Kolatoli Road, Cox's Bazar\",\n    \"note\": \"Regular wholesale buyer\",\n    \"status\": \"active\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Customer Details",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/customers/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "customers",
+                                "1"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Customer",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/customers/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "customers",
+                                "1"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Rahim Enterprise Updated\",\n    \"mobile\": \"01711223344\",\n    \"tel_no\": \"029876543\",\n    \"email\": \"rahim_updated@enterprise.com\",\n    \"address\": \"Main Road, Cox's Bazar\",\n    \"status\": \"active\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Pay Customer Due",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/customers/1/pay-due",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "customers",
+                                "1",
+                                "pay-due"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"amount\": 5000,\n    \"payment_method\": \"Cash\",\n    \"date\": \"2026-11-18\",\n    \"note\": \"Payment received via Cash\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Pay Customer Return Due",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/customers/1/pay-return-due",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "customers",
+                                "1",
+                                "pay-return-due"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"amount\": 1000,\n    \"payment_method\": \"Bank Transfer\",\n    \"date\": \"2026-11-18\",\n    \"note\": \"Return balance adjusted\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Toggle Customer Status",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/customers/1/toggle-status",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "customers",
+                                "1",
+                                "toggle-status"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Export Customers (Excel)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/customers/export/xlsx",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "customers",
+                                "export",
+                                "xlsx"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Download Customer Import Template",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/customers/import/template",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "customers",
+                                "import",
+                                "template"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Customer",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/customers/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "customers",
+                                "1"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "3. Suppliers",
+            "item": [
+                {
+                    "name": "List Suppliers",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/suppliers?search=&status=active&per_page=10",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "suppliers"
+                            ],
+                            "query": [
+                                {
+                                    "key": "search",
+                                    "value": "",
+                                    "description": ""
+                                },
+                                {
+                                    "key": "status",
+                                    "value": "active",
+                                    "description": ""
+                                },
+                                {
+                                    "key": "per_page",
+                                    "value": "10",
+                                    "description": ""
+                                }
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Supplier",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/suppliers",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "suppliers"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Apex Telecom Distributors\",\n    \"mobile\": \"01819988776\",\n    \"tel_no\": \"028877665\",\n    \"email\": \"info@apextelecom.com\",\n    \"tax_number\": \"TIN-987654321\",\n    \"opening_balance\": 15000,\n    \"country\": \"Bangladesh\",\n    \"city\": \"Dhaka\",\n    \"state\": \"Dhaka\",\n    \"postcode\": \"1205\",\n    \"address\": \"Motijheel C/A, Dhaka\",\n    \"status\": \"active\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Supplier Details",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/suppliers/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "suppliers",
+                                "1"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Supplier",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/suppliers/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "suppliers",
+                                "1"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Apex Telecom Distributors Ltd\",\n    \"mobile\": \"01819988776\",\n    \"tel_no\": \"028877665\",\n    \"email\": \"contact@apextelecom.com\",\n    \"address\": \"Motijheel, Dhaka\",\n    \"status\": \"active\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Pay Supplier Due",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/suppliers/1/pay-due",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "suppliers",
+                                "1",
+                                "pay-due"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"amount\": 7500,\n    \"payment_method\": \"Bank Transfer\",\n    \"date\": \"2026-11-18\",\n    \"note\": \"Partial bill clearance\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Pay Supplier Return Due",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/suppliers/1/pay-return-due",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "suppliers",
+                                "1",
+                                "pay-return-due"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"amount\": 1500,\n    \"payment_method\": \"Cash\",\n    \"date\": \"2026-11-18\",\n    \"note\": \"Refund received from supplier\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Toggle Supplier Status",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/suppliers/1/toggle-status",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "suppliers",
+                                "1",
+                                "toggle-status"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Export Suppliers (Excel)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/suppliers/export/xlsx",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "suppliers",
+                                "export",
+                                "xlsx"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Download Supplier Import Template",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/suppliers/import/template",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "suppliers",
+                                "import",
+                                "template"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Supplier",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/suppliers/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "suppliers",
+                                "1"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "4. Brands",
+            "item": [
+                {
+                    "name": "List Brands",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/brands?search=",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "brands"
+                            ],
+                            "query": [
+                                {
+                                    "key": "search",
+                                    "value": "",
+                                    "description": ""
+                                }
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Brand",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/brands",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "brands"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Sony Mobile\",\n    \"note\": \"Xperia series smartphones and audio accessories\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Brand",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/brands/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "brands",
+                                "1"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Sony Xperia\",\n    \"note\": \"Updated description for Sony Xperia\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Export Brands (Excel)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/brands/export/xlsx",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "brands",
+                                "export",
+                                "xlsx"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Brand",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/brands/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "brands",
+                                "1"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "5. Categories",
+            "item": [
+                {
+                    "name": "List Categories",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/categories?search=&status=active",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "categories"
+                            ],
+                            "query": [
+                                {
+                                    "key": "search",
+                                    "value": "",
+                                    "description": ""
+                                },
+                                {
+                                    "key": "status",
+                                    "value": "active",
+                                    "description": ""
+                                }
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Category",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/categories",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "categories"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Gaming Accessories\",\n    \"description\": \"Gaming controllers, triggers, and cooling fans\",\n    \"status\": \"active\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Category",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/categories/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "categories",
+                                "1"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Mobile Gaming Accessories\",\n    \"description\": \"Updated gaming gadgets\",\n    \"status\": \"active\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Toggle Category Status",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/categories/1/toggle-status",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "categories",
+                                "1",
+                                "toggle-status"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Export Categories (Excel)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/categories/export/xlsx",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "categories",
+                                "export",
+                                "xlsx"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Category",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/categories/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "categories",
+                                "1"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "6. Products",
+            "item": [
+                {
+                    "name": "List Products",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/products?search=&status=active&per_page=15",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products"
+                            ],
+                            "query": [
+                                {
+                                    "key": "search",
+                                    "value": "",
+                                    "description": ""
+                                },
+                                {
+                                    "key": "status",
+                                    "value": "active",
+                                    "description": ""
+                                },
+                                {
+                                    "key": "per_page",
+                                    "value": "15",
+                                    "description": ""
+                                }
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Product",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/products",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Galaxy S24 Ultra\",\n    \"brand_id\": 1,\n    \"category_id\": 1,\n    \"model\": \"SM-S928B\",\n    \"barcode\": \"8806095000001\",\n    \"storage\": \"256GB\",\n    \"color\": \"Titanium Gray\",\n    \"purchase_price\": 125000.0,\n    \"sale_price\": 139999.0,\n    \"quantity\": 10,\n    \"unit\": \"Pcs\",\n    \"status\": \"active\",\n    \"note\": \"Flagship 2024 model with S-Pen\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Search Products (Autocomplete)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/products/search?q=Galaxy",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products",
+                                "search"
+                            ],
+                            "query": [
+                                {
+                                    "key": "q",
+                                    "value": "Galaxy",
+                                    "description": ""
+                                }
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Product",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/products/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products",
+                                "1"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Galaxy S24 Ultra (Updated)\",\n    \"purchase_price\": 124000.0,\n    \"sale_price\": 138500.0,\n    \"status\": \"active\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Toggle Product Status",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/products/1/toggle-status",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products",
+                                "1",
+                                "toggle-status"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Export Products (Excel)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/products/export/xlsx",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products",
+                                "export",
+                                "xlsx"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Product",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/products/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products",
+                                "1"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "7. Stock Inventory (Units)",
+            "item": [
+                {
+                    "name": "List Stock Units",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/units?search=&low_stock=0",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "units"
+                            ],
+                            "query": [
+                                {
+                                    "key": "search",
+                                    "value": "",
+                                    "description": ""
+                                },
+                                {
+                                    "key": "low_stock",
+                                    "value": "0",
+                                    "description": ""
+                                }
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Stock Unit",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/units",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "units"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"product_id\": 1,\n    \"quantity\": 50,\n    \"unit\": \"Pcs\",\n    \"note\": \"Initial stock entry\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Stock Unit",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/units/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "units",
+                                "1"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"quantity\": 55,\n    \"unit\": \"Pcs\",\n    \"note\": \"Stock recount adjustment\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Export Stock Units (Excel)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/units/export/xlsx",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "units",
+                                "export",
+                                "xlsx"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Download Stock Import Template",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/units/import/template",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "units",
+                                "import",
+                                "template"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Stock Unit",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/units/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "units",
+                                "1"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "8. Warehouses & Locations",
+            "item": [
+                {
+                    "name": "List Warehouses",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/warehouses",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "warehouses"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Warehouse",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/warehouses",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "warehouses"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Teknaf Outlet Warehouse\",\n    \"code\": \"WH-TK01\",\n    \"type\": \"warehouse\",\n    \"address\": \"Main Road, Teknaf\",\n    \"phone\": \"01812345678\",\n    \"status\": \"active\",\n    \"note\": \"Border region storage\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Warehouse",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/warehouses/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "warehouses",
+                                "1"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Central Distribution Hub\",\n    \"phone\": \"01811223344\",\n    \"status\": \"active\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Warehouse",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/warehouses/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "warehouses",
+                                "1"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "9. Stock Transfers",
+            "item": [
+                {
+                    "name": "List Stock Transfers",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/stock-transfers?status=",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "stock-transfers"
+                            ],
+                            "query": [
+                                {
+                                    "key": "status",
+                                    "value": "",
+                                    "description": ""
+                                }
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Stock Transfer",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/stock-transfers",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "stock-transfers"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"from_location_id\": 1,\n    \"to_location_id\": 2,\n    \"note\": \"Monthly stock replenishment to outlet\",\n    \"items\": [\n        {\n            \"unit_id\": 1,\n            \"quantity\": 5\n        }\n    ]\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Stock Transfer Details",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/stock-transfers/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "stock-transfers",
+                                "1"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Approve Stock Transfer",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/stock-transfers/1/approve",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "stock-transfers",
+                                "1",
+                                "approve"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Reject Stock Transfer",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/stock-transfers/1/reject",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "stock-transfers",
+                                "1",
+                                "reject"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"reason\": \"Insufficient space at destination\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Cancel Stock Transfer",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/stock-transfers/1/cancel",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "stock-transfers",
+                                "1",
+                                "cancel"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Search Units for Transfer",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/stock-transfers/search-units?location_id=1&q=",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "stock-transfers",
+                                "search-units"
+                            ],
+                            "query": [
+                                {
+                                    "key": "location_id",
+                                    "value": "1",
+                                    "description": ""
+                                },
+                                {
+                                    "key": "q",
+                                    "value": "",
+                                    "description": ""
+                                }
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "10. Stock Adjustments",
+            "item": [
+                {
+                    "name": "List Stock Adjustments",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/stock-adjustments?type=",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "stock-adjustments"
+                            ],
+                            "query": [
+                                {
+                                    "key": "type",
+                                    "value": "",
+                                    "description": ""
+                                }
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Stock Adjustment",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/stock-adjustments",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "stock-adjustments"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"type\": \"damage\",\n    \"location_id\": 1,\n    \"note\": \"Water damaged packaging\",\n    \"items\": [\n        {\n            \"unit_id\": 1,\n            \"quantity_adjusted\": 2\n        }\n    ]\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "View Stock Adjustment",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/stock-adjustments/1",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "stock-adjustments",
+                                "1"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Approve Stock Adjustment",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/stock-adjustments/1/approve",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "stock-adjustments",
+                                "1",
+                                "approve"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Reject Stock Adjustment",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/stock-adjustments/1/reject",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "stock-adjustments",
+                                "1",
+                                "reject"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "11. Sales & Collections",
+            "item": [
+                {
+                    "name": "List Sales Orders",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/sales-orders",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "sales-orders"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Sales Order",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/sales-orders",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "sales-orders"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"customer_id\": 1,\n    \"order_date\": \"2026-11-18\",\n    \"note\": \"Urgent delivery requested\",\n    \"items\": [\n        {\n            \"product_id\": 1,\n            \"quantity\": 2,\n            \"unit_price\": 139999.0\n        }\n    ]\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Approve Sales Order",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/sales-orders/1/approve",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "sales-orders",
+                                "1",
+                                "approve"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Reject Sales Order",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/sales-orders/1/reject",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "sales-orders",
+                                "1",
+                                "reject"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"rejection_reason\": \"Out of stock\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "List Sales Invoices",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/sales-invoices",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "sales-invoices"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "List Sales Returns",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/sales-returns",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "sales-returns"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Approve Sales Return",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/sales-returns/1/approve",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "sales-returns",
+                                "1",
+                                "approve"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Reject Sales Return",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/sales-returns/1/reject",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "sales-returns",
+                                "1",
+                                "reject"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"rejection_reason\": \"Physical warranty void\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "List Customer Collections",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/customer-collections",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "customer-collections"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Customer Collection",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/customer-collections",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "customer-collections"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"customer_id\": 1,\n    \"amount\": 25000,\n    \"payment_method\": \"Cash\",\n    \"collection_date\": \"2026-11-18\",\n    \"note\": \"Daily SR field collection\"\n}"
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "12. Purchase Management",
+            "item": [
+                {
+                    "name": "List Purchase Orders",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/purchase-orders",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "purchase-orders"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Purchase Order",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/purchase-orders",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "purchase-orders"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"supplier_id\": 1,\n    \"order_date\": \"2026-11-18\",\n    \"note\": \"Quarterly restock purchase\",\n    \"items\": [\n        {\n            \"product_id\": 1,\n            \"quantity\": 20,\n            \"unit_cost\": 120000.0\n        }\n    ]\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "List Purchase Invoices",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/purchase-invoices",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "purchase-invoices"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "List Purchase Returns",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/purchase-returns",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "purchase-returns"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "13. User Management",
+            "item": [
+                {
+                    "name": "List Users",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/users",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "users"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create User",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/users",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "users"
+                            ]
+                        },
+                        "description": "",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Kamal Hossain\",\n    \"email\": \"kamal@cberp.local\",\n    \"phone\": \"01855667788\",\n    \"password\": \"Password@123\",\n    \"password_confirmation\": \"Password@123\",\n    \"role\": \"Sales Representative\",\n    \"status\": \"active\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Toggle User Status",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/users/2/toggle-status",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "users",
+                                "2",
+                                "toggle-status"
+                            ]
+                        },
+                        "description": ""
+                    },
+                    "response": []
+                }
+            ]
+        }
+    ]
+}

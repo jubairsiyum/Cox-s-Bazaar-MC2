@@ -16,6 +16,7 @@ class StockMovement extends Model
 
     protected $fillable = [
         'unit_id',
+        'location_id',
         'type',
         'quantity',
         'quantity_after',
@@ -39,6 +40,14 @@ class StockMovement extends Model
     public function unit(): BelongsTo
     {
         return $this->belongsTo(Unit::class);
+    }
+
+    /**
+     * The location this movement happened at, when known.
+     */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(Location::class);
     }
 
     public function reference(): MorphTo

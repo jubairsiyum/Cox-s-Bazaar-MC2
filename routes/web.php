@@ -14,11 +14,18 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PlaceholderController;
+use App\Http\Controllers\PosController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PurchaseDueController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\PurchaseReturnController;
+use App\Http\Controllers\SalesInvoiceController;
+use App\Http\Controllers\SalesOrderController;
+use App\Http\Controllers\SalesReportController;
+use App\Http\Controllers\SalesReturnController;
 use App\Http\Controllers\StockAdjustmentController;
 use App\Http\Controllers\StockTransferController;
 use App\Http\Controllers\SupplierController;
@@ -269,6 +276,7 @@ Route::middleware('auth')->group(function () {
         Route::get('stock-transfers/export/{format?}', [StockTransferController::class, 'export'])->name('stock-transfers.export');
         Route::get('stock-transfers/{stockTransfer}/edit', [StockTransferController::class, 'edit'])->name('stock-transfers.edit');
         Route::patch('stock-transfers/{stockTransfer}', [StockTransferController::class, 'update'])->name('stock-transfers.update');
+        Route::patch('stock-transfers/{stockTransfer}/cancel', [StockTransferController::class, 'cancel'])->name('stock-transfers.cancel');
         Route::delete('stock-transfers/{stockTransfer}', [StockTransferController::class, 'destroy'])->name('stock-transfers.destroy');
         Route::get('stock-transfers/{stockTransfer}', [StockTransferController::class, 'show'])->name('stock-transfers.show');
     });
@@ -304,6 +312,19 @@ Route::middleware('auth')->group(function () {
         Route::get('stock-adjustments/{stockAdjustment}/edit', [StockAdjustmentController::class, 'edit'])->name('stock-adjustments.edit');
         Route::patch('stock-adjustments/{stockAdjustment}', [StockAdjustmentController::class, 'update'])->name('stock-adjustments.update');
         Route::delete('stock-adjustments/{stockAdjustment}', [StockAdjustmentController::class, 'destroy'])->name('stock-adjustments.destroy');
+        Route::patch('stock-adjustments/{stockAdjustment}/approve', [StockAdjustmentController::class, 'approve'])->name('stock-adjustments.approve');
+        Route::patch('stock-adjustments/{stockAdjustment}/reject', [StockAdjustmentController::class, 'reject'])->name('stock-adjustments.reject');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notifications (Module 12)
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['verified'])->group(function () {
+        Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+        Route::patch('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
+        Route::patch('notifications/{id}/read', [NotificationController::class, 'read'])->name('notifications.read');
     });
 
     /*
@@ -340,9 +361,29 @@ Route::middleware('auth')->group(function () {
         Route::delete('purchase-invoices/{purchaseOrder}', [PurchaseOrderController::class, 'destroy'])->name('purchase-invoices.destroy');
     });
 
+    // Legacy cleanup only: purchases take effect on creation, so approve/reject
+    // just complete documents that still carry the old pending approval state.
     Route::middleware(['verified', 'permission:purchase-invoices.approve'])->group(function () {
         Route::patch('purchase-invoices/{purchaseOrder}/approve', [PurchaseOrderController::class, 'approve'])->name('purchase-invoices.approve');
         Route::patch('purchase-invoices/{purchaseOrder}/reject', [PurchaseOrderController::class, 'reject'])->name('purchase-invoices.reject');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Purchase Dues (Purchasing) — due payment requests on purchase invoices
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['verified', 'permission:purchase-invoices.view|purchase-invoices.manage|supplier-payments.view|supplier-payments.manage'])->group(function () {
+        Route::get('purchase-dues', [PurchaseDueController::class, 'index'])->name('purchase-dues.index');
+        Route::post('purchase-dues', [PurchaseDueController::class, 'store'])->name('purchase-dues.store');
+        Route::patch('purchase-dues/{purchasePayment}', [PurchaseDueController::class, 'update'])->name('purchase-dues.update');
+        Route::delete('purchase-dues/{purchasePayment}', [PurchaseDueController::class, 'destroy'])->name('purchase-dues.destroy');
+    });
+
+    // Approvals are gated by the responsible branch manager (policy), not a permission.
+    Route::middleware(['verified'])->group(function () {
+        Route::patch('purchase-dues/{purchasePayment}/approve', [PurchaseDueController::class, 'approve'])->name('purchase-dues.approve');
+        Route::patch('purchase-dues/{purchasePayment}/reject', [PurchaseDueController::class, 'reject'])->name('purchase-dues.reject');
     });
 
     /*
@@ -362,6 +403,8 @@ Route::middleware('auth')->group(function () {
         Route::get('purchase-returns/{purchaseReturn}/edit', [PurchaseReturnController::class, 'edit'])->name('purchase-returns.edit');
         Route::patch('purchase-returns/{purchaseReturn}', [PurchaseReturnController::class, 'update'])->name('purchase-returns.update');
         Route::delete('purchase-returns/{purchaseReturn}', [PurchaseReturnController::class, 'destroy'])->name('purchase-returns.destroy');
+        // Legacy cleanup only: returns take effect when submitted, so these just
+        // complete documents that still carry the old pending approval state.
         Route::patch('purchase-returns/{purchaseReturn}/approve', [PurchaseReturnController::class, 'approve'])->name('purchase-returns.approve');
         Route::patch('purchase-returns/{purchaseReturn}/reject', [PurchaseReturnController::class, 'reject'])->name('purchase-returns.reject');
         Route::get('purchase-returns/{purchaseReturn}', [PurchaseReturnController::class, 'show'])->name('purchase-returns.show');
@@ -396,11 +439,6 @@ Route::middleware('auth')->group(function () {
 */
 Route::middleware(['auth', 'verified'])->group(function () {
     $placeholders = [
-        'sales-orders.index' => 'Sales Orders',
-        'sales-invoices.index' => 'Sales Invoices',
-        'sales-returns.index' => 'Sales Returns',
-        'customer-collections.index' => 'Collections',
-        'pos.index' => 'POS Terminal',
         'cash-accounts.index' => 'Cash Accounts',
         'bank-accounts.index' => 'Bank Accounts',
         'income-transactions.index' => 'Income',
@@ -412,11 +450,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Permission guards for placeholders whose module permissions are already seeded.
     $placeholderPermissions = [
-        'sales-orders.index' => 'permission:sales-orders.manage',
-        'sales-invoices.index' => 'permission:sales-invoices.view|sales-invoices.manage|sales-invoices.post',
-        'sales-returns.index' => 'permission:sales-returns.manage',
-        'customer-collections.index' => 'permission:customer-collections.manage',
-        'pos.index' => 'permission:pos.access',
         'cash-accounts.index' => 'permission:finance.view|finance.manage|cash-accounts.manage',
         'bank-accounts.index' => 'permission:finance.view|finance.manage|bank-accounts.manage',
         'income-transactions.index' => 'permission:finance.view|finance.manage|income-transactions.manage',
@@ -432,4 +465,112 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware($placeholderPermissions[$name] ?? [])
             ->name($name);
     }
+});
+
+/*
+|--------------------------------------------------------------------------
+| Sales section (docs/modules.md Modules 09–11): orders, invoices, returns,
+| collections, POS and the sales report.
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'verified'])->group(function () {
+    $salesOrderController = SalesOrderController::class;
+    $salesInvoiceController = SalesInvoiceController::class;
+    $salesReturnController = SalesReturnController::class;
+    $posController = PosController::class;
+    $salesReportController = SalesReportController::class;
+
+    /*
+    | Sales Orders
+    */
+    Route::get('sales-orders/search-units', [$salesOrderController, 'searchUnits'])
+        ->name('sales-orders.search-units')
+        ->middleware('permission:sales-orders.manage|sales-invoices.manage');
+
+    Route::middleware('permission:sales-orders.manage')->group(function () use ($salesOrderController) {
+        Route::get('sales-orders', [$salesOrderController, 'index'])->name('sales-orders.index');
+        Route::get('sales-orders/create', [$salesOrderController, 'create'])->name('sales-orders.create');
+        Route::post('sales-orders', [$salesOrderController, 'store'])->name('sales-orders.store');
+        Route::get('sales-orders/{salesOrder}', [$salesOrderController, 'show'])->name('sales-orders.show');
+        Route::get('sales-orders/{salesOrder}/edit', [$salesOrderController, 'edit'])->name('sales-orders.edit');
+        Route::patch('sales-orders/{salesOrder}', [$salesOrderController, 'update'])->name('sales-orders.update');
+        Route::delete('sales-orders/{salesOrder}', [$salesOrderController, 'destroy'])->name('sales-orders.destroy');
+        Route::patch('sales-orders/{salesOrder}/confirm', [$salesOrderController, 'confirm'])->name('sales-orders.confirm');
+        Route::patch('sales-orders/{salesOrder}/cancel', [$salesOrderController, 'cancel'])->name('sales-orders.cancel');
+    });
+
+    /*
+    | Sales Invoices — register, draft workflow and printable invoice
+    */
+    Route::middleware('permission:sales-invoices.view|sales-invoices.manage|sales-invoices.post')->group(function () use ($salesInvoiceController) {
+        Route::get('sales-invoices/search-units', [$salesInvoiceController, 'searchUnits'])->name('sales-invoices.search-units');
+        Route::get('sales-invoices/export/{format?}', [$salesInvoiceController, 'export'])->name('sales-invoices.export');
+    });
+
+    Route::middleware('permission:sales-invoices.manage')->group(function () use ($salesInvoiceController) {
+        Route::get('sales-invoices/create', [$salesInvoiceController, 'create'])->name('sales-invoices.create');
+        Route::post('sales-invoices', [$salesInvoiceController, 'store'])->name('sales-invoices.store');
+        Route::get('sales-invoices/{salesInvoice}/edit', [$salesInvoiceController, 'edit'])->name('sales-invoices.edit');
+        Route::patch('sales-invoices/{salesInvoice}', [$salesInvoiceController, 'update'])->name('sales-invoices.update');
+        Route::delete('sales-invoices/{salesInvoice}', [$salesInvoiceController, 'destroy'])->name('sales-invoices.destroy');
+    });
+
+    Route::middleware('permission:sales-invoices.view|sales-invoices.manage|sales-invoices.post')->group(function () use ($salesInvoiceController) {
+        Route::get('sales-invoices', [$salesInvoiceController, 'index'])->name('sales-invoices.index');
+        Route::get('sales-invoices/{salesInvoice}', [$salesInvoiceController, 'show'])->name('sales-invoices.show');
+        Route::get('sales-invoices/{salesInvoice}/print', [$salesInvoiceController, 'print'])->name('sales-invoices.print');
+    });
+
+    Route::middleware('permission:sales-invoices.post')->group(function () use ($salesInvoiceController) {
+        Route::patch('sales-invoices/{salesInvoice}/post', [$salesInvoiceController, 'post'])->name('sales-invoices.post');
+        Route::patch('sales-invoices/{salesInvoice}/void', [$salesInvoiceController, 'void'])->name('sales-invoices.void');
+    });
+
+    /*
+    | Sales Returns — "Apply Return" flow with branch-manager approval.
+    | show/approve/reject are open to holders of either sales-returns.manage
+    | or sales-returns.approve; the policy then narrows approvals to the
+    | responsible branch manager (or Super Admin).
+    */
+    Route::middleware('permission:sales-returns.manage')->group(function () use ($salesReturnController) {
+        Route::get('sales-returns/customer-invoices', [$salesReturnController, 'customerInvoices'])->name('sales-returns.customer-invoices');
+        Route::get('sales-returns/invoice-details', [$salesReturnController, 'invoiceDetails'])->name('sales-returns.invoice-details');
+        Route::get('sales-returns', [$salesReturnController, 'index'])->name('sales-returns.index');
+        Route::get('sales-returns/create', [$salesReturnController, 'create'])->name('sales-returns.create');
+        Route::post('sales-returns', [$salesReturnController, 'store'])->name('sales-returns.store');
+        Route::get('sales-returns/{salesReturn}/edit', [$salesReturnController, 'edit'])->name('sales-returns.edit');
+        Route::patch('sales-returns/{salesReturn}', [$salesReturnController, 'update'])->name('sales-returns.update');
+        Route::delete('sales-returns/{salesReturn}', [$salesReturnController, 'destroy'])->name('sales-returns.destroy');
+    });
+
+    Route::middleware('permission:sales-returns.manage|sales-returns.approve')->group(function () use ($salesReturnController) {
+        Route::get('sales-returns/{salesReturn}', [$salesReturnController, 'show'])->name('sales-returns.show');
+        Route::patch('sales-returns/{salesReturn}/approve', [$salesReturnController, 'approve'])->name('sales-returns.approve');
+        Route::patch('sales-returns/{salesReturn}/reject', [$salesReturnController, 'reject'])->name('sales-returns.reject');
+    });
+
+    /*
+    | Collections — every distributor (sales) invoice in one list, generated
+    | from a sales order or rung up on the POS alike. The customer-collections
+    | payment screens are retired "for now" and all of their routes are gone.
+    */
+    Route::middleware('permission:sales-invoices.view|sales-invoices.manage|customer-collections.manage')->group(function () use ($salesInvoiceController) {
+        Route::get('collections', [$salesInvoiceController, 'distributorIndex'])->name('collections.index');
+    });
+
+    /*
+    | POS — quick sale terminal
+    */
+    Route::middleware('permission:pos.access')->group(function () use ($posController) {
+        Route::get('pos', [$posController, 'index'])->name('pos.index');
+        Route::get('pos/search-units', [$posController, 'searchUnits'])->name('pos.search-units');
+        Route::post('pos', [$posController, 'store'])->name('pos.store');
+    });
+
+    /*
+    | Sales report
+    */
+    Route::get('reports/sales', [$salesReportController, 'sales'])
+        ->middleware('permission:reports.view|reports.export')
+        ->name('reports.sales');
 });

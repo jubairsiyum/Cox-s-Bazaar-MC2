@@ -15,4 +15,9 @@ class Branch extends Model
     {
         return $this->hasMany(User::class);
     }
+
+    public function locations(): HasMany
+    {
+        return $this->hasMany(Location::class);
+    }
 }

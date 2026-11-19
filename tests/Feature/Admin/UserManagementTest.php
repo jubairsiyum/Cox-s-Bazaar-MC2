@@ -1,6 +1,8 @@
 <?php
 
+use App\Models\Branch;
 use App\Models\User;
+use Database\Seeders\BranchSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 
 beforeEach(function () {
@@ -40,6 +42,46 @@ it('creates a user and assigns roles', function () {
 
     $this->assertNotNull($user);
     $this->assertTrue($user->hasRole('Manager'));
+});
+
+it('lists the seeded branches in the add user form', function () {
+    actingAsSuperAdmin();
+    $this->seed(BranchSeeder::class);
+
+    $this->get(route('users.create'))
+        ->assertOk()
+        ->assertSee('Head Office')
+        ->assertSee('Sadar Outlet');
+});
+
+it('creates a user with a branch assignment', function () {
+    actingAsSuperAdmin();
+    $this->seed(BranchSeeder::class);
+
+    $branch = Branch::where('name', 'Sadar Outlet')->first();
+
+    $this->post(route('users.store'), [
+        'name' => 'Branch User',
+        'email' => 'branch-user@example.com',
+        'phone' => '01700000001',
+        'password' => 'Password@123',
+        'password_confirmation' => 'Password@123',
+        'status' => 'active',
+        'branch_id' => $branch->id,
+    ])->assertRedirect(route('users.index'));
+
+    expect(User::where('email', 'branch-user@example.com')->first()?->branch_id)->toBe($branch->id);
+});
+
+it('automatically verifies provisioned accounts created outside the admin UI', function () {
+    // e.g. created via tinker or an ad-hoc seeder: still trusted, never walled.
+    $user = User::create([
+        'name' => 'Outlet Manager X',
+        'email' => 'outlet-x@example.com',
+        'password' => 'secret-password',
+    ]);
+
+    expect($user->fresh()->email_verified_at)->not->toBeNull();
 });
 
 it('rejects creating a user with a duplicate email', function () {

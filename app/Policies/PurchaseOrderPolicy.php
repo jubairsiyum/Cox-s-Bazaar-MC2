@@ -12,7 +12,8 @@ use App\Services\LocationScope;
  * Purchase orders are created through the Purchase Orders section
  * (purchase-orders.manage) and managed from the Purchase Invoices register
  * (purchase-invoices.* permissions). Outlet Managers are limited to their
- * assigned location; approvals need the dedicated approve permission.
+ * assigned location. Purchases take effect on creation, so approve/reject
+ * only remain for legacy documents still awaiting sign-off.
  */
 class PurchaseOrderPolicy
 {
@@ -43,7 +44,8 @@ class PurchaseOrderPolicy
     }
 
     /**
-     * Approve (receive) a purchase: the responsible manager of its location.
+     * Complete a legacy purchase awaiting sign-off: the responsible manager of
+     * its location.
      */
     public function approve(User $user, PurchaseOrder $purchaseOrder): bool
     {

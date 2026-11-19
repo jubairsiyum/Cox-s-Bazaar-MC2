@@ -13,6 +13,7 @@ use App\Services\DuplicateCheckService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -72,14 +73,21 @@ class BrandController extends Controller
         if ($reusable instanceof Brand) {
             DuplicateCheckService::purgeTrashConflicts(Brand::class, $validated, $reusable->id);
 
+            $replacedLogo = $reusable->logo;
+            $validated['logo'] = $this->storeLogo($request) ?? $replacedLogo;
+
             $reusable->fill($validated);
             $reusable->restore();
+
+            $this->deleteReplacedLogo($request, ['logo' => $replacedLogo]);
 
             AuditService::created($reusable, "Brand '{$reusable->name}' restored and updated.");
 
             return redirect()->route('brands.index')
                 ->with('success', "Brand '{$reusable->name}' restored and updated successfully.");
         }
+
+        $validated['logo'] = $this->storeLogo($request);
 
         $brand = Brand::create($validated);
 
@@ -99,7 +107,11 @@ class BrandController extends Controller
 
         DuplicateCheckService::purgeTrashConflicts(Brand::class, $validated, $brand->id);
 
+        $validated['logo'] = $this->storeLogo($request) ?? $brand->logo;
+
         $brand->update($validated);
+
+        $this->deleteReplacedLogo($request, $original);
 
         AuditService::updated($brand, $original, "Brand '{$brand->name}' updated.");
 
@@ -206,5 +218,29 @@ class BrandController extends Controller
             ->get();
 
         return [$columns, $brands];
+    }
+
+    /**
+     * Store the uploaded logo and return its public path.
+     */
+    private function storeLogo(Request $request): ?string
+    {
+        return $request->hasFile('logo')
+            ? $request->file('logo')->store('brand-logos', 'public')
+            : null;
+    }
+
+    /**
+     * Remove the previous logo when a replacement was uploaded.
+     *
+     * @param  array<string, mixed>  $original
+     */
+    private function deleteReplacedLogo(Request $request, array $original): void
+    {
+        $previous = $original['logo'] ?? null;
+
+        if ($previous && $request->hasFile('logo')) {
+            Storage::disk('public')->delete($previous);
+        }
     }
 }

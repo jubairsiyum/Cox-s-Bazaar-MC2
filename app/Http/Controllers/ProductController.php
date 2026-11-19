@@ -13,6 +13,7 @@ use App\Services\AuditService;
 use App\Services\StockService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class ProductController extends Controller
@@ -71,6 +72,7 @@ class ProductController extends Controller
         $unitOfMeasure = $validated['unit'] ?? 'Pcs';
         unset($validated['quantity'], $validated['unit']);
         $validated['created_by'] = $request->user()->id;
+        $validated['photo'] = $this->storePhoto($request);
 
         $product = Product::create($validated);
 
@@ -112,7 +114,11 @@ class ProductController extends Controller
         $unitOfMeasure = $validated['unit'] ?? null;
         unset($validated['quantity'], $validated['unit']);
 
+        $validated['photo'] = $this->storePhoto($request) ?? $product->photo;
+
         $product->update($validated);
+
+        $this->deleteReplacedPhoto($request, $original);
 
         $this->syncStockRow($product, $quantity, $unitOfMeasure, $request->user()->id);
 
@@ -186,6 +192,30 @@ class ProductController extends Controller
 
         if ($unitOfMeasure !== null && $unitOfMeasure !== $stockRow->unit) {
             $stockRow->update(['unit' => $unitOfMeasure]);
+        }
+    }
+
+    /**
+     * Store the uploaded photo and return its public path.
+     */
+    private function storePhoto(Request $request): ?string
+    {
+        return $request->hasFile('photo')
+            ? $request->file('photo')->store('product-photos', 'public')
+            : null;
+    }
+
+    /**
+     * Remove the previous photo when a replacement was uploaded.
+     *
+     * @param  array<string, mixed>  $original
+     */
+    private function deleteReplacedPhoto(Request $request, array $original): void
+    {
+        $previous = $original['photo'] ?? null;
+
+        if ($previous && $request->hasFile('photo')) {
+            Storage::disk('public')->delete($previous);
         }
     }
 }

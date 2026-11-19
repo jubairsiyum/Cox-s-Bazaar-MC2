@@ -226,6 +226,13 @@
         $companyName = \App\Models\Setting::get('company_name', config('app.name', "Cox's Bazaar Mobile Center"));
         $companyAddress = \App\Models\Setting::get('company_address', "Cox's Bazaar, Chittagong, Bangladesh");
         $companyPhone = \App\Models\Setting::get('company_phone', "+880 1800-000000");
+
+        $productCountsByBrand = \App\Models\Product::query()
+            ->whereNotNull('brand_id')
+            ->selectRaw('brand_id, COUNT(*) as total_count')
+            ->groupBy('brand_id')
+            ->pluck('total_count', 'brand_id');
+        $totalProductsInReport = $brands->sum(fn ($b) => (int) ($productCountsByBrand[$b->id] ?? 0));
     @endphp
 
     {{-- Official Letterhead --}}
@@ -250,6 +257,7 @@
     <div class="summary-bar">
         <div>
             Total Records: <strong>{{ count($brands) }}</strong> {{ Str::plural('brand', count($brands)) }}
+            · Linked Products: <strong>{{ number_format($totalProductsInReport) }}</strong>
             @if(request('search'))
                 · Filter: <strong>"{{ request('search') }}"</strong>
             @endif
@@ -267,6 +275,7 @@
                 @foreach($columns as $key => $label)
                     <th>{{ $label }}</th>
                 @endforeach
+                <th style="width: 110px; text-align: right;">Products</th>
             </tr>
         </thead>
         <tbody>
@@ -327,10 +336,14 @@
                             @endif
                         </td>
                     @endforeach
+                    @php $brandProductCount = (int) ($productCountsByBrand[$brand->id] ?? 0); @endphp
+                    <td style="text-align: right; font-weight: 700; color: {{ $brandProductCount > 0 ? '#1e3a8a' : '#94a3b8' }};">
+                        {{ number_format($brandProductCount) }} {{ Str::plural('product', $brandProductCount) }}
+                    </td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="{{ count($columns) + 1 }}" style="text-align: center; padding: 24px; color: #64748b;">
+                    <td colspan="{{ count($columns) + 2 }}" style="text-align: center; padding: 24px; color: #64748b;">
                         No brands found.
                     </td>
                 </tr>

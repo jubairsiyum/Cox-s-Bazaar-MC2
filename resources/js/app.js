@@ -6,6 +6,7 @@ import "flatpickr/dist/flatpickr.min.css";
 import "./bootstrap";
 import initCharts from "./components/chart";
 import registerUi from "./ui";
+import { initThemedSelects } from "./ui/themed-select";
 import { registerMotion, startMotion, themeSwitch } from "./motion";
 
 Alpine.plugin(persist);
@@ -251,6 +252,7 @@ function initBarcodeScanner() {
 
 // Initialize components on DOM ready
 document.addEventListener("DOMContentLoaded", () => {
+    initThemedSelects();
     initBarcodeScanner();
 
     // ── Offline / Online detection ──────────────────────────

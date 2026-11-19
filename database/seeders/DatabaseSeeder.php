@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             RolesAndPermissionsSeeder::class, // must be first
             SettingsSeeder::class,
             SuperAdminSeeder::class,
+            BranchSeeder::class,
             DemoUsersSeeder::class,
             CategorySeeder::class,
             BrandSeeder::class,
