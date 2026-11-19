@@ -146,7 +146,7 @@ class InventoryController extends Controller
         $user = $request->user();
 
         if (LocationScope::isRestricted($user)) {
-            return $user->location_id !== null ? (int) $user->location_id : -1;
+            return $user->branch_id !== null ? (int) $user->branch_id : -1;
         }
 
         return $request->filled('location_id') ? $request->integer('location_id') : null;

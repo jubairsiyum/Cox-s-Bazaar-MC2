@@ -39,7 +39,7 @@ class PosController extends Controller
         return view('pos.index', [
             'customers' => Customer::query()->active()->orderBy('name')->get(['id', 'name', 'mobile']),
             'locations' => Location::query()->active()->orderBy('name')->get(['id', 'name']),
-            'defaultLocationId' => Auth::user()?->location_id ?: Location::query()->active()->orderBy('name')->value('id'),
+            'defaultLocationId' => Auth::user()?->branch_id ?: Location::query()->active()->orderBy('name')->value('id'),
         ]);
     }
 
@@ -60,7 +60,8 @@ class PosController extends Controller
                     'invoice_date' => now(),
                     'customer_id' => $validated['customer_id'] ?? null,
                     'location_id' => $validated['location_id'],
-                    'branch_id' => $request->user()?->branch_id,
+                    // The creator's branch: the branch of their assigned outlet.
+                    'branch_id' => $request->user()?->branch?->branch_id,
                     'status' => SalesInvoiceStatus::Draft,
                     'tax_rate' => (float) ($validated['tax_rate'] ?? 0),
                     'note' => $validated['note'] ?? 'POS sale',

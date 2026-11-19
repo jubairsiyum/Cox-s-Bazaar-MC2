@@ -21,7 +21,8 @@ class StockAdjustmentFactory extends Factory
         return [
             'adjustment_date' => now(),
             'type' => StockAdjustmentType::Set->value,
-            'approval_status' => ApprovalStatus::Pending->value,
+            'approval_status' => ApprovalStatus::Approved->value,
+            'approved_at' => now(),
             'total_amount' => 0,
             'reason' => fake()->sentence(),
         ];
@@ -38,6 +39,18 @@ class StockAdjustmentFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'type' => StockAdjustmentType::Remove->value,
+        ]);
+    }
+
+    /**
+     * Legacy rows still awaiting the (retired) approval step; they are
+     * treated as applied everywhere.
+     */
+    public function pending(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'approval_status' => ApprovalStatus::Pending->value,
+            'approved_at' => null,
         ]);
     }
 

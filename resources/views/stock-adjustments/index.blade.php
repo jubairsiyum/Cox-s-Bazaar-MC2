@@ -488,26 +488,6 @@
                             @can('stock-adjustments.manage')
                                 <td class="py-4 px-5 text-end whitespace-nowrap">
                                     <div class="inline-flex items-center justify-end gap-2">
-                                        @if($adjustment->isPending())
-                                            @can('approve', $adjustment)
-                                                <button type="button"
-                                                        @click="openActionModal('approve', @js(route('stock-adjustments.approve', $adjustment)), @js($adjustment->reference_no))"
-                                                        class="btn-scale inline-flex items-center gap-1.5 rounded-xl bg-success px-3 py-1.5 text-xs font-semibold text-on-brand shadow-2xs hover:opacity-95 transition-opacity cursor-pointer"
-                                                        title="Approve and apply this adjustment">
-                                                    <x-icon name="check" class="size-3.5" />
-                                                    <span>Approve</span>
-                                                </button>
-                                            @endcan
-                                            @can('reject', $adjustment)
-                                                <button type="button"
-                                                        @click="openActionModal('reject', @js(route('stock-adjustments.reject', $adjustment)), @js($adjustment->reference_no))"
-                                                        class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-danger/30 bg-danger/10 px-3 py-1.5 text-xs font-semibold text-danger hover:bg-danger hover:text-on-brand transition-colors cursor-pointer"
-                                                        title="Reject this adjustment request">
-                                                    <x-svg.x class="size-3.5" />
-                                                    <span>Reject</span>
-                                                </button>
-                                            @endcan
-                                        @endif
                                         @can('update', $adjustment)
                                             <a href="{{ route('stock-adjustments.edit', $adjustment) }}"
                                                class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs hover:border-brand-500 hover:text-brand-500 hover:bg-soft transition-colors">
@@ -517,7 +497,7 @@
                                         @endcan
                                         @can('delete', $adjustment)
                                             <button type="button"
-                                                    @click="openActionModal('delete', @js(route('stock-adjustments.destroy', $adjustment)), @js($adjustment->reference_no))"
+                                                    @click="openDeleteModal(@js(route('stock-adjustments.destroy', $adjustment)), @js($adjustment->reference_no))"
                                                     class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-danger/30 bg-danger/10 px-3 py-1.5 text-xs font-semibold text-danger hover:bg-danger hover:text-on-brand transition-colors cursor-pointer">
                                                 <x-svg.trash-bin class="size-3.5" />
                                                 <span>Delete</span>
@@ -570,50 +550,34 @@
         </div>
     </div>
 
-    {{-- Approve / Reject / Delete Confirmation Modal --}}
-    <div x-show="actionModal.open" x-cloak
+    {{-- Delete Confirmation Modal --}}
+    <div x-show="deleteModal.open" x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay backdrop-blur-xs"
-         @keydown.escape.window="actionModal.open = false">
+         @keydown.escape.window="deleteModal.open = false">
         <div class="w-full max-w-md rounded-3xl border border-line bg-surface shadow-card p-6" @click.stop>
             <div class="flex items-start gap-3.5">
-                <div class="flex size-11 shrink-0 items-center justify-center rounded-2xl ring-1"
-                     :class="actionModal.kind === 'approve' ? 'bg-success/10 text-success ring-success/20' : 'bg-danger/10 text-danger ring-danger/20'">
-                    <template x-if="actionModal.kind === 'approve'">
-                        <x-icon name="check" class="size-5" />
-                    </template>
-                    <template x-if="actionModal.kind !== 'approve'">
-                        <x-icon name="alert-triangle" class="size-5" />
-                    </template>
+                <div class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-danger/10 text-danger ring-1 ring-danger/20">
+                    <x-icon name="alert-triangle" class="size-5" />
                 </div>
                 <div class="min-w-0 flex-1">
-                    <h3 class="text-base font-bold text-ink"
-                        x-text="actionModal.kind === 'approve' ? 'Approve & apply adjustment?' : (actionModal.kind === 'reject' ? 'Reject adjustment request?' : 'Delete stock adjustment?')"></h3>
+                    <h3 class="text-base font-bold text-ink">Delete stock adjustment?</h3>
                     <p class="mt-1.5 text-xs text-muted leading-relaxed">
-                        <template x-if="actionModal.kind === 'approve'">
-                            <span>Approve <strong class="text-ink" x-text="actionModal.ref"></strong>? Its stock effect will be posted to the ledger and applied to the quantities.</span>
-                        </template>
-                        <template x-if="actionModal.kind === 'reject'">
-                            <span>Reject <strong class="text-ink" x-text="actionModal.ref"></strong>? The request is turned down and no stock is changed.</span>
-                        </template>
-                        <template x-if="actionModal.kind === 'delete'">
-                            <span>Are you sure you want to delete <strong class="text-ink" x-text="actionModal.ref"></strong>? Its stock effect will be automatically reversed if no subsequent movements occurred.</span>
-                        </template>
+                        Are you sure you want to delete <strong class="text-ink" x-text="deleteModal.ref"></strong>? Its stock effect will be automatically reversed if no subsequent movements occurred.
                     </p>
                 </div>
             </div>
             <div class="mt-6 flex items-center justify-end gap-2.5 pt-4 border-t border-line">
-                <button type="button" @click="actionModal.open = false"
+                <button type="button" @click="deleteModal.open = false"
                         class="btn-scale rounded-xl border border-line bg-surface px-4 py-2 text-xs font-semibold text-ink hover:bg-soft transition-colors cursor-pointer">
                     Cancel
                 </button>
-                <form :action="actionModal.url" method="POST">
+                <form :action="deleteModal.url" method="POST">
                     @csrf
-                    <input type="hidden" name="_method" :value="actionModal.kind === 'delete' ? 'DELETE' : 'PATCH'">
+                    @method('DELETE')
                     <button type="submit"
-                            class="btn-scale inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold text-on-brand shadow-sm hover:opacity-95 transition-opacity cursor-pointer"
-                            :class="actionModal.kind === 'approve' ? 'bg-success' : 'bg-danger'">
+                            class="btn-scale inline-flex items-center gap-1.5 rounded-xl bg-danger px-4 py-2 text-xs font-semibold text-on-brand shadow-sm hover:opacity-95 transition-opacity cursor-pointer">
                         <x-icon name="check" class="size-3.5" />
-                        <span x-text="actionModal.kind === 'approve' ? 'Approve & Apply' : (actionModal.kind === 'reject' ? 'Confirm Rejection' : 'Delete & Reverse')"></span>
+                        <span>Delete & Reverse</span>
                     </button>
                 </form>
             </div>
@@ -626,9 +590,8 @@
 function adjustmentsPage() {
     return {
         typeFilter: 'all',
-        actionModal: {
+        deleteModal: {
             open: false,
-            kind: 'approve',
             url: '',
             ref: ''
         },
@@ -655,8 +618,8 @@ function adjustmentsPage() {
 
         searchQuery: @js((string) request('search', '')),
 
-        openActionModal(kind, url, ref) {
-            this.actionModal = { open: true, kind, url, ref };
+        openDeleteModal(url, ref) {
+            this.deleteModal = { open: true, url, ref };
         },
 
         toggleColumn(key) {

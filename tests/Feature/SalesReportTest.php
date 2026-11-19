@@ -84,7 +84,7 @@ it('scopes the report to the assigned location for outlet managers', function ()
     $myInvoice = reportInvoice(1000, 0, ['location_id' => $mine->id]);
     $otherInvoice = reportInvoice(800, 0, ['location_id' => $other->id]);
 
-    $manager = User::factory()->create(['email_verified_at' => now(), 'location_id' => $mine->id]);
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $mine->id]);
     $manager->assignRole('Outlet Manager');
     $manager->givePermissionTo(['reports.view', 'sales-invoices.view']);
 

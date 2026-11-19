@@ -25,7 +25,7 @@
                 <x-status-badge :status="$order->status->value" :label="$order->status->label()" />
             </div>
             <p class="text-xs sm:text-sm text-muted mt-1">
-                Draft and confirmed orders can be edited. Invoiced orders are locked.
+                Orders awaiting payment can be edited. Invoiced orders are locked.
             </p>
         </div>
 

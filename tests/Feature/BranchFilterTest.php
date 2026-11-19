@@ -36,7 +36,7 @@ function branchFilterManagerAt(Location $location): User
 {
     $user = User::factory()->create([
         'email_verified_at' => now(),
-        'location_id' => $location->id,
+        'branch_id' => $location->id,
     ]);
     $user->assignRole('Outlet Manager');
 

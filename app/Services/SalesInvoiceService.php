@@ -20,9 +20,12 @@ use Illuminate\Support\Facades\DB;
  * brings the stock back and settles the invoice. Draft invoices are pure
  * documents and never touch stock.
  *
- * Completed sales orders are invoiced through {@see generateFromOrder()},
- * which issues and posts the invoice immediately — a sale always moves stock
- * and produces its invoice, exactly like a POS quick sale.
+ * Sales orders settle the moment they are paid: {@see generateFromOrder()}
+ * copies the order's line items into an invoice that is generated PAID IN
+ * FULL (due = 0, payment status "Paid") and posted on the spot. The business
+ * never sells on credit, so an order only produces its invoice once the
+ * payment has been confirmed — and that single post is the only stock
+ * effect the sale ever has.
  */
 class SalesInvoiceService
 {
@@ -50,8 +53,9 @@ class SalesInvoiceService
     }
 
     /**
-     * Generate the invoice for a completed sales order and post it on the
-     * spot: the invoice is copied from the order's line items and the
+     * Generate the invoice for a paid-in-full sales order and post it on the
+     * spot: the invoice is copied from the order's line items, settled in
+     * full (due = 0, payment status "Paid" — never "Payment Due") and the
      * stock-out takes effect immediately, like a POS quick sale. Call inside
      * the order's transaction so an {@see InsufficientStockException} rolls
      * the whole sale back.
@@ -85,6 +89,11 @@ class SalesInvoiceService
         }
 
         self::recalculate($invoice, (float) $order->tax_rate);
+
+        // Full payment is captured before the invoice is generated: settle it
+        // in full so it never reads "Payment Due".
+        $invoice->update(['paid_amount' => (float) $invoice->grand_total]);
+
         self::post($invoice);
 
         return $invoice;

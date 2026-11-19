@@ -28,7 +28,7 @@
                 </span>
             </div>
             <p class="text-xs sm:text-sm text-muted mt-1">
-                Capture the sale now — saving the order automatically generates and posts its sales invoice, and stock is issued immediately.
+                Capture the order now — the invoice is generated (paid in full) and the stock is issued only once the payment is confirmed on the order.
             </p>
         </div>
 

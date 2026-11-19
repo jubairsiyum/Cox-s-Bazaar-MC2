@@ -44,17 +44,24 @@ function salesOrderWithItem(Unit $unit, int $quantity = 3, float $rate = 250.0, 
 }
 
 /**
- * A minimal valid order payload for the given stock row.
+ * A minimal valid order payload for the given stock row. The customer is
+ * created up front so the payload carries a consistent customer_id /
+ * customer_name / customer_phone trio (the phone is the customer's own, so
+ * the identity rules never flag it).
  *
  * @param  array<string, mixed>  $overrides
  * @return array<string, mixed>
  */
 function salesOrderPayload(Unit $unit, array $overrides = []): array
 {
+    $customer = Customer::factory()->create();
+
     return array_merge([
         'order_date' => now()->format('Y-m-d\TH:i'),
         'expected_date' => now()->addDays(3)->toDateString(),
-        'customer_id' => Customer::factory()->create()->id,
+        'customer_id' => $customer->id,
+        'customer_name' => $customer->name,
+        'customer_phone' => $customer->tel_no,
         'location_id' => Location::factory()->create()->id,
         'tax_rate' => 0,
         'note' => null,
@@ -76,7 +83,7 @@ it('lists sales orders with a Create Order button', function () {
         ->assertSee('Create Order');
 });
 
-it('creates an order and auto-generates its posted invoice with computed totals', function () {
+it('creates an order with computed totals and holds the invoice until the payment is confirmed', function () {
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 50]);
@@ -92,34 +99,19 @@ it('creates an order and auto-generates its posted invoice with computed totals'
 
     expect($order)->not->toBeNull()
         ->and($order->order_no)->toStartWith('SO')
-        ->and($order->status->value)->toBe('invoiced')
+        ->and($order->status->value)->toBe('draft')
         ->and((float) $order->subtotal)->toBe(900.0)
         ->and((float) $order->tax_amount)->toBe(90.0)
         ->and((float) $order->grand_total)->toBe(990.0)
         ->and($order->items)->toHaveCount(1);
 
-    // The invoice is generated and posted on the spot: a completed sale moves
-    // stock and produces its invoice, like a POS quick sale.
-    $invoice = SalesInvoice::first();
-
-    expect($invoice)->not->toBeNull()
-        ->and($invoice->sales_order_id)->toBe($order->id)
-        ->and($invoice->invoice_no)->toStartWith('INV')
-        ->and($invoice->status->value)->toBe('posted')
-        ->and($invoice->posted_at)->not->toBeNull()
-        ->and((float) $invoice->grand_total)->toBe(990.0)
-        ->and((float) $invoice->due_amount)->toBe(990.0)
-        ->and($invoice->items)->toHaveCount(1);
-
-    expect($unit->fresh()->quantity)->toBe(48);
-
-    // The generated invoice shows up in the Sales Invoice register.
-    $this->get(route('sales-invoices.index'))
-        ->assertOk()
-        ->assertSee($invoice->invoice_no);
+    // The order is only captured: no invoice exists and the stock is
+    // untouched until the payment is confirmed.
+    expect(SalesInvoice::count())->toBe(0)
+        ->and($unit->fresh()->quantity)->toBe(50);
 });
 
-it('shows the generated invoice on the order instead of a Create Invoice button', function () {
+it('shows the confirm payment step on the order instead of a Create Invoice button', function () {
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 50]);
@@ -127,13 +119,10 @@ it('shows the generated invoice on the order instead of a Create Invoice button'
     $this->post(route('sales-orders.store'), salesOrderPayload($unit));
 
     $order = SalesOrder::first();
-    $invoice = SalesInvoice::first();
 
     $this->get(route('sales-orders.show', $order))
         ->assertOk()
-        ->assertSee('Generated Invoice')
-        ->assertSee($invoice->invoice_no)
-        ->assertSee('Posted')
+        ->assertSee('Confirm Payment &amp; Generate Invoice', false)
         ->assertDontSee('Create Invoice');
 
     $this->get(route('sales-orders.index'))
@@ -141,7 +130,7 @@ it('shows the generated invoice on the order instead of a Create Invoice button'
         ->assertDontSee('Create Invoice');
 });
 
-it('voids the generated invoice and restores stock when the order is cancelled', function () {
+it('voids the generated invoice and restores stock when a paid order is cancelled', function () {
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 50]);
@@ -149,6 +138,14 @@ it('voids the generated invoice and restores stock when the order is cancelled',
     $this->post(route('sales-orders.store'), salesOrderPayload($unit));
 
     $order = SalesOrder::first();
+
+    expect($unit->fresh()->quantity)->toBe(50);
+
+    $this->patch(route('sales-orders.confirm', $order), [
+        'payment_method' => 'cash',
+        'amount_received' => $order->grand_total,
+    ])->assertRedirect(route('sales-orders.show', $order));
+
     $invoice = SalesInvoice::first();
 
     expect($unit->fresh()->quantity)->toBe(47);
@@ -168,10 +165,13 @@ it('voids the generated invoice and restores stock when the order is cancelled',
 
     // A cancelled order can no longer be edited or re-confirmed.
     $this->get(route('sales-orders.edit', $order))->assertRedirect(route('sales-orders.show', $order));
-    $this->patch(route('sales-orders.confirm', $order))->assertSessionHas('error');
+    $this->patch(route('sales-orders.confirm', $order), [
+        'payment_method' => 'cash',
+        'amount_received' => $order->grand_total,
+    ])->assertSessionHas('error');
 });
 
-it('persists neither order nor invoice when the stock is insufficient', function () {
+it('persists the order without touching stock when nothing is confirmed yet', function () {
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 1]);
@@ -180,36 +180,35 @@ it('persists neither order nor invoice when the stock is insufficient', function
         'items' => [
             ['unit_id' => $unit->id, 'quantity' => 5, 'unit_price' => 250, 'discount' => 0],
         ],
-    ]))->assertSessionHas('error');
+    ]))->assertRedirect();
 
-    expect(SalesOrder::count())->toBe(0)
+    // Capturing the order posts nothing: the stock-out only happens when the
+    // payment is confirmed and the invoice is generated.
+    expect(SalesOrder::count())->toBe(1)
         ->and(SalesInvoice::count())->toBe(0)
         ->and($unit->fresh()->quantity)->toBe(1);
 });
 
-it('confirms and cancels a legacy draft order without an invoice', function () {
-    // Draft orders only exist as legacy data: new orders are invoiced the
-    // moment they are saved. Their confirm/cancel lifecycle is kept here.
+it('cancels a draft order that has no invoice', function () {
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 50]);
     $order = salesOrderWithItem($unit);
-
-    $this->patch(route('sales-orders.confirm', $order))
-        ->assertRedirect(route('sales-orders.show', $order));
-
-    expect($order->fresh()->status->value)->toBe('confirmed');
 
     $this->patch(route('sales-orders.cancel', $order))
         ->assertRedirect(route('sales-orders.show', $order));
 
     $order->refresh();
 
-    expect($order->status->value)->toBe('cancelled');
+    expect($order->status->value)->toBe('cancelled')
+        ->and(SalesInvoice::count())->toBe(0);
 
     // A cancelled order can no longer be edited or re-confirmed.
     $this->get(route('sales-orders.edit', $order))->assertRedirect(route('sales-orders.show', $order));
-    $this->patch(route('sales-orders.confirm', $order))->assertSessionHas('error');
+    $this->patch(route('sales-orders.confirm', $order), [
+        'payment_method' => 'cash',
+        'amount_received' => $order->grand_total,
+    ])->assertSessionHas('error');
 });
 
 it('edits a draft order and recomputes the totals', function () {
@@ -220,6 +219,8 @@ it('edits a draft order and recomputes the totals', function () {
 
     $this->patch(route('sales-orders.update', $order), salesOrderPayload($unit, [
         'customer_id' => $order->customer_id,
+        'customer_name' => $order->customer->name,
+        'customer_phone' => $order->customer->tel_no,
         'location_id' => $order->location_id,
         'items' => [
             ['unit_id' => $unit->id, 'quantity' => 5, 'unit_price' => 100, 'discount' => 50],
@@ -234,12 +235,12 @@ it('edits a draft order and recomputes the totals', function () {
 
 it('keeps the legacy order-to-invoice conversion for old draft orders', function () {
     // The manual conversion path (pre-filled from the order) is retained for
-    // compatibility with legacy draft orders; new orders are auto-invoiced.
+    // compatibility with legacy draft orders; new orders are invoiced when
+    // their payment is confirmed.
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 50]);
     $order = salesOrderWithItem($unit, 3, 250.0);
-    $this->patch(route('sales-orders.confirm', $order));
 
     $this->get(route('sales-invoices.create', ['sales_order' => $order->id]))
         ->assertOk()
@@ -252,7 +253,6 @@ it('marks the order invoiced when its invoice is posted and confirmed again afte
 
     $unit = Unit::factory()->create(['quantity' => 50]);
     $order = salesOrderWithItem($unit, 3, 250.0);
-    $this->patch(route('sales-orders.confirm', $order));
 
     $this->post(route('sales-invoices.store'), [
         'invoice_date' => now()->format('Y-m-d\TH:i'),
@@ -323,7 +323,7 @@ it('scopes the order register to the assigned location', function () {
     $myOrder = salesOrderWithItem($unit, 1, 100.0, ['location_id' => $mine->id]);
     $otherOrder = salesOrderWithItem($unit, 1, 100.0, ['location_id' => $other->id]);
 
-    $manager = User::factory()->create(['email_verified_at' => now(), 'location_id' => $mine->id]);
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $mine->id]);
     $manager->assignRole('Outlet Manager');
     $manager->givePermissionTo('sales-orders.manage');
 

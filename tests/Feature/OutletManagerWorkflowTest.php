@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Enums\ApprovalStatus;
 use App\Models\Location;
 use App\Models\PurchaseOrder;
+use App\Models\PurchasePayment;
 use App\Models\PurchaseReturn;
 use App\Models\StockTransfer;
+use App\Models\Supplier;
 use App\Models\Unit;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -24,7 +27,7 @@ function outletManagerUser(Location $location): User
 {
     $user = User::factory()->create([
         'email_verified_at' => now(),
-        'location_id' => $location->id,
+        'branch_id' => $location->id,
     ]);
     $user->assignRole('Outlet Manager');
 
@@ -281,4 +284,40 @@ it('scopes the return register and its approval to the assigned location', funct
 
     expect($myReturn->fresh()->approval_status->value)->toBe('approved')
         ->and($unit->fresh()->quantity)->toBe(50);
+});
+
+it('completes purchase due payments the outlet manager records for their own outlet', function () {
+    $mine = Location::factory()->create();
+
+    $supplier = Supplier::factory()->create(['opening_balance' => 0, 'purchase_due' => 3000, 'purchase_return_due' => 0]);
+    $order = PurchaseOrder::factory()->create([
+        'supplier_id' => $supplier->id,
+        'location_id' => $mine->id,
+        'purchase_status' => 'received',
+        'approval_status' => 'approved',
+        'subtotal' => 5000,
+        'tax_amount' => 0,
+        'grand_total' => 5000,
+        'paid_amount' => 2000,
+    ]);
+
+    $manager = outletManagerUser($mine);
+
+    $this->actingAs($manager)->post(route('purchase-dues.store'), [
+        'purchase_order_id' => $order->id,
+        'amount' => 3000,
+        'method' => 'cash',
+    ])->assertRedirect();
+
+    $payment = PurchasePayment::query()->first();
+
+    // No self-approval theater: the manager's own due payment is applied at
+    // once and they are never asked to approve their own task.
+    expect($payment)->not->toBeNull()
+        ->and($payment->status)->toBe(ApprovalStatus::Approved)
+        ->and((int) $payment->created_by)->toBe($manager->id)
+        ->and((int) $payment->approved_by)->toBe($manager->id)
+        ->and((float) $order->fresh()->paid_amount)->toBe(5000.0)
+        ->and((float) $supplier->fresh()->purchase_due)->toBe(0.0)
+        ->and($manager->fresh()->notifications()->count())->toBe(0);
 });

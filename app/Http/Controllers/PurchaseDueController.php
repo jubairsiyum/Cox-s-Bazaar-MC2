@@ -14,21 +14,30 @@ use App\Models\Branch;
 use App\Models\Location;
 use App\Models\PurchaseOrder;
 use App\Models\PurchasePayment;
+use App\Models\User;
 use App\Services\AuditService;
 use App\Services\LocationScope;
 use App\Services\ManagerLookup;
 use App\Services\NotificationService;
+use App\Services\SalesScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
  * "Purchase Dues" — tracks the remaining dues of partially paid purchase
- * invoices by reference and lets staff request due payments that only the
- * responsible branch manager may approve.
+ * invoices by reference and lets staff request due payments.
+ *
+ * A manager must never be asked to approve their own task: when the acting
+ * user is the responsible approver for the purchase's outlet/branch (or no
+ * other responsible user exists to ask), the payment is applied immediately
+ * and recorded as completed directly. Genuine segregation of duties remains
+ * for staff-level requests, which go to the outlet/branch manager (or Super
+ * Admin) for approval — the approver is never the requester themselves.
  */
 class PurchaseDueController extends Controller
 {
@@ -71,7 +80,11 @@ class PurchaseDueController extends Controller
     }
 
     /**
-     * Submit a due payment request against a purchase invoice. The request is
+     * Submit a due payment against a purchase invoice.
+     *
+     * When the acting user is the responsible approver for this purchase (or
+     * the only responsible user at its outlet/branch) the payment is applied
+     * immediately — no approval request is raised. Otherwise the request is
      * saved pending and has no financial effect until a manager approves it.
      */
     public function store(StorePurchaseDueRequest $request): RedirectResponse
@@ -100,13 +113,28 @@ class PurchaseDueController extends Controller
             'created_by' => $request->user()?->id,
         ]);
 
+        if ($this->shouldCompleteDirectly($request->user(), $order)) {
+            $this->applyPayment($payment, $order, $request->user()?->id);
+
+            AuditService::created(
+                $payment,
+                sprintf(
+                    'Due payment of %s against purchase %s completed directly by the responsible manager — no approval request was raised.',
+                    Money::format($amount),
+                    $order->reference_no
+                )
+            );
+
+            return back()->with('success', 'Due payment applied to the purchase invoice.');
+        }
+
         AuditService::created(
             $payment,
             sprintf('Requested a due payment of %s against purchase %s.', Money::format($amount), $order->reference_no)
         );
 
         NotificationService::notifyMany(
-            ManagerLookup::managersFor($order->location_id, $request->user()?->branch_id),
+            $this->approversFor($order, $request->user()),
             sprintf("Purchase due request '%s' awaits your approval.", $order->reference_no),
             sprintf(
                 '%s — %s — %s, submitted by %s.',
@@ -123,18 +151,44 @@ class PurchaseDueController extends Controller
     }
 
     /**
-     * Edit a pending due payment request (its creator only).
+     * Edit a pending due payment request (its creator only). A creator who is
+     * the responsible approver completes the request directly on update —
+     * there is nobody else who could sign it off.
      */
     public function update(UpdatePurchaseDueRequest $request, PurchasePayment $purchasePayment): RedirectResponse
     {
         $validated = $request->validated();
         $original = $purchasePayment->toArray();
 
+        $order = $purchasePayment->purchaseOrder;
+        $amount = round((float) $validated['amount'], 2);
+        $completesDirectly = $order !== null && $this->shouldCompleteDirectly($request->user(), $order);
+
+        if ($completesDirectly && $amount > (float) $order->payment_due) {
+            return back()->withInput()->with('error', 'The remaining due of this purchase no longer covers the request.');
+        }
+
         $purchasePayment->update([
-            'amount' => round((float) $validated['amount'], 2),
+            'amount' => $amount,
             'method' => $validated['method'] ?? null,
             'note' => $validated['note'] ?? null,
         ]);
+
+        if ($completesDirectly) {
+            $this->applyPayment($purchasePayment, $order, $request->user()?->id);
+
+            AuditService::updated(
+                $purchasePayment,
+                $original,
+                sprintf(
+                    'Due payment of %s against purchase %s completed directly by the responsible manager — no approval request was raised.',
+                    Money::format($amount),
+                    $order->reference_no
+                )
+            );
+
+            return back()->with('success', 'Due payment applied to the purchase invoice.');
+        }
 
         AuditService::updated($purchasePayment, $original, sprintf('Updated the due payment request for purchase %s.', $purchasePayment->purchaseOrder?->reference_no ?? ''));
 
@@ -161,11 +215,16 @@ class PurchaseDueController extends Controller
 
     /**
      * Approve a pending due payment request: the payment is applied to the
-     * purchase invoice and the supplier's purchase due balance.
+     * purchase invoice and the supplier's purchase due balance. Kept working
+     * for pending legacy rows; a user may never approve their own request.
      */
     public function approve(Request $request, PurchasePayment $purchasePayment): RedirectResponse
     {
         $this->authorize('approve', $purchasePayment);
+
+        if ((int) $purchasePayment->created_by === (int) $request->user()?->id) {
+            return back()->with('error', 'You cannot approve your own due payment request. Another responsible manager must sign it off.');
+        }
 
         if ($purchasePayment->status !== ApprovalStatus::Pending) {
             return back()->with('error', 'Only pending due payment requests can be approved.');
@@ -183,24 +242,7 @@ class PurchaseDueController extends Controller
             return back()->with('error', 'The remaining due of this purchase no longer covers the request.');
         }
 
-        DB::transaction(function () use ($purchasePayment, $order, $request): void {
-            $order->paid_amount = round((float) $order->paid_amount + (float) $purchasePayment->amount, 2);
-            $order->save();
-
-            if ($order->supplier_id) {
-                $supplier = $order->supplier;
-
-                $supplier->update([
-                    'purchase_due' => round(max(0, (float) $supplier->purchase_due - (float) $purchasePayment->amount), 2),
-                ]);
-            }
-
-            $purchasePayment->update([
-                'status' => ApprovalStatus::Approved,
-                'approved_by' => $request->user()?->id,
-                'approved_at' => now(),
-            ]);
-        });
+        $this->applyPayment($purchasePayment, $order, $request->user()?->id);
 
         AuditService::log(
             'approved',
@@ -216,11 +258,17 @@ class PurchaseDueController extends Controller
     }
 
     /**
-     * Reject a pending due payment request: nothing is applied anywhere.
+     * Reject a pending due payment request: nothing is applied anywhere. A
+     * user may never reject (and thereby decide) their own request either —
+     * creators cancel their own requests instead.
      */
     public function reject(Request $request, PurchasePayment $purchasePayment): RedirectResponse
     {
         $this->authorize('reject', $purchasePayment);
+
+        if ((int) $purchasePayment->created_by === (int) $request->user()?->id) {
+            return back()->with('error', 'You cannot decide your own due payment request. Cancel it instead.');
+        }
 
         if ($purchasePayment->status !== ApprovalStatus::Pending) {
             return back()->with('error', 'Only pending due payment requests can be rejected.');
@@ -272,6 +320,83 @@ class PurchaseDueController extends Controller
             route('purchase-dues.index'),
             $approved ? 'success' : 'error'
         );
+    }
+
+    /**
+     * Apply a due payment to the purchase invoice and the supplier's purchase
+     * due balance, marking the payment approved by the given user.
+     */
+    private function applyPayment(PurchasePayment $purchasePayment, PurchaseOrder $order, ?int $approvedBy): void
+    {
+        DB::transaction(function () use ($purchasePayment, $order, $approvedBy): void {
+            $order->paid_amount = round((float) $order->paid_amount + (float) $purchasePayment->amount, 2);
+            $order->save();
+
+            if ($order->supplier_id) {
+                $supplier = $order->supplier;
+
+                $supplier->update([
+                    'purchase_due' => round(max(0, (float) $supplier->purchase_due - (float) $purchasePayment->amount), 2),
+                ]);
+            }
+
+            $purchasePayment->update([
+                'status' => ApprovalStatus::Approved,
+                'approved_by' => $approvedBy,
+                'approved_at' => now(),
+            ]);
+        });
+    }
+
+    /**
+     * Whether the acting user completes the due payment themselves instead of
+     * raising an approval request.
+     *
+     * True when the user IS the responsible approver for the purchase's
+     * outlet/branch (Super Admin, or a Manager/Outlet Manager of the record —
+     * including head-office Managers, who are responsible for all outlets):
+     * asking them to approve their own task would be self-approval theater.
+     * Also true when the resolved approver set would only contain the
+     * requester — there is nobody else who could ever sign it off.
+     */
+    private function shouldCompleteDirectly(?User $user, PurchaseOrder $order): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+
+        if (SalesScope::canApprove($user, $order)) {
+            return true;
+        }
+
+        $responsible = ManagerLookup::managersFor($order->location_id);
+
+        return $responsible->isNotEmpty()
+            && $responsible->every(fn (User $candidate): bool => (int) $candidate->id === (int) $user->id);
+    }
+
+    /**
+     * The users who may be asked to approve a request raised by the given
+     * user: managers of the purchase's outlet/branch (never the requester
+     * themselves), falling back to Super Admins when no manager is assigned.
+     *
+     * @return Collection<int, User>
+     */
+    private function approversFor(PurchaseOrder $order, ?User $actor): Collection
+    {
+        $isActor = fn (User $candidate): bool => $actor !== null && (int) $candidate->id === (int) $actor->id;
+
+        $approvers = ManagerLookup::managersFor($order->location_id)
+            ->filter(fn (User $candidate): bool => SalesScope::canApprove($candidate, $order))
+            ->reject($isActor);
+
+        if ($approvers->isNotEmpty()) {
+            return $approvers->values();
+        }
+
+        return User::query()->active()->role('Super Admin')->get()
+            ->reject($isActor)
+            ->values();
     }
 
     /**

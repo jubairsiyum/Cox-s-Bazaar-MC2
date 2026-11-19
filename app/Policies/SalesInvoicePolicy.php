@@ -8,6 +8,17 @@ use App\Models\SalesInvoice;
 use App\Models\User;
 use App\Services\SalesScope;
 
+/**
+ * Sales invoice authorization: the sales-invoices.manage permission plus the
+ * usual branch/location scope.
+ *
+ * Business rule implemented here: only unposted (draft) invoices may be
+ * edited or deleted — posting finalises a document (and issues its stock).
+ * Note that the Super Admin Gate bypass in AppServiceProvider short-circuits
+ * these policy answers, so the Blade edit/delete buttons additionally check
+ * the document state themselves; the controllers keep a matching guard for
+ * direct URL access.
+ */
 class SalesInvoicePolicy
 {
     /**
@@ -30,6 +41,11 @@ class SalesInvoicePolicy
         return $user->can('sales-invoices.manage');
     }
 
+    /**
+     * Update (or delete) an invoice: permission + scope, and only while the
+     * document is still a draft — the same rule the edit/delete buttons use
+     * for their visibility.
+     */
     public function update(User $user, SalesInvoice $salesInvoice): bool
     {
         return $user->can('sales-invoices.manage')

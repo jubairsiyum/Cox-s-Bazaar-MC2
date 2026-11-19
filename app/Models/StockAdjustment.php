@@ -14,6 +14,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * A stock adjustment (damage, loss, found, correction).
+ *
+ * Adjustments take effect the moment they are saved: the stock effect is
+ * posted to the ledger exactly once and there is no approval step. The
+ * approval columns are kept for data compatibility — legacy rows still
+ * marked pending are treated as applied — and to record who posted the
+ * adjustment (approved_by = the user whose save applied it).
+ */
 class StockAdjustment extends Model
 {
     use HasFactory, SoftDeletes;
@@ -75,6 +84,10 @@ class StockAdjustment extends Model
 
     // ── Helpers ──────────────────────────────────────────────────────
 
+    /**
+     * Legacy pending rows predate the workflow retirement and are treated as
+     * applied everywhere (their data migration normalizes them too).
+     */
     public function isPending(): bool
     {
         return $this->approval_status === ApprovalStatus::Pending;
@@ -91,16 +104,16 @@ class StockAdjustment extends Model
     }
 
     /**
-     * Badge status/label pair for the approval workflow.
+     * Badge status/label pair. Every non-rejected adjustment has taken
+     * effect, so both applied and legacy pending rows read "Applied".
      *
      * @return array{value: string, label: string}
      */
     public function displayStatus(): array
     {
         return match ($this->approval_status) {
-            ApprovalStatus::Approved => ['value' => 'approved', 'label' => 'Approved / Applied'],
             ApprovalStatus::Rejected => ['value' => 'rejected', 'label' => 'Rejected'],
-            ApprovalStatus::Pending => ['value' => 'pending', 'label' => 'Awaiting Approval'],
+            default => ['value' => 'completed', 'label' => 'Applied'],
         };
     }
 

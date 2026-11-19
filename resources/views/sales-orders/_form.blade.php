@@ -40,19 +40,44 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
             <div>
-                <label for="customer_id" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                <label for="customer_select" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
                     Customer<span class="text-danger">*</span>
                 </label>
-                <select id="customer_id" name="customer_id" required
-                        class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('customer_id') border-danger @enderror">
-                    <option value="">Please Select</option>
+                <select id="customer_select" class="js-customer-select w-full">
+                    <option value=""></option>
+                    @if(old('customer_name') && ! old('customer_id'))
+                        <option value="{{ old('customer_name') }}" selected data-phone="{{ old('customer_phone') }}">{{ old('customer_name') }}</option>
+                    @endif
                     @foreach($customers as $customer)
-                        <option value="{{ $customer->id }}" @selected((int) old('customer_id', $order->customer_id) === $customer->id)>{{ $customer->name }}</option>
+                        <option value="{{ $customer->id }}" data-phone="{{ $customer->tel_no }}"
+                                @selected((int) old('customer_id', $isEdit ? $order->customer_id : 0) === $customer->id)>
+                            {{ $customer->name }}
+                        </option>
                     @endforeach
                 </select>
+                <input type="hidden" id="customer_id" name="customer_id" value="{{ old('customer_id', $isEdit ? $order->customer_id : '') }}">
+                <input type="hidden" id="customer_name" name="customer_name" value="{{ old('customer_name', $isEdit ? $order->customer?->name : '') }}">
+                <p class="mt-1.5 text-xs text-muted">Search an existing customer or type a new name to add one.</p>
                 @error('customer_id')
+                    <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>
+                @enderror
+                @error('customer_name')
+                    <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div>
+                <label for="customer_phone" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                    Phone Number<span class="text-danger">*</span>
+                </label>
+                <input type="text" id="customer_phone" name="customer_phone" required
+                       value="{{ old('customer_phone', $isEdit ? $order->customer?->tel_no : '') }}"
+                       placeholder="Customer phone number"
+                       class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('customer_phone') border-danger @enderror">
+                <p class="mt-1.5 text-xs text-muted">Auto-filled for existing customers and saved back to their profile.</p>
+                @error('customer_phone')
                     <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>
                 @enderror
             </div>
@@ -267,6 +292,157 @@
         </div>
     </div>
 </div>
+
+{{--
+    Customer picker: Select2 (searchable dropdown + free-typed new names).
+    Select2 and jQuery are loaded from the jsdelivr CDN right here, in the
+    form's script section only — the rest of the app stays on the bundled
+    assets.
+--}}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
+<style>
+    .select2-container--default .select2-selection--single,
+    .select2-container--default .select2-selection--multiple {
+        border-radius: 0.75rem;
+        border: 1px solid var(--color-line, #e5e7eb);
+        background: var(--color-surface, #fff);
+        min-height: 2.75rem;
+        padding: 0.25rem 0.25rem;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 2.25rem;
+        padding-left: 0.875rem;
+        padding-right: 0.875rem;
+        color: var(--color-ink, #111827);
+        font-size: 0.875rem;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 2.5rem;
+        right: 0.5rem;
+    }
+    .select2-container--default .select2-selection--multiple .select2-selection__choice {
+        border-radius: 0.5rem;
+        border: 1px solid var(--color-line, #e5e7eb);
+        background: var(--color-soft, #f9fafb);
+        color: var(--color-ink, #111827);
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.15rem 0.5rem;
+    }
+    .select2-container--default .select2-selection--multiple .select2-search--inline .select2-search__field {
+        font-size: 0.875rem;
+        padding: 0.35rem 0.25rem;
+    }
+    .select2-container--default.select2-container--focus .select2-selection--single,
+    .select2-container--default.select2-container--focus .select2-selection--multiple,
+    .select2-container--default.select2-container--open .select2-selection--single,
+    .select2-container--default.select2-container--open .select2-selection--multiple {
+        border-color: var(--color-brand-500, #465fff);
+        box-shadow: 0 0 0 3px rgba(70, 95, 255, 0.2);
+    }
+    .select2-container--default .select2-dropdown {
+        border-radius: 0.75rem;
+        border: 1px solid var(--color-line, #e5e7eb);
+        overflow: hidden;
+    }
+    .select2-container--default .select2-search--dropdown .select2-search__field {
+        border-radius: 0.75rem;
+        border: 1px solid var(--color-line, #e5e7eb);
+        font-size: 0.875rem;
+        padding: 0.5rem 0.875rem;
+    }
+    .select2-container--default .select2-results__option--highlighted[aria-selected] {
+        background: var(--color-brand-500, #465fff);
+    }
+    .select2-container--default .select2-results__option {
+        padding: 0.5rem 0.875rem;
+        font-size: 0.875rem;
+    }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var select = document.getElementById('customer_select');
+    var idInput = document.getElementById('customer_id');
+    var nameInput = document.getElementById('customer_name');
+    var phoneInput = document.getElementById('customer_phone');
+
+    if (!select || !idInput || !nameInput || !phoneInput || typeof window.jQuery === 'undefined') {
+        return;
+    }
+
+    var $ = window.jQuery;
+
+    $(select).select2({
+        tags: true,
+        width: '100%',
+        placeholder: 'Search or type a new customer name...',
+        allowClear: true,
+        ajax: {
+            url: @js(route('sales-orders.search-customers')),
+            dataType: 'json',
+            delay: 250,
+            data: function (params) {
+                return { q: params.term };
+            },
+            processResults: function (data) {
+                return {
+                    results: (data.customers || []).map(function (customer) {
+                        return { id: String(customer.id), text: customer.name, tel_no: customer.tel_no };
+                    })
+                };
+            },
+            cache: true
+        },
+        createTag: function (params) {
+            var term = (params.term || '').trim();
+
+            if (term === '') {
+                return null;
+            }
+
+            return { id: term, text: term, isNew: true };
+        }
+    });
+
+    function syncCustomerFields(data) {
+        if (!data || !data.id) {
+            idInput.value = '';
+            nameInput.value = '';
+            return;
+        }
+
+        if (data.isNew) {
+            // A typed-in name: a new customer is created on submit.
+            idInput.value = '';
+            nameInput.value = data.text;
+            return;
+        }
+
+        // An existing customer: keep the id and autofill the phone, which
+        // stays editable and is saved back to the customer on submit.
+        idInput.value = data.id;
+        nameInput.value = data.text;
+
+        var phone = data.tel_no
+            || (data.element && data.element.dataset ? data.element.dataset.phone : '')
+            || '';
+
+        if (phone !== '') {
+            phoneInput.value = phone;
+        }
+    }
+
+    $(select).on('select2:select', function (event) {
+        syncCustomerFields(event.params.data);
+    });
+
+    $(select).on('select2:clear', function () {
+        syncCustomerFields(null);
+    });
+});
+</script>
 
 <script>
 function orderForm(state) {

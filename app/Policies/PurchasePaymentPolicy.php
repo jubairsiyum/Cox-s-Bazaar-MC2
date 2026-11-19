@@ -49,17 +49,22 @@ class PurchasePaymentPolicy
      * Approve a due payment request: the responsible branch manager of the
      * purchase's branch/location (or Super Admin). No dedicated permission is
      * required — the gate is the branch-manager relationship itself, mirroring
-     * {@see SalesReturnPolicy::approve}.
+     * {@see SalesReturnPolicy::approve}. A user may never sign off their own
+     * request: genuine segregation of duties (requests made by the responsible
+     * manager themselves complete on creation and never reach this point).
      */
     public function approve(User $user, PurchasePayment $purchasePayment): bool
     {
         $order = $purchasePayment->purchaseOrder;
 
-        return $order !== null && SalesScope::canApprove($user, $order);
+        return $order !== null
+            && SalesScope::canApprove($user, $order)
+            && (int) $purchasePayment->created_by !== (int) $user->id;
     }
 
     /**
-     * Reject a due payment request: same audience as approval.
+     * Reject a due payment request: same audience as approval, and the same
+     * rule that the requester may not decide their own request.
      */
     public function reject(User $user, PurchasePayment $purchasePayment): bool
     {
