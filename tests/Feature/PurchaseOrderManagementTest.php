@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Enums\ApprovalStatus;
 use App\Enums\PaymentStatus;
-use App\Models\Branch;
 use App\Models\Location;
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
@@ -33,6 +32,7 @@ function purchaseOrderPayload(Unit $unit, array $overrides = []): array
         'reference_no' => null,
         'supplier_id' => Supplier::factory()->create(['opening_balance' => 0, 'purchase_due' => 0])->id,
         'location_id' => Location::factory()->create()->id,
+        'purchase_status' => 'received',
         'tax_rate' => 5,
         'paid_amount' => 50,
         'items' => [
@@ -87,7 +87,10 @@ it('shows the new purchase order form', function () {
         ->assertSee('Purchase Tax', false)
         ->assertSee('Amount Paid', false)
         ->assertSee('Attach Document', false)
-        ->assertSee('Received');
+        ->assertSee('Purchase Status', false)
+        ->assertSee('Received')
+        ->assertSee('Pending')
+        ->assertSee('Ordered');
 });
 
 it('creates a purchase order that takes effect immediately', function () {
@@ -138,7 +141,7 @@ it("makes the creating manager's own purchase effective right away with no self-
     Notification::fake();
 
     $location = Location::factory()->create();
-    $manager = purchaseOrderTeamUser('Manager', ['location_id' => $location->id, 'branch_id' => null]);
+    $manager = purchaseOrderTeamUser('Manager', ['branch_id' => $location->id]);
     $unit = Unit::factory()->create(['quantity' => 50]);
 
     $this->actingAs($manager)
@@ -170,11 +173,107 @@ it('validates the purchase order form', function () {
     $this->post(route('purchase-orders.store'), [
         'order_date' => now()->format('Y-m-d\TH:i'),
         'items' => [],
-    ])->assertSessionHasErrors(['supplier_id', 'location_id', 'items']);
+    ])->assertSessionHasErrors(['supplier_id', 'location_id', 'purchase_status', 'items']);
+});
+
+it('creates a purchase with a clerk-chosen receiving status and posts stock only when received', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+
+    $this->post(route('purchase-orders.store'), purchaseOrderPayload($unit, [
+        'purchase_status' => 'ordered',
+    ]))->assertRedirect(route('purchase-invoices.index'));
+
+    $order = PurchaseOrder::first();
+
+    // The chosen status is persisted and the purchase stays stock-neutral
+    // until the goods are actually received. The supplier payable still
+    // registers at creation — it follows the committed purchase, only stock
+    // follows the receiving status.
+    expect($order->purchase_status->value)->toBe('ordered')
+        ->and($unit->fresh()->quantity)->toBe(50)
+        ->and((float) $order->supplier->fresh()->purchase_due)->toBe(1000.0);
+
+    $this->assertDatabaseMissing('stock_movements', ['unit_id' => $unit->id, 'type' => 'restock']);
+
+    // Moving the purchase to Received on the edit form posts the receipt.
+    $this->patch(route('purchase-invoices.update', $order), [
+        'order_date' => $order->order_date->format('Y-m-d\TH:i'),
+        'supplier_id' => $order->supplier_id,
+        'location_id' => $order->location_id,
+        'purchase_status' => 'received',
+        'paid_amount' => 50,
+        'items' => [
+            ['unit_id' => $unit->id, 'quantity' => 5, 'unit_price' => 200],
+        ],
+    ])->assertRedirect(route('purchase-invoices.index'));
+
+    expect($order->fresh()->purchase_status->value)->toBe('received')
+        ->and($unit->fresh()->quantity)->toBe(55);
+
+    $this->assertDatabaseHas('stock_movements', [
+        'unit_id' => $unit->id,
+        'type' => 'restock',
+        'quantity' => 5,
+    ]);
+});
+
+it('rejects statuses outside the receiving workflow at creation', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+
+    $this->post(route('purchase-orders.store'), purchaseOrderPayload($unit, [
+        'purchase_status' => 'cancelled',
+    ]))->assertSessionHasErrors('purchase_status');
+
+    $this->post(route('purchase-orders.store'), purchaseOrderPayload($unit, [
+        'purchase_status' => 'partially-received',
+    ]))->assertSessionHasErrors('purchase_status');
+
+    expect(PurchaseOrder::count())->toBe(0)
+        ->and($unit->fresh()->quantity)->toBe(50);
+});
+
+it('lets the edit form change the receiving status of a purchase', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $this->post(route('purchase-orders.store'), purchaseOrderPayload($unit))->assertRedirect();
+    $order = PurchaseOrder::first();
+
+    expect($unit->fresh()->quantity)->toBe(55);
+
+    // Un-receiving the purchase reverses the stock posting.
+    $this->patch(route('purchase-invoices.update', $order), [
+        'order_date' => $order->order_date->format('Y-m-d\TH:i'),
+        'supplier_id' => $order->supplier_id,
+        'location_id' => $order->location_id,
+        'purchase_status' => 'ordered',
+        'paid_amount' => 50,
+    ])->assertRedirect(route('purchase-invoices.index'));
+
+    expect($order->fresh()->purchase_status->value)->toBe('ordered')
+        ->and($unit->fresh()->quantity)->toBe(50);
+
+    $this->assertDatabaseHas('stock_movements', [
+        'unit_id' => $unit->id,
+        'type' => 'purchase_return',
+        'quantity' => -5,
+    ]);
+
+    // The edit form offers the full receiving workflow.
+    $this->get(route('purchase-invoices.edit', $order))
+        ->assertOk()
+        ->assertSee('>Pending</option>', false)
+        ->assertSee('>Ordered</option>', false)
+        ->assertSee('>Received</option>', false)
+        ->assertSee('>Cancelled</option>', false);
 });
 
 /**
- * A verified purchasing user with the given role and branch/location assignment.
+ * A verified purchasing user with the given role and branch assignment.
  *
  * @param  array<string, mixed>  $attributes
  */
@@ -186,19 +285,20 @@ function purchaseOrderTeamUser(string $role, array $attributes = []): User
     return $user;
 }
 
-it('finds the responsible managers by location or by branch', function () {
+it('finds the responsible managers by their assigned branch', function () {
     $location = Location::factory()->create();
-    $branch = Branch::query()->create(['name' => 'Sadar Outlet', 'code' => 'TB1', 'status' => 'active']);
 
-    $byLocation = purchaseOrderTeamUser('Outlet Manager', ['location_id' => $location->id, 'branch_id' => null]);
-    $byBranch = purchaseOrderTeamUser('Manager', ['location_id' => null, 'branch_id' => $branch->id]);
-    $inactive = purchaseOrderTeamUser('Outlet Manager', ['location_id' => $location->id, 'status' => 'inactive']);
-    $elsewhere = purchaseOrderTeamUser('Outlet Manager', ['location_id' => Location::factory()->create()->id]);
+    // A user's branch IS their assigned outlet — the legacy branches-table
+    // user scoping is gone, so managers are found by outlet assignment alone.
+    $assigned = purchaseOrderTeamUser('Outlet Manager', ['branch_id' => $location->id]);
+    $assignedManager = purchaseOrderTeamUser('Manager', ['branch_id' => $location->id]);
+    $inactive = purchaseOrderTeamUser('Outlet Manager', ['branch_id' => $location->id, 'status' => 'inactive']);
+    $elsewhere = purchaseOrderTeamUser('Outlet Manager', ['branch_id' => Location::factory()->create()->id]);
 
-    $found = PurchaseApprovalNotifier::managersFor($location->id, $branch->id);
+    $found = PurchaseApprovalNotifier::managersFor($location->id);
 
     expect($found->pluck('id')->all())
-        ->toContain($byLocation->id, $byBranch->id)
+        ->toContain($assigned->id, $assignedManager->id)
         ->not->toContain($inactive->id, $elsewhere->id);
 });
 
@@ -206,14 +306,13 @@ it('sends no approval notifications anywhere in the purchase flow', function () 
     Notification::fake();
 
     $location = Location::factory()->create();
-    $branch = Branch::query()->create(['name' => 'Sadar Outlet', 'code' => 'TB1', 'status' => 'active']);
 
-    // Managers exist for the location and branch, exactly like the old
-    // awaiting-approval audience, but nothing awaits approval anymore.
-    purchaseOrderTeamUser('Outlet Manager', ['location_id' => $location->id, 'branch_id' => null]);
-    purchaseOrderTeamUser('Manager', ['location_id' => null, 'branch_id' => $branch->id]);
+    // Managers exist for the outlet, exactly like the old awaiting-approval
+    // audience, but nothing awaits approval anymore.
+    purchaseOrderTeamUser('Outlet Manager', ['branch_id' => $location->id]);
+    purchaseOrderTeamUser('Manager', ['branch_id' => $location->id]);
 
-    $creator = purchaseOrderTeamUser('Manager', ['location_id' => null, 'branch_id' => $branch->id]);
+    $creator = purchaseOrderTeamUser('Manager', ['branch_id' => Location::factory()->create()->id]);
     $unit = Unit::factory()->create(['quantity' => 50]);
 
     $this->actingAs($creator)

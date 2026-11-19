@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AccountTransactionController;
+use App\Http\Controllers\AccountTransferController;
 use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\RoleController;
@@ -29,6 +32,7 @@ use App\Http\Controllers\SalesReturnController;
 use App\Http\Controllers\StockAdjustmentController;
 use App\Http\Controllers\StockTransferController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\SupplierPaymentController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\WarehouseController;
 use Illuminate\Support\Facades\Route;
@@ -316,8 +320,6 @@ Route::middleware('auth')->group(function () {
         Route::get('stock-adjustments/{stockAdjustment}/edit', [StockAdjustmentController::class, 'edit'])->name('stock-adjustments.edit');
         Route::patch('stock-adjustments/{stockAdjustment}', [StockAdjustmentController::class, 'update'])->name('stock-adjustments.update');
         Route::delete('stock-adjustments/{stockAdjustment}', [StockAdjustmentController::class, 'destroy'])->name('stock-adjustments.destroy');
-        Route::patch('stock-adjustments/{stockAdjustment}/approve', [StockAdjustmentController::class, 'approve'])->name('stock-adjustments.approve');
-        Route::patch('stock-adjustments/{stockAdjustment}/reject', [StockAdjustmentController::class, 'reject'])->name('stock-adjustments.reject');
     });
 
     /*
@@ -443,23 +445,11 @@ Route::middleware('auth')->group(function () {
 */
 Route::middleware(['auth', 'verified'])->group(function () {
     $placeholders = [
-        'cash-accounts.index' => 'Cash Accounts',
-        'bank-accounts.index' => 'Bank Accounts',
-        'income-transactions.index' => 'Income',
-        'expense-transactions.index' => 'Expenses',
-        'account-transfers.index' => 'Transfers',
-        'supplier-payments.index' => 'Supplier Payments',
         'reports.sales' => 'Reports',
     ];
 
     // Permission guards for placeholders whose module permissions are already seeded.
     $placeholderPermissions = [
-        'cash-accounts.index' => 'permission:finance.view|finance.manage|cash-accounts.manage',
-        'bank-accounts.index' => 'permission:finance.view|finance.manage|bank-accounts.manage',
-        'income-transactions.index' => 'permission:finance.view|finance.manage|income-transactions.manage',
-        'expense-transactions.index' => 'permission:finance.view|finance.manage|expense-transactions.manage',
-        'account-transfers.index' => 'permission:finance.view|finance.manage|account-transfers.manage',
-        'supplier-payments.index' => 'permission:finance.view|finance.manage|supplier-payments.view|supplier-payments.manage',
         'reports.sales' => 'permission:reports.view|reports.export',
     ];
 
@@ -469,6 +459,99 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware($placeholderPermissions[$name] ?? [])
             ->name($name);
     }
+});
+
+/*
+|--------------------------------------------------------------------------
+| Finance (docs/modules.md Module 07 & 10): cash/bank accounts, the merged
+| income+expense "Transactions" section, account transfers and supplier
+| payments.
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'verified'])->group(function () {
+    /*
+    | Cash accounts
+    */
+    Route::middleware('permission:finance.view|finance.manage|cash-accounts.manage')->group(function () {
+        Route::get('cash-accounts', [AccountController::class, 'index'])->defaults('type', 'cash')->name('cash-accounts.index');
+    });
+
+    Route::middleware('permission:finance.manage|cash-accounts.manage')->group(function () {
+        Route::get('cash-accounts/create', [AccountController::class, 'create'])->defaults('type', 'cash')->name('cash-accounts.create');
+        Route::post('cash-accounts', [AccountController::class, 'store'])->defaults('type', 'cash')->name('cash-accounts.store');
+        Route::get('cash-accounts/{account}/edit', [AccountController::class, 'edit'])->defaults('type', 'cash')->name('cash-accounts.edit');
+        Route::patch('cash-accounts/{account}', [AccountController::class, 'update'])->defaults('type', 'cash')->name('cash-accounts.update');
+        Route::delete('cash-accounts/{account}', [AccountController::class, 'destroy'])->defaults('type', 'cash')->name('cash-accounts.destroy');
+    });
+
+    /*
+    | Bank accounts
+    */
+    Route::middleware('permission:finance.view|finance.manage|bank-accounts.manage')->group(function () {
+        Route::get('bank-accounts', [AccountController::class, 'index'])->defaults('type', 'bank')->name('bank-accounts.index');
+    });
+
+    Route::middleware('permission:finance.manage|bank-accounts.manage')->group(function () {
+        Route::get('bank-accounts/create', [AccountController::class, 'create'])->defaults('type', 'bank')->name('bank-accounts.create');
+        Route::post('bank-accounts', [AccountController::class, 'store'])->defaults('type', 'bank')->name('bank-accounts.store');
+        Route::get('bank-accounts/{account}/edit', [AccountController::class, 'edit'])->defaults('type', 'bank')->name('bank-accounts.edit');
+        Route::patch('bank-accounts/{account}', [AccountController::class, 'update'])->defaults('type', 'bank')->name('bank-accounts.update');
+        Route::delete('bank-accounts/{account}', [AccountController::class, 'destroy'])->defaults('type', 'bank')->name('bank-accounts.destroy');
+    });
+
+    /*
+    | Transactions — the merged income & expense section
+    */
+    Route::middleware('permission:finance.view|finance.manage|income-transactions.manage|expense-transactions.manage')->group(function () {
+        Route::get('transactions', [AccountTransactionController::class, 'index'])->name('transactions.index');
+    });
+
+    Route::middleware('permission:finance.manage|income-transactions.manage|expense-transactions.manage')->group(function () {
+        Route::get('transactions/create', [AccountTransactionController::class, 'create'])->name('transactions.create');
+        Route::post('transactions', [AccountTransactionController::class, 'store'])->name('transactions.store');
+        Route::get('transactions/{accountTransaction}/edit', [AccountTransactionController::class, 'edit'])->name('transactions.edit');
+        Route::patch('transactions/{accountTransaction}', [AccountTransactionController::class, 'update'])->name('transactions.update');
+        Route::delete('transactions/{accountTransaction}', [AccountTransactionController::class, 'destroy'])->name('transactions.destroy');
+        Route::patch('transactions/{accountTransaction}/approve', [AccountTransactionController::class, 'approve'])->name('transactions.approve');
+        Route::patch('transactions/{accountTransaction}/reject', [AccountTransactionController::class, 'reject'])->name('transactions.reject');
+    });
+
+    // Legacy URLs from when income and expenses were separate sections.
+    Route::middleware('permission:finance.view|finance.manage|income-transactions.manage|expense-transactions.manage')->group(function () {
+        Route::redirect('income-transactions', '/transactions', 302)->name('income-transactions.index');
+        Route::redirect('expense-transactions', '/transactions', 302)->name('expense-transactions.index');
+    });
+
+    /*
+    | Account transfers
+    */
+    Route::middleware('permission:finance.view|finance.manage|account-transfers.manage')->group(function () {
+        Route::get('account-transfers', [AccountTransferController::class, 'index'])->name('account-transfers.index');
+    });
+
+    Route::middleware('permission:finance.manage|account-transfers.manage')->group(function () {
+        Route::get('account-transfers/create', [AccountTransferController::class, 'create'])->name('account-transfers.create');
+        Route::post('account-transfers', [AccountTransferController::class, 'store'])->name('account-transfers.store');
+        Route::get('account-transfers/{accountTransfer}/edit', [AccountTransferController::class, 'edit'])->name('account-transfers.edit');
+        Route::patch('account-transfers/{accountTransfer}', [AccountTransferController::class, 'update'])->name('account-transfers.update');
+        Route::delete('account-transfers/{accountTransfer}', [AccountTransferController::class, 'destroy'])->name('account-transfers.destroy');
+        Route::patch('account-transfers/{accountTransfer}/approve', [AccountTransferController::class, 'approve'])->name('account-transfers.approve');
+        Route::patch('account-transfers/{accountTransfer}/reject', [AccountTransferController::class, 'reject'])->name('account-transfers.reject');
+    });
+
+    /*
+    | Supplier payments (finance side of purchase_payments)
+    */
+    Route::middleware('permission:finance.manage|supplier-payments.manage')->group(function () {
+        Route::get('supplier-payments/create', [SupplierPaymentController::class, 'create'])->name('supplier-payments.create');
+        Route::post('supplier-payments', [SupplierPaymentController::class, 'store'])->name('supplier-payments.store');
+        Route::delete('supplier-payments/{purchasePayment}', [SupplierPaymentController::class, 'destroy'])->name('supplier-payments.destroy');
+    });
+
+    Route::middleware('permission:finance.view|finance.manage|supplier-payments.view|supplier-payments.manage')->group(function () {
+        Route::get('supplier-payments', [SupplierPaymentController::class, 'index'])->name('supplier-payments.index');
+        Route::get('supplier-payments/{purchasePayment}', [SupplierPaymentController::class, 'show'])->name('supplier-payments.show');
+    });
 });
 
 /*
@@ -489,6 +572,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     */
     Route::get('sales-orders/search-units', [$salesOrderController, 'searchUnits'])
         ->name('sales-orders.search-units')
+        ->middleware('permission:sales-orders.manage|sales-invoices.manage');
+
+    Route::get('sales-orders/search-customers', [$salesOrderController, 'searchCustomers'])
+        ->name('sales-orders.search-customers')
         ->middleware('permission:sales-orders.manage|sales-invoices.manage');
 
     Route::middleware('permission:sales-orders.manage')->group(function () use ($salesOrderController) {

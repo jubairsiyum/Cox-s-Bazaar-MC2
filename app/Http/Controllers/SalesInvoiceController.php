@@ -109,7 +109,7 @@ class SalesInvoiceController extends Controller
             'locations' => Location::query()->active()->orderBy('name')->get(['id', 'name']),
             'salesOrder' => $order,
             'rows' => $this->itemRows($order, $this->oldItems()),
-            'defaultLocationId' => old('location_id') ?: Auth::user()?->location_id,
+            'defaultLocationId' => old('location_id') ?: Auth::user()?->branch_id,
         ]);
     }
 
@@ -130,7 +130,8 @@ class SalesInvoiceController extends Controller
                 'customer_id' => $validated['customer_id'],
                 'sales_order_id' => $validated['sales_order_id'] ?? null,
                 'location_id' => $validated['location_id'],
-                'branch_id' => $request->user()?->branch_id,
+                // The creator's branch: the branch of their assigned outlet.
+                'branch_id' => $request->user()?->branch?->branch_id,
                 'status' => SalesInvoiceStatus::Draft,
                 'tax_rate' => (float) ($validated['tax_rate'] ?? 0),
                 'paid_amount' => (float) ($validated['paid_amount'] ?? 0),

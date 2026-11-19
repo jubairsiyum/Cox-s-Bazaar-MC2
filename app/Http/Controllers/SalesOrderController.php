@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Enums\SalesInvoiceStatus;
 use App\Enums\SalesOrderStatus;
 use App\Exceptions\InsufficientStockException;
+use App\Http\Requests\SalesOrder\ConfirmSalesOrderPaymentRequest;
 use App\Http\Requests\SalesOrder\StoreSalesOrderRequest;
 use App\Http\Requests\SalesOrder\UpdateSalesOrderRequest;
 use App\Models\Branch;
@@ -16,6 +17,7 @@ use App\Models\Product;
 use App\Models\SalesOrder;
 use App\Models\Unit;
 use App\Services\AuditService;
+use App\Services\CustomerResolver;
 use App\Services\SalesInvoiceService;
 use App\Services\SalesScope;
 use Illuminate\Database\Eloquent\Builder;
@@ -81,16 +83,18 @@ class SalesOrderController extends Controller
             'customers' => Customer::query()->active()->orderBy('name')->get(),
             'locations' => Location::query()->active()->orderBy('name')->get(['id', 'name']),
             'rows' => $this->oldItems(),
-            'defaultLocationId' => old('location_id') ?: Auth::user()?->location_id,
+            'defaultLocationId' => old('location_id') ?: Auth::user()?->branch_id,
         ]);
     }
 
     /**
      * Store a newly created sales order.
      *
-     * Saving the order completes the sale: its sales invoice is generated and
-     * posted immediately (stock-out), the same way a POS quick sale works —
-     * there is no manual "Create Invoice" step and no approval hold.
+     * Saving the order only captures it: no invoice exists yet and no stock
+     * moves. The sale takes effect on the "Confirm Payment & Generate
+     * Invoice" step — the business never sells on credit, so the invoice is
+     * generated (and its stock-out posted) exactly once, when the payment
+     * has been confirmed in full.
      */
     public function store(StoreSalesOrderRequest $request): RedirectResponse
     {
@@ -100,37 +104,37 @@ class SalesOrderController extends Controller
             return back()->withInput()->with('error', 'You can only create orders for your own branch/location.');
         }
 
-        try {
-            [$order, $invoice] = DB::transaction(function () use ($request, $validated) {
-                $order = SalesOrder::create([
-                    'order_date' => $validated['order_date'],
-                    'expected_date' => $validated['expected_date'] ?? null,
-                    'customer_id' => $validated['customer_id'],
-                    'location_id' => $validated['location_id'],
-                    'branch_id' => $request->user()?->branch_id,
-                    'status' => SalesOrderStatus::Draft,
-                    'tax_rate' => (float) ($validated['tax_rate'] ?? 0),
-                    'note' => $validated['note'] ?? null,
-                    'created_by' => $request->user()?->id,
-                ]);
+        $order = DB::transaction(function () use ($request, $validated) {
+            $customer = CustomerResolver::resolveOrCreate(
+                self::customerId($validated),
+                $validated['customer_name'] ?? null,
+                $validated['customer_phone'] ?? null,
+                $request->user()?->id
+            );
 
-                $this->saveItems($order, $validated['items']);
-                $this->recalculate($order, (float) ($validated['tax_rate'] ?? 0));
+            $order = SalesOrder::create([
+                'order_date' => $validated['order_date'],
+                'expected_date' => $validated['expected_date'] ?? null,
+                'customer_id' => $customer->id,
+                'location_id' => $validated['location_id'],
+                // The creator's branch: the branch of their assigned outlet.
+                'branch_id' => $request->user()?->branch?->branch_id,
+                'status' => SalesOrderStatus::Draft,
+                'tax_rate' => (float) ($validated['tax_rate'] ?? 0),
+                'note' => $validated['note'] ?? null,
+                'created_by' => $request->user()?->id,
+            ]);
 
-                $invoice = SalesInvoiceService::generateFromOrder($order, $request->user()?->id);
+            $this->saveItems($order, $validated['items']);
+            $this->recalculate($order, (float) ($validated['tax_rate'] ?? 0));
 
-                return [$order, $invoice];
-            });
-        } catch (InsufficientStockException $e) {
-            return back()->withInput()->with('error', $e->getMessage());
-        }
+            return $order;
+        });
 
         AuditService::created($order, "Sales order '{$order->order_no}' created.");
-        AuditService::created($invoice, "Sales invoice '{$invoice->invoice_no}' generated from sales order '{$order->order_no}'.");
-        AuditService::posted($invoice, "Sales invoice '{$invoice->invoice_no}' posted. Stock issued.");
 
         return redirect()->route('sales-orders.show', $order)
-            ->with('success', "Sales order '{$order->order_no}' created — invoice '{$invoice->invoice_no}' generated and posted.");
+            ->with('success', "Sales order '{$order->order_no}' created. Confirm the payment to generate the invoice.");
     }
 
     /**
@@ -186,14 +190,21 @@ class SalesOrderController extends Controller
             return back()->withInput()->with('error', 'You can only keep orders on your own branch/location.');
         }
 
-        DB::transaction(function () use ($salesOrder, $validated) {
+        DB::transaction(function () use ($salesOrder, $validated, $request) {
+            $customer = CustomerResolver::resolveOrCreate(
+                self::customerId($validated),
+                $validated['customer_name'] ?? null,
+                $validated['customer_phone'] ?? null,
+                $request->user()?->id
+            );
+
             $salesOrder->items()->delete();
             $this->saveItems($salesOrder, $validated['items']);
 
             $salesOrder->update([
                 'order_date' => $validated['order_date'],
                 'expected_date' => $validated['expected_date'] ?? null,
-                'customer_id' => $validated['customer_id'],
+                'customer_id' => $customer->id,
                 'location_id' => $validated['location_id'],
                 'tax_rate' => (float) ($validated['tax_rate'] ?? 0),
                 'note' => $validated['note'] ?? null,
@@ -231,26 +242,45 @@ class SalesOrderController extends Controller
     }
 
     /**
-     * Confirm a legacy draft order: it becomes ready for invoicing. New orders
-     * are invoiced the moment they are saved, so this only applies to old
-     * draft orders kept for the manual conversion path.
+     * Confirm the payment and generate the invoice — the order's "Confirm
+     * Payment & Generate Invoice" step. The payment must cover the order
+     * total in full ({@see ConfirmSalesOrderPaymentRequest}); only then is
+     * the invoice generated, settled as PAID (due = 0) and posted, which is
+     * the sale's single stock effect. Until this step the order holds no
+     * invoice and never touches stock.
      */
-    public function confirm(SalesOrder $salesOrder): RedirectResponse
+    public function confirm(ConfirmSalesOrderPaymentRequest $request, SalesOrder $salesOrder): RedirectResponse
     {
         $this->authorize('update', $salesOrder);
 
-        if ($salesOrder->status !== SalesOrderStatus::Draft) {
-            return back()->with('error', 'Only draft orders can be confirmed.');
+        if (! in_array($salesOrder->status, [SalesOrderStatus::Draft, SalesOrderStatus::Confirmed], true)) {
+            return back()->with('error', "Sales order '{$salesOrder->order_no}' is already invoiced or cancelled.");
         }
 
+        $validated = $request->validated();
         $original = $salesOrder->getOriginal();
 
-        $salesOrder->update(['status' => SalesOrderStatus::Confirmed]);
+        try {
+            [$order, $invoice] = DB::transaction(function () use ($salesOrder, $validated, $request) {
+                $invoice = SalesInvoiceService::generateFromOrder($salesOrder, $request->user()?->id);
 
-        AuditService::updated($salesOrder, $original, "Sales order '{$salesOrder->order_no}' confirmed.");
+                $salesOrder->update([
+                    'payment_method' => $validated['payment_method'],
+                    'paid_at' => now(),
+                ]);
 
-        return redirect()->route('sales-orders.show', $salesOrder)
-            ->with('success', "Sales order '{$salesOrder->order_no}' confirmed.");
+                return [$salesOrder, $invoice];
+            });
+        } catch (InsufficientStockException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        AuditService::updated($order, $original, "Payment confirmed for sales order '{$order->order_no}'.");
+        AuditService::created($invoice, "Sales invoice '{$invoice->invoice_no}' generated from sales order '{$order->order_no}'.");
+        AuditService::posted($invoice, "Sales invoice '{$invoice->invoice_no}' posted. Stock issued.");
+
+        return redirect()->route('sales-orders.show', $order)
+            ->with('success', "Payment confirmed. Invoice '{$invoice->invoice_no}' generated — paid in full.");
     }
 
     /**
@@ -282,8 +312,12 @@ class SalesOrderController extends Controller
 
         AuditService::updated($salesOrder, $original, "Sales order '{$salesOrder->order_no}' cancelled.");
 
+        $message = $salesOrder->invoices()->exists()
+            ? "Sales order '{$salesOrder->order_no}' cancelled. Its invoice was voided and stock restored."
+            : "Sales order '{$salesOrder->order_no}' cancelled.";
+
         return redirect()->route('sales-orders.show', $salesOrder)
-            ->with('success', "Sales order '{$salesOrder->order_no}' cancelled. Its invoice was voided and stock restored.");
+            ->with('success', $message);
     }
 
     /**
@@ -310,6 +344,35 @@ class SalesOrderController extends Controller
                 'quantity' => (float) $unit->quantity,
                 'sale_price' => (float) ($unit->product?->sale_price ?? 0),
                 'barcode' => $unit->product?->barcode,
+            ])->values()->all(),
+        ]);
+    }
+
+    /**
+     * Customer lookup for the order form's customer picker: matches name,
+     * phone or customer code and returns each phone number so the form can
+     * autofill it. Typed names that match nothing become new customers on
+     * submit (see {@see CustomerResolver}).
+     */
+    public function searchCustomers(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', SalesOrder::class);
+
+        $term = $request->string('q')->toString();
+
+        $customers = Customer::query()
+            ->active()
+            ->when($term !== '', fn (Builder $query) => $query->search($term))
+            ->orderBy('name')
+            ->limit(10)
+            ->get(['id', 'name', 'tel_no']);
+
+        return response()->json([
+            'success' => true,
+            'customers' => $customers->map(fn (Customer $customer) => [
+                'id' => (int) $customer->id,
+                'name' => $customer->name,
+                'tel_no' => $customer->tel_no,
             ])->values()->all(),
         ]);
     }
@@ -359,6 +422,17 @@ class SalesOrderController extends Controller
             'cancelled' => (int) ($counts['cancelled'] ?? 0),
             'grand_total' => round($grandTotal, 2),
         ];
+    }
+
+    /**
+     * Selected customer id of the form payload, or null when the customer is
+     * being typed in as a new name.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    private static function customerId(array $validated): ?int
+    {
+        return (int) ($validated['customer_id'] ?? 0) ?: null;
     }
 
     /**

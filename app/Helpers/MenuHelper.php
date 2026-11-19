@@ -111,8 +111,7 @@ class MenuHelper
                 'subItems' => [
                     ['name' => 'Cash Accounts', 'path' => '/cash-accounts', 'canany' => ['finance.view', 'finance.manage', 'cash-accounts.manage']],
                     ['name' => 'Bank Accounts', 'path' => '/bank-accounts', 'canany' => ['finance.view', 'finance.manage', 'bank-accounts.manage']],
-                    ['name' => 'Income', 'path' => '/income-transactions', 'canany' => ['finance.view', 'finance.manage', 'income-transactions.manage']],
-                    ['name' => 'Expenses', 'path' => '/expense-transactions', 'canany' => ['finance.view', 'finance.manage', 'expense-transactions.manage']],
+                    ['name' => 'Transactions', 'path' => '/transactions', 'canany' => ['finance.view', 'finance.manage', 'income-transactions.manage', 'expense-transactions.manage']],
                     ['name' => 'Transfers', 'path' => '/account-transfers', 'canany' => ['finance.view', 'finance.manage', 'account-transfers.manage']],
                     ['name' => 'Supplier Payments', 'path' => '/supplier-payments', 'canany' => ['finance.view', 'finance.manage', 'supplier-payments.view', 'supplier-payments.manage']],
                 ],

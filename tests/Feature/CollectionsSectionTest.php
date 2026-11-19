@@ -66,7 +66,7 @@ it('scopes the collections list to the own location for outlet managers', functi
     $myPosInvoice = distributorInvoice($unit, ['location_id' => $mine->id]);
     $otherInvoice = distributorInvoice($unit, ['location_id' => $other->id]);
 
-    $manager = User::factory()->create(['email_verified_at' => now(), 'location_id' => $mine->id]);
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $mine->id]);
     $manager->assignRole('Outlet Manager');
     $manager->givePermissionTo(['sales-invoices.view']);
 

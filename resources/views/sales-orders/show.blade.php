@@ -40,16 +40,12 @@
             </a>
 
             @can('update', $order)
-                @if($order->status === \App\Enums\SalesOrderStatus::Draft)
-                    <form method="POST" action="{{ route('sales-orders.confirm', $order) }}" class="inline">
-                        @csrf
-                        @method('PATCH')
-                        <button type="submit"
-                                class="btn-scale inline-flex items-center gap-2 rounded-2xl bg-brand-500 hover:bg-brand-600 px-5 py-2.5 text-xs sm:text-sm font-semibold text-on-brand shadow-sm transition-colors cursor-pointer">
-                            <x-icon name="check" class="size-4" />
-                            <span>Confirm Order</span>
-                        </button>
-                    </form>
+                @if($order->status === \App\Enums\SalesOrderStatus::Draft || $order->status === \App\Enums\SalesOrderStatus::Confirmed)
+                    <button type="submit" form="payment-form"
+                            class="btn-scale inline-flex items-center gap-2 rounded-2xl bg-brand-500 hover:bg-brand-600 px-5 py-2.5 text-xs sm:text-sm font-semibold text-on-brand shadow-sm transition-colors cursor-pointer">
+                        <x-icon name="check" class="size-4" />
+                        <span>Confirm Payment &amp; Generate Invoice</span>
+                    </button>
                 @endif
 
                 @if($order->status->isEditable())
@@ -146,6 +142,73 @@
                     </div>
                 </dl>
             </div>
+
+            @if($order->status === \App\Enums\SalesOrderStatus::Draft || $order->status === \App\Enums\SalesOrderStatus::Confirmed)
+                @can('update', $order)
+                    <div class="rounded-3xl border border-brand-500/20 bg-surface p-5 sm:p-6 shadow-card">
+                        <h2 class="text-base font-bold text-ink pb-4 mb-4 border-b border-line">Confirm Payment</h2>
+                        <p class="text-xs text-muted mb-4 leading-relaxed">
+                            This business never sells on credit. Capture the payment in full below — the invoice is generated as PAID and the stock is issued exactly once, only after the payment is confirmed.
+                        </p>
+                        <form id="payment-form" method="POST" action="{{ route('sales-orders.confirm', $order) }}" class="space-y-4">
+                            @csrf
+                            @method('PATCH')
+
+                            <div>
+                                <label for="payment_method" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                                    Payment Method<span class="text-danger">*</span>
+                                </label>
+                                <select id="payment_method" name="payment_method" required
+                                        class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('payment_method') border-danger @enderror">
+                                    <option value="">Please Select</option>
+                                    @foreach(\App\Enums\PaymentMethod::options() as $value => $label)
+                                        <option value="{{ $value }}" @selected(old('payment_method') === $value)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                @error('payment_method')
+                                    <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <div>
+                                <label for="amount_received" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                                    Amount Received<span class="text-danger">*</span>
+                                </label>
+                                <div class="relative flex items-center">
+                                    <span class="absolute left-3.5 text-sm font-bold text-muted pointer-events-none">৳</span>
+                                    <input type="number" id="amount_received" name="amount_received" step="0.01" min="0" required
+                                           value="{{ old('amount_received', $order->grand_total) }}"
+                                           class="w-full rounded-xl border border-line bg-surface pl-8 pr-3.5 py-2.5 text-sm font-semibold text-ink tabular-nums shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('amount_received') border-danger @enderror">
+                                </div>
+                                <p class="mt-1.5 text-xs text-muted">
+                                    Must equal the order total ({{ \App\Helpers\Money::format($order->grand_total) }}) — full payment is required, partial payments are rejected.
+                                </p>
+                                @error('amount_received')
+                                    <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        </form>
+                    </div>
+                @endcan
+            @elseif($order->status === \App\Enums\SalesOrderStatus::Invoiced)
+                <div class="rounded-3xl border border-line bg-surface p-5 sm:p-6 shadow-card">
+                    <h2 class="text-base font-bold text-ink pb-4 mb-4 border-b border-line">Payment</h2>
+                    <dl class="space-y-3 text-sm">
+                        <div class="flex items-center justify-between">
+                            <dt class="text-muted">Amount Received</dt>
+                            <dd class="font-semibold text-success tabular-nums">{{ \App\Helpers\Money::format($order->grand_total) }}</dd>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <dt class="text-muted">Payment Method</dt>
+                            <dd class="font-semibold text-ink">{{ filled($order->payment_method) ? (\App\Enums\PaymentMethod::tryFrom($order->payment_method)?->label() ?? $order->payment_method) : '—' }}</dd>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <dt class="text-muted">Paid At</dt>
+                            <dd class="font-semibold text-ink tabular-nums">{{ $order->paid_at?->format('d/m/Y H:i') ?? '—' }}</dd>
+                        </div>
+                    </dl>
+                </div>
+            @endif
 
             <div class="rounded-3xl border border-line bg-surface p-5 sm:p-6 shadow-card">
                 <h2 class="text-base font-bold text-ink pb-4 mb-4 border-b border-line">Customer</h2>

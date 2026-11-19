@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\PurchaseOrder;
 
+use App\Enums\PurchaseStatus;
 use App\Models\PurchaseOrder;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -16,6 +17,22 @@ class StorePurchaseOrderRequest extends FormRequest
     }
 
     /**
+     * Receiving statuses selectable at entry time. "Cancelled" is a lifecycle
+     * end state (edit / delete) and never an entry state; "Partially Received"
+     * does not exist because receipts are posted for whole orders.
+     *
+     * @return array<string>
+     */
+    public static function entryStatuses(): array
+    {
+        return [
+            PurchaseStatus::Pending->value,
+            PurchaseStatus::Ordered->value,
+            PurchaseStatus::Received->value,
+        ];
+    }
+
+    /**
      * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
@@ -25,6 +42,7 @@ class StorePurchaseOrderRequest extends FormRequest
             'reference_no' => ['nullable', 'string', 'max:50', Rule::unique('purchase_orders', 'reference_no')->whereNull('deleted_at')],
             'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
             'location_id' => ['required', 'integer', 'exists:locations,id'],
+            'purchase_status' => ['required', Rule::in(self::entryStatuses())],
             'tax_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'paid_amount' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'document' => ['nullable', 'file', 'max:5120', 'mimes:pdf,csv,zip,doc,docx,jpeg,jpg,png'],
@@ -45,6 +63,7 @@ class StorePurchaseOrderRequest extends FormRequest
             'reference_no' => 'Reference No',
             'supplier_id' => 'Supplier',
             'location_id' => 'Business Location',
+            'purchase_status' => 'Purchase Status',
             'tax_rate' => 'Purchase Tax',
             'paid_amount' => 'Amount Paid',
             'document' => 'Attach Document',

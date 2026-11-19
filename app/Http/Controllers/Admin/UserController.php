@@ -7,7 +7,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\User\StoreUserRequest;
 use App\Http\Requests\User\UpdateUserRequest;
-use App\Models\Branch;
 use App\Models\Location;
 use App\Models\User;
 use App\Services\AuditService;
@@ -27,7 +26,7 @@ class UserController extends Controller
         $this->authorize('viewAny', User::class);
 
         $users = User::query()
-            ->with('roles')
+            ->with('roles', 'branch')
             ->when($request->filled('search'), function ($query) use ($request) {
                 $term = $request->string('search')->toString();
 
@@ -40,6 +39,9 @@ class UserController extends Controller
             ->when($request->filled('role'), function ($query) use ($request) {
                 $query->whereHas('roles', fn ($q) => $q->where('name', $request->string('role')->toString()));
             })
+            ->when($request->filled('branch_id'), function ($query) use ($request) {
+                $query->where('branch_id', (int) $request->input('branch_id'));
+            })
             ->when($request->filled('status'), function ($query) use ($request) {
                 $query->where('status', $request->string('status')->toString());
             })
@@ -51,6 +53,7 @@ class UserController extends Controller
         return view('admin.users.index', [
             'users' => $users,
             'roles' => Role::orderBy('name')->get(),
+            'locations' => Location::orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -63,8 +66,7 @@ class UserController extends Controller
 
         return view('admin.users.create', [
             'roles' => Role::orderBy('name')->get(),
-            'branches' => Branch::orderBy('name')->get(),
-            'locations' => Location::orderBy('name')->get(),
+            'locations' => Location::orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -83,7 +85,6 @@ class UserController extends Controller
             'email_verified_at' => now(),
             'status' => $validated['status'],
             'branch_id' => $validated['branch_id'] ?? null,
-            'location_id' => $validated['location_id'] ?? null,
         ]);
 
         if (! empty($validated['roles'])) {
@@ -105,8 +106,7 @@ class UserController extends Controller
         return view('admin.users.edit', [
             'user' => $user->load('roles'),
             'roles' => Role::orderBy('name')->get(),
-            'branches' => Branch::orderBy('name')->get(),
-            'locations' => Location::orderBy('name')->get(),
+            'locations' => Location::orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -124,7 +124,6 @@ class UserController extends Controller
             'phone' => $validated['phone'] ?? null,
             'status' => $validated['status'],
             'branch_id' => $validated['branch_id'] ?? null,
-            'location_id' => $validated['location_id'] ?? null,
         ]);
 
         if (! empty($validated['password'])) {

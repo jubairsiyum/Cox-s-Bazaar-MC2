@@ -19,7 +19,7 @@
                 <span class="font-medium text-ink">Sales Orders</span>
             </nav>
             <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink">Sales Orders</h1>
-            <p class="text-xs sm:text-sm text-muted mt-1">Order capture with automatic invoice generation — every saved order is invoiced and posted instantly.</p>
+            <p class="text-xs sm:text-sm text-muted mt-1">Order capture with payment confirmation — the invoice is generated (paid in full) only once the payment is confirmed.</p>
         </div>
 
         @can('create', \App\Models\SalesOrder::class)
@@ -43,12 +43,12 @@
                     <p class="text-xl font-extrabold text-ink tabular-nums">{{ $totals['total'] }}</p>
                 </div>
             </div>
-            <p class="mt-3 text-[11px] text-muted">Draft {{ $totals['draft'] }} · Confirmed {{ $totals['confirmed'] }}</p>
+            <p class="mt-3 text-[11px] text-muted">Awaiting Payment {{ $totals['draft'] }} · Confirmed {{ $totals['confirmed'] }}</p>
         </div>
         <div class="rounded-3xl border border-line bg-surface p-5 shadow-card">
             <p class="text-xs font-semibold uppercase tracking-wider text-muted">Invoiced</p>
             <p class="mt-1 text-xl font-extrabold text-ink tabular-nums">{{ $totals['invoiced'] }}</p>
-            <p class="mt-3 text-[11px] text-muted">Auto-generated sales invoices</p>
+            <p class="mt-3 text-[11px] text-muted">Paid orders with a generated invoice</p>
         </div>
         <div class="rounded-3xl border border-danger/20 bg-danger/5 p-5 shadow-card">
             <p class="text-xs font-semibold uppercase tracking-wider text-muted">Cancelled</p>

@@ -105,7 +105,7 @@ class SalesReturnController extends Controller
                 'customer_id' => $validated['customer_id'],
                 'return_date' => $validated['return_date'],
                 'location_id' => $invoice->location_id,
-                'branch_id' => $invoice->branch_id ?? $request->user()?->branch_id,
+                'branch_id' => $invoice->branch_id ?? $request->user()?->branch?->branch_id,
                 'status' => SalesReturnStatus::Pending,
                 'reason' => $validated['reason'] ?? null,
                 'refund_amount' => 0,

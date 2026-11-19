@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\ApprovalStatus;
 use App\Enums\PaymentStatus;
+use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\Location;
 use App\Models\PurchaseOrder;
@@ -103,7 +104,7 @@ it('scopes the purchase dues list to the own location for outlet managers', func
     $mineOrder = duePurchase([], null, $mine);
     $otherOrder = duePurchase([], null, $other);
 
-    $manager = User::factory()->create(['email_verified_at' => now(), 'location_id' => $mine->id]);
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $mine->id]);
     $manager->assignRole('Outlet Manager');
 
     $this->actingAs($manager)
@@ -120,7 +121,7 @@ it('submits a pending due payment request capped at the due and alerts the respo
     $location = Location::factory()->create();
     $order = duePurchase(['grand_total' => 5000, 'paid_amount' => 2000], null, $location);
 
-    $manager = User::factory()->create(['email_verified_at' => now(), 'location_id' => $location->id]);
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
     $manager->assignRole('Manager');
 
     $this->actingAs($creator)->post(route('purchase-dues.store'), [
@@ -166,7 +167,7 @@ it('applies the approved due payment to the purchase and supplier and notifies t
         'created_by' => $creator->id,
     ]);
 
-    $manager = User::factory()->create(['email_verified_at' => now(), 'location_id' => $location->id]);
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
     $manager->assignRole('Outlet Manager');
 
     $this->actingAs($manager)
@@ -219,7 +220,7 @@ it('only lets the responsible branch manager approve or reject a due payment req
     ]);
 
     // An outlet manager of another location is an outsider.
-    $outsider = User::factory()->create(['email_verified_at' => now(), 'location_id' => Location::factory()->create()->id]);
+    $outsider = User::factory()->create(['email_verified_at' => now(), 'branch_id' => Location::factory()->create()->id]);
     $outsider->assignRole('Outlet Manager');
 
     $this->actingAs($outsider)
@@ -231,7 +232,7 @@ it('only lets the responsible branch manager approve or reject a due payment req
         ->assertForbidden();
 
     // Staff without a manager role may not approve either.
-    $staff = User::factory()->create(['email_verified_at' => now(), 'location_id' => $location->id]);
+    $staff = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
     $staff->assignRole('Accountant');
 
     $this->actingAs($staff)
@@ -255,7 +256,7 @@ it('applies nothing when a due payment request is rejected', function () {
         'created_by' => $creator->id,
     ]);
 
-    $manager = User::factory()->create(['email_verified_at' => now(), 'location_id' => $location->id]);
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
     $manager->assignRole('Manager');
 
     $this->actingAs($manager)
@@ -304,4 +305,195 @@ it('lets the creator edit or cancel their own pending request only', function ()
         ->assertRedirect();
 
     $this->assertDatabaseMissing('purchase_payments', ['id' => $payment->id]);
+});
+
+it('completes a due payment directly when the responsible outlet manager records it', function () {
+    $location = Location::factory()->create();
+    $supplier = Supplier::factory()->create(['opening_balance' => 0, 'purchase_due' => 3000, 'purchase_return_due' => 0]);
+    $order = duePurchase(['grand_total' => 5000, 'paid_amount' => 2000], $supplier, $location);
+
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
+    $manager->assignRole('Outlet Manager');
+
+    $this->actingAs($manager)->post(route('purchase-dues.store'), [
+        'purchase_order_id' => $order->id,
+        'amount' => 3000,
+        'method' => 'cash',
+        'note' => 'Paid the supplier directly',
+    ])->assertRedirect();
+
+    $payment = PurchasePayment::query()->first();
+
+    // No self-approval theater: the payment is applied and completed at once.
+    expect($payment)->not->toBeNull()
+        ->and($payment->status)->toBe(ApprovalStatus::Approved)
+        ->and((int) $payment->created_by)->toBe($manager->id)
+        ->and((int) $payment->approved_by)->toBe($manager->id)
+        ->and($payment->approved_at)->not->toBeNull()
+        ->and((float) $order->fresh()->paid_amount)->toBe(5000.0)
+        ->and((float) $supplier->fresh()->purchase_due)->toBe(0.0);
+
+    // The manager is never notified to approve their own task.
+    expect($manager->fresh()->notifications()->count())->toBe(0);
+
+    $audit = AuditLog::query()->where('auditable_id', $payment->id)->latest('id')->first();
+
+    expect($audit->description)->toContain('completed directly by the responsible manager');
+});
+
+it('completes a due payment directly when a super admin records it', function () {
+    $admin = actingAsSuperAdmin();
+
+    $supplier = Supplier::factory()->create(['opening_balance' => 0, 'purchase_due' => 3000, 'purchase_return_due' => 0]);
+    $order = duePurchase(['grand_total' => 5000, 'paid_amount' => 2000], $supplier);
+
+    $this->actingAs($admin)->post(route('purchase-dues.store'), [
+        'purchase_order_id' => $order->id,
+        'amount' => 3000,
+    ])->assertRedirect();
+
+    $payment = PurchasePayment::query()->first();
+
+    expect($payment->status)->toBe(ApprovalStatus::Approved)
+        ->and((int) $payment->approved_by)->toBe($admin->id)
+        ->and((float) $order->fresh()->paid_amount)->toBe(5000.0)
+        ->and($admin->fresh()->notifications()->count())->toBe(0);
+});
+
+it('keeps a staff request pending for the outlet manager and never lets the requester approve it', function () {
+    $location = Location::factory()->create();
+    $order = duePurchase(['grand_total' => 5000, 'paid_amount' => 2000], null, $location);
+
+    $staff = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
+    $staff->assignRole('Storekeeper');
+
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
+    $manager->assignRole('Outlet Manager');
+
+    $this->actingAs($staff)->post(route('purchase-dues.store'), [
+        'purchase_order_id' => $order->id,
+        'amount' => 500,
+    ])->assertRedirect();
+
+    $payment = PurchasePayment::query()->first();
+
+    expect($payment->status)->toBe(ApprovalStatus::Pending)
+        ->and((int) $payment->created_by)->toBe($staff->id)
+        ->and((float) $order->fresh()->paid_amount)->toBe(2000.0);
+
+    // The outlet manager is asked to sign off — never the requester.
+    expect($manager->fresh()->notifications()->count())->toBe(1)
+        ->and($staff->fresh()->notifications()->count())->toBe(0);
+
+    $this->actingAs($staff)
+        ->patch(route('purchase-dues.approve', $payment))
+        ->assertForbidden();
+
+    expect($payment->fresh()->status)->toBe(ApprovalStatus::Pending);
+
+    $this->actingAs($manager)
+        ->patch(route('purchase-dues.approve', $payment))
+        ->assertRedirect();
+
+    expect($payment->fresh()->status)->toBe(ApprovalStatus::Approved)
+        ->and((float) $order->fresh()->paid_amount)->toBe(2500.0);
+});
+
+it('never lets a user decide their own due payment request', function () {
+    $location = Location::factory()->create();
+    $order = duePurchase(['grand_total' => 5000, 'paid_amount' => 2000], null, $location);
+
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
+    $manager->assignRole('Outlet Manager');
+
+    $ownRequest = PurchasePayment::factory()->pending()->create([
+        'purchase_order_id' => $order->id,
+        'amount' => 500,
+        'created_by' => $manager->id,
+    ]);
+
+    // A manager may not sign off their own request (policy).
+    $this->actingAs($manager)
+        ->patch(route('purchase-dues.approve', $ownRequest))
+        ->assertForbidden();
+
+    $this->actingAs($manager)
+        ->patch(route('purchase-dues.reject', $ownRequest))
+        ->assertForbidden();
+
+    expect($ownRequest->fresh()->status)->toBe(ApprovalStatus::Pending);
+
+    // Even a Super Admin is stopped by the controller guard on self-approval.
+    $admin = actingAsSuperAdmin();
+
+    $adminRequest = PurchasePayment::factory()->pending()->create([
+        'purchase_order_id' => $order->id,
+        'amount' => 500,
+        'created_by' => $admin->id,
+    ]);
+
+    $this->actingAs($admin)
+        ->patch(route('purchase-dues.approve', $adminRequest))
+        ->assertRedirect()
+        ->assertSessionHas('error');
+
+    expect($adminRequest->fresh()->status)->toBe(ApprovalStatus::Pending)
+        ->and((float) $order->fresh()->paid_amount)->toBe(2000.0);
+});
+
+it('completes the request directly when the requester is the only responsible user', function () {
+    $location = Location::factory()->create();
+    $order = duePurchase(['grand_total' => 5000, 'paid_amount' => 2000], null, $location);
+
+    // The sole user at the outlet: the resolved approver set would only ever
+    // contain the requester, so no request is raised at all.
+    $sole = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
+    $sole->assignRole('Storekeeper');
+
+    $this->actingAs($sole)->post(route('purchase-dues.store'), [
+        'purchase_order_id' => $order->id,
+        'amount' => 1000,
+    ])->assertRedirect();
+
+    $payment = PurchasePayment::query()->first();
+
+    expect($payment->status)->toBe(ApprovalStatus::Approved)
+        ->and((int) $payment->approved_by)->toBe($sole->id)
+        ->and((float) $order->fresh()->paid_amount)->toBe(3000.0)
+        ->and($sole->fresh()->notifications()->count())->toBe(0);
+
+    $audit = AuditLog::query()->where('auditable_id', $payment->id)->latest('id')->first();
+
+    expect($audit->description)->toContain('completed directly');
+});
+
+it('completes a legacy pending request directly when its responsible manager updates it', function () {
+    $location = Location::factory()->create();
+    $supplier = Supplier::factory()->create(['opening_balance' => 0, 'purchase_due' => 3000, 'purchase_return_due' => 0]);
+    $order = duePurchase(['grand_total' => 5000, 'paid_amount' => 2000], $supplier, $location);
+
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
+    $manager->assignRole('Outlet Manager');
+
+    $payment = PurchasePayment::factory()->pending()->create([
+        'purchase_order_id' => $order->id,
+        'amount' => 500,
+        'created_by' => $manager->id,
+    ]);
+
+    $this->actingAs($manager)
+        ->patch(route('purchase-dues.update', $payment), ['amount' => 1000, 'method' => 'cash'])
+        ->assertRedirect();
+
+    $payment->refresh();
+
+    expect($payment->status)->toBe(ApprovalStatus::Approved)
+        ->and((float) $payment->amount)->toBe(1000.0)
+        ->and((int) $payment->approved_by)->toBe($manager->id)
+        ->and((float) $order->fresh()->paid_amount)->toBe(3000.0)
+        ->and((float) $supplier->fresh()->purchase_due)->toBe(2000.0);
+
+    $audit = AuditLog::query()->where('auditable_id', $payment->id)->latest('id')->first();
+
+    expect($audit->description)->toContain('completed directly by the responsible manager');
 });

@@ -11,7 +11,7 @@ use App\Models\SalesReturn;
  * Branch-manager-wise approval notifications for the sales section.
  *
  * The audience is resolved through PurchaseApprovalNotifier::managersFor(),
- * which tolerates users tied to either a location or a branch. The shared
+ * which finds the active users assigned to the return's outlet. The shared
  * notification vocabulary is used throughout: warning for pending approval,
  * success for approved, error for rejected.
  */
@@ -25,7 +25,7 @@ class SalesApprovalNotifier
         $creator = $return->creator;
 
         NotificationService::notifyMany(
-            PurchaseApprovalNotifier::managersFor($return->location_id, $creator?->branch_id ?? $return->branch_id),
+            PurchaseApprovalNotifier::managersFor($return->location_id),
             self::title($return, 'awaits your approval'),
             sprintf(
                 '%s · %s · %s, submitted by %s.',

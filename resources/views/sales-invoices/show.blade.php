@@ -47,13 +47,18 @@
                 <x-icon name="enquiries" class="size-4" />
                 <span>Print Invoice</span>
             </a>
-            @can('update', $invoice)
-                <a href="{{ route('sales-invoices.edit', $invoice) }}"
-                   class="btn-scale inline-flex items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-2.5 text-xs sm:text-sm font-semibold text-ink shadow-2xs hover:bg-soft hover:text-brand-500 transition-colors">
-                    <x-icon name="settings" class="size-4" />
-                    <span>Edit</span>
-                </a>
-            @endcan
+            {{-- Edit only for draft invoices: the rule lives in the policy, but
+                 the Super Admin's Gate bypass makes @can always true, so the
+                 document state is checked explicitly too. --}}
+            @if($invoice->status->isEditable())
+                @can('update', $invoice)
+                    <a href="{{ route('sales-invoices.edit', $invoice) }}"
+                       class="btn-scale inline-flex items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-2.5 text-xs sm:text-sm font-semibold text-ink shadow-2xs hover:bg-soft hover:text-brand-500 transition-colors">
+                        <x-icon name="settings" class="size-4" />
+                        <span>Edit</span>
+                    </a>
+                @endcan
+            @endif
             @can('post', $invoice)
                 @if($invoice->status->value === 'draft')
                     <form method="POST" action="{{ route('sales-invoices.post', $invoice) }}">

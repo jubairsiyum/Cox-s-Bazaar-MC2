@@ -33,8 +33,7 @@ class StoreUserRequest extends FormRequest
             'phone' => ['nullable', 'string', 'max:20'],
             'password' => ['required', 'confirmed', Password::defaults()],
             'status' => ['required', new Enum(UserStatus::class)],
-            'branch_id' => ['nullable', 'integer', Rule::exists('branches', 'id')],
-            'location_id' => ['nullable', 'integer', Rule::exists('locations', 'id')],
+            'branch_id' => ['nullable', 'integer', Rule::exists('locations', 'id')],
             'roles' => ['nullable', 'array'],
             'roles.*' => ['string', 'distinct', Rule::exists('roles', 'name')],
         ];

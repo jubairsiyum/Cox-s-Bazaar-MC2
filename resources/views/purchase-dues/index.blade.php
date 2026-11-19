@@ -115,7 +115,11 @@
                                         @if($latestRequest->method) · {{ $latestRequest->method->label() }}@endif
                                     </span>
                                 @elseif($latestRequest->status === \App\Enums\ApprovalStatus::Approved)
-                                    <x-status-badge status="approved" label="Approved" />
+                                    @if((int) $latestRequest->approved_by === (int) $latestRequest->created_by && $latestRequest->approved_by !== null)
+                                        <x-status-badge status="completed" label="Completed" />
+                                    @else
+                                        <x-status-badge status="approved" label="Approved" />
+                                    @endif
                                     <span class="block text-[11px] text-muted mt-1 tabular-nums">
                                         {{ \App\Helpers\Money::format($latestRequest->amount) }}
                                         @if($latestRequest->method) · {{ $latestRequest->method->label() }}@endif
@@ -256,8 +260,9 @@
                     </div>
 
                     <p class="text-xs text-muted leading-relaxed">
-                        The request is saved as <span class="font-semibold text-ink">Awaiting Approval</span> and has no
-                        financial effect until the responsible branch manager approves it.
+                        Payments recorded by the responsible manager are applied immediately. Staff requests are saved as
+                        <span class="font-semibold text-ink">Awaiting Approval</span> and have no financial effect until a
+                        responsible manager — never the requester — approves them.
                     </p>
                 </div>
 

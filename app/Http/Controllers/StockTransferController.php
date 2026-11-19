@@ -626,7 +626,7 @@ class StockTransferController extends Controller
     private function notifyReceivers(StockTransfer $transfer, string $title, string $body, string $type): void
     {
         NotificationService::notifyMany(
-            PurchaseApprovalNotifier::managersFor($transfer->to_location_id, $transfer->toLocation?->branch_id),
+            PurchaseApprovalNotifier::managersFor($transfer->to_location_id),
             $title,
             $body,
             route('stock-transfers.show', $transfer),
