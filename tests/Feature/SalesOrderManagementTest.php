@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Customer;
 use App\Models\Location;
+use App\Models\Product;
 use App\Models\SalesInvoice;
 use App\Models\SalesOrder;
 use App\Models\Unit;
@@ -75,7 +76,7 @@ it('lists sales orders with a Create Order button', function () {
         ->assertSee('Create Order');
 });
 
-it('creates a draft order with items and computes totals', function () {
+it('creates an order and auto-generates its posted invoice with computed totals', function () {
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 50]);
@@ -91,14 +92,104 @@ it('creates a draft order with items and computes totals', function () {
 
     expect($order)->not->toBeNull()
         ->and($order->order_no)->toStartWith('SO')
-        ->and($order->status->value)->toBe('draft')
+        ->and($order->status->value)->toBe('invoiced')
         ->and((float) $order->subtotal)->toBe(900.0)
         ->and((float) $order->tax_amount)->toBe(90.0)
         ->and((float) $order->grand_total)->toBe(990.0)
         ->and($order->items)->toHaveCount(1);
+
+    // The invoice is generated and posted on the spot: a completed sale moves
+    // stock and produces its invoice, like a POS quick sale.
+    $invoice = SalesInvoice::first();
+
+    expect($invoice)->not->toBeNull()
+        ->and($invoice->sales_order_id)->toBe($order->id)
+        ->and($invoice->invoice_no)->toStartWith('INV')
+        ->and($invoice->status->value)->toBe('posted')
+        ->and($invoice->posted_at)->not->toBeNull()
+        ->and((float) $invoice->grand_total)->toBe(990.0)
+        ->and((float) $invoice->due_amount)->toBe(990.0)
+        ->and($invoice->items)->toHaveCount(1);
+
+    expect($unit->fresh()->quantity)->toBe(48);
+
+    // The generated invoice shows up in the Sales Invoice register.
+    $this->get(route('sales-invoices.index'))
+        ->assertOk()
+        ->assertSee($invoice->invoice_no);
 });
 
-it('confirms and cancels an order through its lifecycle', function () {
+it('shows the generated invoice on the order instead of a Create Invoice button', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+
+    $this->post(route('sales-orders.store'), salesOrderPayload($unit));
+
+    $order = SalesOrder::first();
+    $invoice = SalesInvoice::first();
+
+    $this->get(route('sales-orders.show', $order))
+        ->assertOk()
+        ->assertSee('Generated Invoice')
+        ->assertSee($invoice->invoice_no)
+        ->assertSee('Posted')
+        ->assertDontSee('Create Invoice');
+
+    $this->get(route('sales-orders.index'))
+        ->assertOk()
+        ->assertDontSee('Create Invoice');
+});
+
+it('voids the generated invoice and restores stock when the order is cancelled', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+
+    $this->post(route('sales-orders.store'), salesOrderPayload($unit));
+
+    $order = SalesOrder::first();
+    $invoice = SalesInvoice::first();
+
+    expect($unit->fresh()->quantity)->toBe(47);
+
+    $this->patch(route('sales-orders.cancel', $order))
+        ->assertRedirect(route('sales-orders.show', $order));
+
+    $order->refresh();
+    $invoice->refresh();
+
+    expect($order->status->value)->toBe('cancelled')
+        ->and($invoice->status->value)->toBe('voided')
+        ->and($invoice->voided_at)->not->toBeNull()
+        ->and((float) $invoice->due_amount)->toBe(0.0);
+
+    expect($unit->fresh()->quantity)->toBe(50);
+
+    // A cancelled order can no longer be edited or re-confirmed.
+    $this->get(route('sales-orders.edit', $order))->assertRedirect(route('sales-orders.show', $order));
+    $this->patch(route('sales-orders.confirm', $order))->assertSessionHas('error');
+});
+
+it('persists neither order nor invoice when the stock is insufficient', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 1]);
+
+    $this->post(route('sales-orders.store'), salesOrderPayload($unit, [
+        'items' => [
+            ['unit_id' => $unit->id, 'quantity' => 5, 'unit_price' => 250, 'discount' => 0],
+        ],
+    ]))->assertSessionHas('error');
+
+    expect(SalesOrder::count())->toBe(0)
+        ->and(SalesInvoice::count())->toBe(0)
+        ->and($unit->fresh()->quantity)->toBe(1);
+});
+
+it('confirms and cancels a legacy draft order without an invoice', function () {
+    // Draft orders only exist as legacy data: new orders are invoiced the
+    // moment they are saved. Their confirm/cancel lifecycle is kept here.
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 50]);
@@ -141,7 +232,9 @@ it('edits a draft order and recomputes the totals', function () {
         ->and((float) $order->grand_total)->toBe(450.0);
 });
 
-it('offers the Create Invoice conversion prefilled with the order items', function () {
+it('keeps the legacy order-to-invoice conversion for old draft orders', function () {
+    // The manual conversion path (pre-filled from the order) is retained for
+    // compatibility with legacy draft orders; new orders are auto-invoiced.
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 50]);
@@ -152,10 +245,6 @@ it('offers the Create Invoice conversion prefilled with the order items', functi
         ->assertOk()
         ->assertSee('From Order '.$order->order_no)
         ->assertSee('Converted from Sales Order '.$order->order_no);
-
-    $this->get(route('sales-orders.show', $order))
-        ->assertOk()
-        ->assertSee('Create Invoice');
 });
 
 it('marks the order invoiced when its invoice is posted and confirmed again after a void', function () {
@@ -247,4 +336,90 @@ it('scopes the order register to the assigned location', function () {
     $this->actingAs($manager)
         ->get(route('sales-orders.show', $otherOrder))
         ->assertForbidden();
+});
+
+it('searches units by product name for the order item picker', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create([
+        'quantity' => 50,
+        'product_id' => Product::factory()->create([
+            'name' => 'Samsung Nebula X1 Cover',
+            'storage' => null,
+            'color' => null,
+        ])->id,
+    ]);
+    Unit::factory()->create(['quantity' => 10]);
+
+    $this->get(route('sales-orders.search-units', ['search' => 'Nebula X1']))
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonCount(1, 'units')
+        ->assertJsonPath('units.0.id', (int) $unit->id)
+        ->assertJsonPath('units.0.display_name', 'Samsung Nebula X1 Cover');
+});
+
+it('searches units by barcode for the order item picker', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create([
+        'quantity' => 25,
+        'product_id' => Product::factory()->create([
+            'name' => 'Aurora Bluetooth Speaker',
+            'storage' => null,
+            'color' => null,
+            'barcode' => '889912345678',
+        ])->id,
+    ]);
+    Unit::factory()->create(['quantity' => 10]);
+
+    $this->get(route('sales-orders.search-units', ['search' => '889912345678']))
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonCount(1, 'units')
+        ->assertJsonPath('units.0.id', (int) $unit->id)
+        ->assertJsonPath('units.0.barcode', '889912345678');
+});
+
+it('searches units by product code and model for the order item picker', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create([
+        'quantity' => 25,
+        'product_id' => Product::factory()->create([
+            'name' => 'Orion Smart Watch',
+            'storage' => null,
+            'color' => null,
+            'product_id' => 'PRD-7788',
+            'model' => 'OSW-2000',
+        ])->id,
+    ]);
+
+    $this->get(route('sales-orders.search-units', ['search' => 'PRD-7788']))
+        ->assertOk()
+        ->assertJsonCount(1, 'units')
+        ->assertJsonPath('units.0.id', (int) $unit->id);
+
+    $this->get(route('sales-orders.search-units', ['search' => 'OSW-2000']))
+        ->assertOk()
+        ->assertJsonCount(1, 'units')
+        ->assertJsonPath('units.0.id', (int) $unit->id);
+});
+
+it('renders the product search field on the create and edit forms', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+
+    $this->get(route('sales-orders.create'))
+        ->assertOk()
+        ->assertSee('Search product or scan barcode')
+        ->assertSee('searchUnits', false);
+
+    $order = salesOrderWithItem($unit);
+
+    $this->get(route('sales-orders.edit', $order))
+        ->assertOk()
+        ->assertSee('Search product or scan barcode')
+        ->assertSee('searchUnits', false);
 });

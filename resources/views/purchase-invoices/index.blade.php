@@ -35,7 +35,7 @@
     $totalPaid = max(0, round($totalGrand - $totalDue, 2));
     $paidRatioPct = $totalGrand > 0 ? min(100, (int) round(($totalPaid / $totalGrand) * 100)) : 0;
 
-    $pendingApprovalCount = \App\Services\LocationScope::scopeQuery(\App\Models\PurchaseOrder::query(), auth()->user())
+    $legacyPendingCount = \App\Services\LocationScope::scopeQuery(\App\Models\PurchaseOrder::query(), auth()->user())
         ->where('approval_status', \App\Enums\ApprovalStatus::Pending)
         ->count();
 @endphp
@@ -65,15 +65,15 @@
                     <span class="size-1.5 rounded-full bg-brand-500"></span>
                     {{ number_format($orders->total()) }} {{ Str::plural('invoice', $orders->total()) }}
                 </span>
-                @if($pendingApprovalCount > 0)
+                @if($legacyPendingCount > 0)
                     <span class="inline-flex items-center gap-1.5 rounded-full bg-warning/10 px-3 py-1 text-xs font-semibold text-warning ring-1 ring-warning/20 tabular-nums">
                         <x-icon name="alert-triangle" class="size-3.5" />
-                        <span>{{ number_format($pendingApprovalCount) }} pending {{ Str::plural('approval', $pendingApprovalCount) }}</span>
+                        <span>{{ number_format($legacyPendingCount) }} awaiting {{ Str::plural('completion', $legacyPendingCount) }}</span>
                     </span>
                 @endif
             </div>
             <p class="text-xs sm:text-sm text-muted mt-1">
-                All purchase records in one place — track supplier payables, stock receipts, and approval status.
+                All purchase records in one place — track supplier payables, stock receipts, and payment status.
             </p>
         </div>
 
@@ -167,21 +167,21 @@
             </div>
         </div>
 
-        {{-- KPI 4: Pending Approvals --}}
+        {{-- KPI 4: Legacy Pending --}}
         <div class="rounded-3xl border border-line bg-surface p-5 shadow-card lift flex flex-col justify-between">
             <div class="flex items-start justify-between gap-3">
                 <div>
-                    <span class="text-[11px] font-semibold text-muted uppercase tracking-wider">Pending Approvals</span>
+                    <span class="text-[11px] font-semibold text-muted uppercase tracking-wider">Awaiting Completion</span>
                     <p class="text-2xl sm:text-3xl font-bold tracking-tight text-ink mt-1.5 tabular-nums">
-                        {{ number_format($pendingApprovalCount) }}
+                        {{ number_format($legacyPendingCount) }}
                     </p>
                 </div>
-                <div class="flex size-11 shrink-0 items-center justify-center rounded-2xl {{ $pendingApprovalCount > 0 ? 'bg-warning/10 text-warning ring-1 ring-warning/20' : 'bg-soft text-brand-500 ring-1 ring-line' }}">
+                <div class="flex size-11 shrink-0 items-center justify-center rounded-2xl {{ $legacyPendingCount > 0 ? 'bg-warning/10 text-warning ring-1 ring-warning/20' : 'bg-soft text-brand-500 ring-1 ring-line' }}">
                     <x-icon name="truck" class="size-5" />
                 </div>
             </div>
             <div class="mt-3 flex items-center justify-between gap-2 text-xs text-muted">
-                <span>{{ $pendingApprovalCount > 0 ? 'Awaiting receiving sign-off' : 'All orders processed' }}</span>
+                <span>{{ $legacyPendingCount > 0 ? 'Legacy purchases awaiting sign-off' : 'All purchases processed' }}</span>
                 <a href="{{ route('purchase-returns.index') }}" class="font-semibold text-brand-500 hover:underline inline-flex items-center gap-0.5 shrink-0">
                     <span>Returns</span>
                     <x-icon name="arrow-up-right" class="size-3.5" />
@@ -513,8 +513,7 @@
                             </td>
                             <td x-show="columns.purchase_status" data-col="purchase_status" class="py-3.5 px-4 whitespace-nowrap">
                                 <div class="flex items-center gap-1.5 flex-wrap">
-                                    <x-status-badge :status="$order->purchase_status->value" :label="$order->purchase_status->label()" />
-                                    <x-status-badge :status="$order->approval_status->value" :label="$order->approval_status->label()" />
+                                    @include('purchase-invoices.partials.consolidated-status', ['order' => $order])
                                 </div>
                             </td>
                             <td x-show="columns.payment_status" data-col="payment_status" class="py-3.5 px-4 whitespace-nowrap">
@@ -541,11 +540,11 @@
                                     </a>
 
                                     @can('approve', $order)
-                                        @if($order->approval_status !== \App\Enums\ApprovalStatus::Approved)
+                                        @if($order->approval_status === \App\Enums\ApprovalStatus::Pending)
                                             <button type="button"
                                                     @click="openActionModal('approve', @js(['ref' => $order->reference_no, 'supplier' => $order->supplier?->name ?? '—', 'total' => \App\Helpers\Money::format($order->grand_total), 'url' => route('purchase-invoices.approve', $order)]))"
                                                     class="btn-scale inline-flex items-center gap-1 rounded-xl border border-success/30 bg-success/10 px-2.5 py-1.5 text-xs font-semibold text-success hover:bg-success hover:text-on-brand transition-colors cursor-pointer"
-                                                    title="Approve and receive order">
+                                                    title="Receive this legacy pending order">
                                                 <x-icon name="check" class="size-3.5" />
                                                 <span>Approve</span>
                                             </button>

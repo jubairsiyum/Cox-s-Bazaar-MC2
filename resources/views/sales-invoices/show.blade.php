@@ -87,15 +87,6 @@
                     </form>
                 @endif
             @endcan
-            @if($invoice->payment_status->value !== 'paid' && $invoice->payment_status->value !== 'cancelled')
-                @can('create', \App\Models\CustomerCollection::class)
-                    <a href="{{ route('customer-collections.create', ['customer' => $invoice->customer_id, 'invoice' => $invoice->id]) }}"
-                       class="btn-scale inline-flex items-center gap-2 rounded-2xl bg-success hover:bg-success/90 px-5 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-sm transition-colors">
-                        <x-icon name="wallet" class="size-4" />
-                        <span>Record Payment</span>
-                    </a>
-                @endcan
-            @endif
         </div>
     </div>
 

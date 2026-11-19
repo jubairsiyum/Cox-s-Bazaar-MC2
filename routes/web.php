@@ -11,7 +11,6 @@ use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\BrandController;
 use App\Http\Controllers\CategoryController;
-use App\Http\Controllers\CustomerCollectionController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InventoryController;
@@ -20,6 +19,7 @@ use App\Http\Controllers\PlaceholderController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PurchaseDueController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\PurchaseReturnController;
 use App\Http\Controllers\SalesInvoiceController;
@@ -361,9 +361,29 @@ Route::middleware('auth')->group(function () {
         Route::delete('purchase-invoices/{purchaseOrder}', [PurchaseOrderController::class, 'destroy'])->name('purchase-invoices.destroy');
     });
 
+    // Legacy cleanup only: purchases take effect on creation, so approve/reject
+    // just complete documents that still carry the old pending approval state.
     Route::middleware(['verified', 'permission:purchase-invoices.approve'])->group(function () {
         Route::patch('purchase-invoices/{purchaseOrder}/approve', [PurchaseOrderController::class, 'approve'])->name('purchase-invoices.approve');
         Route::patch('purchase-invoices/{purchaseOrder}/reject', [PurchaseOrderController::class, 'reject'])->name('purchase-invoices.reject');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Purchase Dues (Purchasing) — due payment requests on purchase invoices
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['verified', 'permission:purchase-invoices.view|purchase-invoices.manage|supplier-payments.view|supplier-payments.manage'])->group(function () {
+        Route::get('purchase-dues', [PurchaseDueController::class, 'index'])->name('purchase-dues.index');
+        Route::post('purchase-dues', [PurchaseDueController::class, 'store'])->name('purchase-dues.store');
+        Route::patch('purchase-dues/{purchasePayment}', [PurchaseDueController::class, 'update'])->name('purchase-dues.update');
+        Route::delete('purchase-dues/{purchasePayment}', [PurchaseDueController::class, 'destroy'])->name('purchase-dues.destroy');
+    });
+
+    // Approvals are gated by the responsible branch manager (policy), not a permission.
+    Route::middleware(['verified'])->group(function () {
+        Route::patch('purchase-dues/{purchasePayment}/approve', [PurchaseDueController::class, 'approve'])->name('purchase-dues.approve');
+        Route::patch('purchase-dues/{purchasePayment}/reject', [PurchaseDueController::class, 'reject'])->name('purchase-dues.reject');
     });
 
     /*
@@ -383,6 +403,8 @@ Route::middleware('auth')->group(function () {
         Route::get('purchase-returns/{purchaseReturn}/edit', [PurchaseReturnController::class, 'edit'])->name('purchase-returns.edit');
         Route::patch('purchase-returns/{purchaseReturn}', [PurchaseReturnController::class, 'update'])->name('purchase-returns.update');
         Route::delete('purchase-returns/{purchaseReturn}', [PurchaseReturnController::class, 'destroy'])->name('purchase-returns.destroy');
+        // Legacy cleanup only: returns take effect when submitted, so these just
+        // complete documents that still carry the old pending approval state.
         Route::patch('purchase-returns/{purchaseReturn}/approve', [PurchaseReturnController::class, 'approve'])->name('purchase-returns.approve');
         Route::patch('purchase-returns/{purchaseReturn}/reject', [PurchaseReturnController::class, 'reject'])->name('purchase-returns.reject');
         Route::get('purchase-returns/{purchaseReturn}', [PurchaseReturnController::class, 'show'])->name('purchase-returns.show');
@@ -455,7 +477,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     $salesOrderController = SalesOrderController::class;
     $salesInvoiceController = SalesInvoiceController::class;
     $salesReturnController = SalesReturnController::class;
-    $customerCollectionController = CustomerCollectionController::class;
     $posController = PosController::class;
     $salesReportController = SalesReportController::class;
 
@@ -529,16 +550,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     /*
-    | Customer Collections — payments against sales invoices
+    | Collections — every distributor (sales) invoice in one list, generated
+    | from a sales order or rung up on the POS alike. The customer-collections
+    | payment screens are retired "for now" and all of their routes are gone.
     */
-    Route::middleware('permission:customer-collections.manage')->group(function () use ($customerCollectionController) {
-        Route::get('customer-collections', [$customerCollectionController, 'index'])->name('customer-collections.index');
-        Route::get('customer-collections/create', [$customerCollectionController, 'create'])->name('customer-collections.create');
-        Route::get('customer-collections/customer-invoices', [$customerCollectionController, 'customerInvoices'])->name('customer-collections.customer-invoices');
-        Route::post('customer-collections', [$customerCollectionController, 'store'])->name('customer-collections.store');
-        Route::get('customer-collections/{customerCollection}', [$customerCollectionController, 'show'])->name('customer-collections.show');
-        Route::get('customer-collections/{customerCollection}/receipt', [$customerCollectionController, 'receipt'])->name('customer-collections.receipt');
-        Route::delete('customer-collections/{customerCollection}', [$customerCollectionController, 'destroy'])->name('customer-collections.destroy');
+    Route::middleware('permission:sales-invoices.view|sales-invoices.manage|customer-collections.manage')->group(function () use ($salesInvoiceController) {
+        Route::get('collections', [$salesInvoiceController, 'distributorIndex'])->name('collections.index');
     });
 
     /*

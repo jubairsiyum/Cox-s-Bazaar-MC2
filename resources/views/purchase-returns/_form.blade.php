@@ -316,7 +316,7 @@
                         <span class="block text-2xl font-extrabold text-brand-500 tabular-nums mt-0.5" x-text="formatMoney(totalAmount)"></span>
                     </div>
                     <p class="text-xs text-muted max-w-xs hidden md:block">
-                        Stock and supplier return due credits update once an authorized manager approves this request.
+                        Stock and supplier return due credits update the moment this return is submitted.
                     </p>
                 </div>
 

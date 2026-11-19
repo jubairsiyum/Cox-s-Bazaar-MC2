@@ -40,8 +40,7 @@
                 <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink">
                     Purchase Order {{ $order->reference_no }}
                 </h1>
-                <x-status-badge :status="$order->purchase_status->value" :label="$order->purchase_status->label()" />
-                <x-status-badge :status="$order->approval_status->value" :label="$order->approval_status->label()" />
+                @include('purchase-invoices.partials.consolidated-status', ['order' => $order])
                 <x-status-badge :status="$order->payment_status->value" :label="$order->payment_status->label()" />
             </div>
             <p class="text-xs sm:text-sm text-muted mt-1">
@@ -52,7 +51,7 @@
         {{-- Action Bar --}}
         <div class="flex items-center gap-2 flex-wrap shrink-0 no-print">
             @can('approve', $order)
-                @if($order->approval_status !== \App\Enums\ApprovalStatus::Approved)
+                @if($order->approval_status === \App\Enums\ApprovalStatus::Pending)
                     <button type="button" @click="confirmModal = 'approve'"
                             class="btn-scale inline-flex items-center gap-1.5 rounded-2xl bg-success hover:bg-success/90 px-4 py-2.5 text-xs sm:text-sm font-semibold text-on-brand shadow-sm transition-colors cursor-pointer">
                         <x-icon name="check" class="size-4" />
@@ -248,9 +247,9 @@
                     <dd class="mt-1 font-bold text-ink">{{ $order->creator?->name ?? '—' }}</dd>
                 </div>
                 <div class="rounded-2xl bg-soft/50 border border-line/70 p-3.5">
-                    <dt class="text-[11px] font-semibold uppercase tracking-wider text-muted">Approval Status</dt>
+                    <dt class="text-[11px] font-semibold uppercase tracking-wider text-muted">Status</dt>
                     <dd class="mt-1.5">
-                        <x-status-badge :status="$order->approval_status->value" :label="$order->approval_status->label()" />
+                        @include('purchase-invoices.partials.consolidated-status', ['order' => $order])
                     </dd>
                 </div>
                 <div class="rounded-2xl bg-soft/50 border border-line/70 p-3.5">
@@ -261,20 +260,19 @@
                     <dt class="text-[11px] font-semibold uppercase tracking-wider text-muted">Approved At</dt>
                     <dd class="mt-1 font-semibold text-ink tabular-nums">{{ $order->approved_at?->format('d/m/Y H:i') ?? '—' }}</dd>
                 </div>
-                <div class="sm:col-span-2 rounded-2xl bg-soft/50 border border-line/70 p-3.5 flex items-center justify-between gap-3">
+                <div class="sm:col-span-2 rounded-2xl bg-soft/50 border border-line/70 p-3.5">
                     <div>
                         <dt class="text-[11px] font-semibold uppercase tracking-wider text-muted">Workflow Status</dt>
                         <dd class="mt-1 text-xs text-muted">
                             @if($order->approval_status === \App\Enums\ApprovalStatus::Approved)
-                                Stock has been received into inventory and supplier payables have been updated.
+                                Stock was received into inventory and supplier payables updated when this purchase was created.
                             @elseif($order->approval_status === \App\Enums\ApprovalStatus::Rejected)
                                 This purchase order was rejected and cancelled without affecting stock.
                             @else
-                                Awaiting manager sign-off before stock quantities and supplier balances update.
+                                Legacy purchase awaiting sign-off before stock quantities and supplier balances update.
                             @endif
                         </dd>
                     </div>
-                    <x-status-badge :status="$order->purchase_status->value" :label="$order->purchase_status->label()" />
                 </div>
             </dl>
         </div>
@@ -356,7 +354,7 @@
 
     {{-- Approve Modal --}}
     @can('approve', $order)
-        @if($order->approval_status !== \App\Enums\ApprovalStatus::Approved)
+        @if($order->approval_status === \App\Enums\ApprovalStatus::Pending)
             <div x-show="confirmModal === 'approve'" x-cloak
                  class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-overlay backdrop-blur-xs no-print"
                  @keydown.escape.window="confirmModal = null">

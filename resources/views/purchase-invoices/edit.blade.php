@@ -26,11 +26,10 @@
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-xs font-bold text-brand-500 ring-1 ring-brand-500/20 tabular-nums">
                     {{ $order->reference_no }}
                 </span>
-                <x-status-badge :status="$order->purchase_status->value" :label="$order->purchase_status->label()" />
-                <x-status-badge :status="$order->approval_status->value" :label="$order->approval_status->label()" />
+                @include('purchase-invoices.partials.consolidated-status', ['order' => $order])
             </div>
             <p class="text-xs sm:text-sm text-muted mt-1">
-                Update order details, payment status, attached documents, or line items before receiving approval.
+                Update order details, payment status, or attached documents. Line items are frozen once a purchase has taken effect.
             </p>
         </div>
 

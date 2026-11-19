@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\Location;
 use App\Models\SalesInvoice;
+use App\Models\SalesOrder;
 use App\Models\Unit;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -63,16 +64,20 @@ function salesDraftInvoice(Unit $unit, int $quantity = 2, float $rate = 500.0, a
     return $invoice->fresh();
 }
 
-it('lists sales invoices with the register and a Create Invoice button', function () {
+it('lists only order-generated invoices on the register and hides the add button', function () {
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 50]);
-    $invoice = salesDraftInvoice($unit);
+    $fromOrder = salesDraftInvoice($unit, 1, 500.0, ['sales_order_id' => SalesOrder::factory()->create()->id]);
+    $direct = salesDraftInvoice($unit, 1, 500.0);
 
     $this->get(route('sales-invoices.index'))
         ->assertOk()
-        ->assertSee($invoice->invoice_no)
-        ->assertSee('Create Invoice');
+        ->assertSee($fromOrder->invoice_no)
+        ->assertDontSee($direct->invoice_no)
+        ->assertDontSee('Create Invoice')
+        ->assertSee('Edit')
+        ->assertSee('Delete');
 });
 
 it('creates a draft invoice with items and computes totals', function () {
@@ -230,7 +235,7 @@ it('shows the invoice detail and printable pages with payment info', function ()
     $this->get(route('sales-invoices.show', $invoice))
         ->assertOk()
         ->assertSee($invoice->invoice_no)
-        ->assertSee('Record Payment')
+        ->assertDontSee('Record Payment')
         ->assertSee('Due', false)
         ->assertSee('Post Invoice');
 
@@ -245,8 +250,8 @@ it('scopes the register to the assigned location for outlet managers', function 
     $other = Location::factory()->create();
     $unit = Unit::factory()->create(['quantity' => 50]);
 
-    $myInvoice = salesDraftInvoice($unit, 1, 100.0, ['location_id' => $mine->id]);
-    $otherInvoice = salesDraftInvoice($unit, 1, 100.0, ['location_id' => $other->id]);
+    $myInvoice = salesDraftInvoice($unit, 1, 100.0, ['location_id' => $mine->id, 'sales_order_id' => SalesOrder::factory()->create()->id]);
+    $otherInvoice = salesDraftInvoice($unit, 1, 100.0, ['location_id' => $other->id, 'sales_order_id' => SalesOrder::factory()->create()->id]);
 
     $manager = User::factory()->create(['email_verified_at' => now(), 'location_id' => $mine->id]);
     $manager->assignRole('Outlet Manager');
@@ -274,8 +279,8 @@ it('scopes the register to the assigned location for outlet managers', function 
 it('shows super admins every branch in the overview', function () {
     actingAsSuperAdmin();
 
-    $a = salesDraftInvoice(Unit::factory()->create(['quantity' => 10]), 1, 100.0);
-    $b = salesDraftInvoice(Unit::factory()->create(['quantity' => 10]), 1, 100.0);
+    $a = salesDraftInvoice(Unit::factory()->create(['quantity' => 10]), 1, 100.0, ['sales_order_id' => SalesOrder::factory()->create()->id]);
+    $b = salesDraftInvoice(Unit::factory()->create(['quantity' => 10]), 1, 100.0, ['sales_order_id' => SalesOrder::factory()->create()->id]);
 
     $this->get(route('sales-invoices.index', ['branch_id' => 999]))
         ->assertOk()

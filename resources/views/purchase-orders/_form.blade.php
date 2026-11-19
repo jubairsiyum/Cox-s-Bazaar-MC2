@@ -112,16 +112,26 @@
                     <span title="Line items are frozen once the order is received."
                           class="inline-flex size-4 items-center justify-center rounded-full bg-brand-500/15 text-brand-500 text-[10px] font-bold cursor-help">i</span>
                 </label>
-                <select id="purchase_status" name="purchase_status" required
-                        class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('purchase_status') border-danger @enderror">
-                    <option value="">Please Select</option>
-                    @foreach($statuses as $value => $label)
-                        <option value="{{ $value }}" @selected($statusValue === $value)>{{ $label }}</option>
-                    @endforeach
-                </select>
-                <p class="mt-1.5 text-xs text-muted">
-                    Stock and supplier payables take effect once the order is approved and received.
-                </p>
+                @if($isEdit)
+                    <select id="purchase_status" name="purchase_status" required
+                            class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('purchase_status') border-danger @enderror">
+                        <option value="">Please Select</option>
+                        @foreach($statuses as $value => $label)
+                            <option value="{{ $value }}" @selected($statusValue === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1.5 text-xs text-muted">
+                        Stock and supplier payables follow this status: keeping "Received" holds the goods in stock, "Cancelled" reverses them.
+                    </p>
+                @else
+                    <div class="flex items-center gap-2.5 rounded-xl border border-line bg-surface px-3.5 py-2.5">
+                        <x-status-badge status="received" label="Received" />
+                        <span class="text-xs text-muted">Fixed — purchases take effect immediately.</span>
+                    </div>
+                    <p class="mt-1.5 text-xs text-muted">
+                        Stock is received and the supplier payable registers as soon as the purchase is saved.
+                    </p>
+                @endif
                 @error('purchase_status')
                     <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>
                 @enderror
@@ -462,7 +472,7 @@
                 @if($isEdit)
                     Saving updates the purchase invoice record and recalculates supplier balances where applicable.
                 @else
-                    New purchase orders are created in pending approval status until an authorized manager receives them.
+                    New purchases take effect immediately: stock and supplier payables update as soon as you save.
                 @endif
             </p>
             <div class="flex items-center justify-end gap-2.5">

@@ -19,7 +19,7 @@
                 <span class="font-medium text-ink">Sales Orders</span>
             </nav>
             <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink">Sales Orders</h1>
-            <p class="text-xs sm:text-sm text-muted mt-1">Order capture with confirm/cancel workflow and one-click invoice conversion.</p>
+            <p class="text-xs sm:text-sm text-muted mt-1">Order capture with automatic invoice generation — every saved order is invoiced and posted instantly.</p>
         </div>
 
         @can('create', \App\Models\SalesOrder::class)
@@ -48,7 +48,7 @@
         <div class="rounded-3xl border border-line bg-surface p-5 shadow-card">
             <p class="text-xs font-semibold uppercase tracking-wider text-muted">Invoiced</p>
             <p class="mt-1 text-xl font-extrabold text-ink tabular-nums">{{ $totals['invoiced'] }}</p>
-            <p class="mt-3 text-[11px] text-muted">Converted into sales invoices</p>
+            <p class="mt-3 text-[11px] text-muted">Auto-generated sales invoices</p>
         </div>
         <div class="rounded-3xl border border-danger/20 bg-danger/5 p-5 shadow-card">
             <p class="text-xs font-semibold uppercase tracking-wider text-muted">Cancelled</p>
@@ -152,9 +152,6 @@
                             <td class="py-3.5 px-5">
                                 <div class="flex items-center justify-end gap-1.5">
                                     <a href="{{ route('sales-orders.show', $order) }}" class="rounded-lg border border-line bg-soft px-2.5 py-1 text-[11px] font-semibold text-ink hover:border-brand-500 hover:text-brand-500 transition-colors">View</a>
-                                    @if($order->status !== \App\Enums\SalesOrderStatus::Invoiced && $order->status !== \App\Enums\SalesOrderStatus::Cancelled)
-                                        <a href="{{ route('sales-invoices.create', ['sales_order' => $order->id]) }}" class="rounded-lg border border-brand-500/30 bg-brand-500/10 px-2.5 py-1 text-[11px] font-semibold text-brand-500 hover:bg-brand-500/15 transition-colors">Create Invoice</a>
-                                    @endif
                                 </div>
                             </td>
                         </tr>

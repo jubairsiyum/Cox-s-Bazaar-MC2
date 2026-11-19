@@ -49,7 +49,6 @@
             'order' => $order ?? new \App\Models\PurchaseOrder,
             'suppliers' => $suppliers,
             'locations' => $locations,
-            'statuses' => $statuses,
             'items' => $items,
             'itemsEditable' => true,
         ])

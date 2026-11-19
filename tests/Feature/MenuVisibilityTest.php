@@ -54,7 +54,7 @@ it('blocks a storekeeper from sales, reports and pos pages directly', function (
 
     $this->actingAs($storekeeper);
 
-    foreach (['sales-orders.index', 'sales-invoices.index', 'sales-returns.index', 'customer-collections.index', 'reports.sales', 'pos.index'] as $routeName) {
+    foreach (['sales-orders.index', 'sales-invoices.index', 'sales-returns.index', 'collections.index', 'reports.sales', 'pos.index'] as $routeName) {
         $this->get(route($routeName))->assertForbidden();
     }
 });

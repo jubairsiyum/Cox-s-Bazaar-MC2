@@ -404,3 +404,113 @@ it('blocks double approval and shows the dynamic status labels', function () {
     $return->refresh();
     expect($return->displayStatusFor($manager)['label'])->toBe('Restocked & Completed');
 });
+
+it('lets a salesman submit a return that stays on hold', function () {
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $invoice = salesReturnParentInvoice($unit, 5, 200.0, ['paid_amount' => 1000]);
+
+    $salesman = User::factory()->create(['email_verified_at' => now()]);
+    $salesman->assignRole('Sales Staff');
+
+    $this->actingAs($salesman)
+        ->post(route('sales-returns.store'), salesReturnPayload($invoice))
+        ->assertRedirect(route('sales-returns.index'));
+
+    $return = SalesReturn::first();
+
+    expect($return)->not->toBeNull()
+        ->and($return->status->value)->toBe('pending')
+        ->and($return->created_by)->toBe($salesman->id);
+
+    // The return stays on manager hold: nothing takes effect yet.
+    expect($unit->fresh()->quantity)->toBe(50)
+        ->and((float) $invoice->fresh()->credit_amount)->toBe(0.0);
+});
+
+it('forbids a salesman from approving or rejecting a return', function () {
+    $location = Location::factory()->create();
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $invoice = salesReturnParentInvoice($unit, 5, 200.0, ['location_id' => $location->id, 'paid_amount' => 1000]);
+    $return = SalesReturn::factory()->forInvoice($invoice)->create();
+    $return->items()->create([
+        'unit_id' => $unit->id,
+        'quantity' => 2,
+        'unit_price' => 200,
+        'subtotal' => 400,
+    ]);
+    $return->update(['refund_amount' => 400]);
+
+    $salesman = User::factory()->create(['email_verified_at' => now(), 'location_id' => $location->id]);
+    $salesman->assignRole('Sales Staff');
+
+    $this->actingAs($salesman)
+        ->patch(route('sales-returns.approve', $return))
+        ->assertForbidden();
+
+    $this->actingAs($salesman)
+        ->patch(route('sales-returns.reject', $return))
+        ->assertForbidden();
+
+    expect($return->fresh()->status->value)->toBe('pending');
+});
+
+it('processes a salesman return only once the manager approves it', function () {
+    $location = Location::factory()->create();
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $invoice = salesReturnParentInvoice($unit, 5, 200.0, ['location_id' => $location->id, 'paid_amount' => 1000]);
+
+    $salesman = User::factory()->create(['email_verified_at' => now()]);
+    $salesman->assignRole('Sales Staff');
+
+    $this->actingAs($salesman)
+        ->post(route('sales-returns.store'), salesReturnPayload($invoice))
+        ->assertRedirect(route('sales-returns.index'));
+
+    $return = SalesReturn::first();
+
+    expect($return->status->value)->toBe('pending');
+
+    $manager = User::factory()->create(['email_verified_at' => now(), 'location_id' => $location->id]);
+    $manager->assignRole('Outlet Manager');
+
+    $this->actingAs($manager)
+        ->patch(route('sales-returns.approve', $return))
+        ->assertRedirect(route('sales-returns.index'));
+
+    $return->refresh();
+    $invoice = $invoice->fresh();
+
+    // Approval processes the return: restockable lines come back into stock
+    // and the invoice is credited.
+    expect($return->status->value)->toBe('completed')
+        ->and($return->approved_by)->toBe($manager->id)
+        ->and($unit->fresh()->quantity)->toBe(52)
+        ->and((float) $invoice->credit_amount)->toBe(400.0);
+});
+
+it('leaves a salesman return unprocessed when the manager rejects it', function () {
+    $location = Location::factory()->create();
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $invoice = salesReturnParentInvoice($unit, 5, 200.0, ['location_id' => $location->id, 'paid_amount' => 1000]);
+
+    $salesman = User::factory()->create(['email_verified_at' => now()]);
+    $salesman->assignRole('Sales Staff');
+
+    $this->actingAs($salesman)
+        ->post(route('sales-returns.store'), salesReturnPayload($invoice))
+        ->assertRedirect(route('sales-returns.index'));
+
+    $return = SalesReturn::first();
+
+    $manager = User::factory()->create(['email_verified_at' => now(), 'location_id' => $location->id]);
+    $manager->assignRole('Outlet Manager');
+
+    $this->actingAs($manager)
+        ->patch(route('sales-returns.reject', $return))
+        ->assertRedirect(route('sales-returns.index'));
+
+    // A rejected return never takes effect.
+    expect($return->fresh()->status->value)->toBe('rejected')
+        ->and($unit->fresh()->quantity)->toBe(50)
+        ->and((float) $invoice->fresh()->credit_amount)->toBe(0.0);
+});

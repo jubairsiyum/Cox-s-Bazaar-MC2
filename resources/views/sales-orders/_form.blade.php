@@ -284,13 +284,15 @@ function orderForm(state) {
         },
 
         async searchUnits() {
-            if (this.searchQuery.trim().length < 1) {
+            const query = this.searchQuery.trim();
+
+            if (query.length < 1) {
                 this.results = [];
                 return;
             }
 
             try {
-                const response = await fetch(@js(route('sales-orders.search-units')) + '?search=' + encodeURIComponent(this.searchQuery), {
+                const response = await fetch(@js(route('sales-orders.search-units')) + '?search=' + encodeURIComponent(query), {
                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
                 });
                 const data = await response.json();
