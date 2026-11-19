@@ -95,6 +95,11 @@ class PurchaseOrderController extends Controller
         return view('purchase-orders.create', [
             'suppliers' => Supplier::query()->orderBy('name')->get(),
             'locations' => $this->scopedLocations(),
+            'statuses' => array_filter(
+                PurchaseStatus::options(),
+                fn (string $value) => in_array($value, StorePurchaseOrderRequest::entryStatuses(), true),
+                ARRAY_FILTER_USE_KEY
+            ),
             'items' => $this->hydrateItems(collect(old('items', []))->all()),
         ]);
     }
@@ -102,23 +107,33 @@ class PurchaseOrderController extends Controller
     /**
      * Store a newly created purchase order in storage.
      *
-     * Creation is effective: the purchase is recorded as received and signed
-     * off by its creator, so stock and the supplier payable register in the
-     * same transaction. There is no separate approval step.
+     * The clerk chooses the receiving status at entry time: "Received" for
+     * goods counted in right away, "Pending"/"Ordered" for purchases still
+     * awaiting delivery. "Cancelled" is not an entry state and "Partially
+     * Received" does not exist — receipts post whole orders (there is no
+     * per-line received quantity), so a receipt is all-or-nothing. Stock
+     * posts if and only if the chosen status has received the goods
+     * ({@see PurchaseStatus::hasReceived()}); a Pending/Ordered purchase is
+     * stock-neutral until it is edited to "Received", which posts the receipt
+     * through {@see PurchaseOrderService::applyStatusChange()}. The supplier
+     * payable still registers at creation — it follows the committed purchase
+     * and is released again on cancellation, only stock follows the receiving
+     * status.
      */
     public function store(StorePurchaseOrderRequest $request): RedirectResponse
     {
         $validated = $request->validated();
         $items = $validated['items'];
+        $purchaseStatus = PurchaseStatus::from($validated['purchase_status']);
 
         try {
-            $order = DB::transaction(function () use ($request, $validated, $items) {
+            $order = DB::transaction(function () use ($request, $validated, $items, $purchaseStatus) {
                 $order = PurchaseOrder::create([
                     'reference_no' => $validated['reference_no'] ?? null,
                     'order_date' => $validated['order_date'],
                     'supplier_id' => $validated['supplier_id'],
                     'location_id' => $validated['location_id'],
-                    'purchase_status' => PurchaseStatus::Received,
+                    'purchase_status' => $purchaseStatus,
                     'approval_status' => ApprovalStatus::Approved,
                     'approved_by' => $request->user()->id,
                     'approved_at' => now(),
@@ -146,7 +161,9 @@ class PurchaseOrderController extends Controller
         AuditService::created($order, "Purchase order '{$order->reference_no}' created.");
 
         return redirect()->route('purchase-invoices.index')
-            ->with('success', "Purchase order '{$order->reference_no}' created. Stock received and supplier due updated.");
+            ->with('success', $order->purchase_status->hasReceived()
+                ? "Purchase order '{$order->reference_no}' created. Stock received and supplier due updated."
+                : "Purchase order '{$order->reference_no}' created as {$order->purchase_status->label()}. Stock will post once it is marked Received.");
     }
 
     /**
@@ -170,7 +187,7 @@ class PurchaseOrderController extends Controller
     {
         $this->authorize('update', $purchaseOrder);
 
-        $itemsEditable = $purchaseOrder->approval_status !== ApprovalStatus::Approved;
+        $itemsEditable = ! $purchaseOrder->purchase_status->hasReceived();
 
         $items = $itemsEditable && $this->oldItems() !== []
             ? $this->hydrateItems($this->oldItems())
@@ -194,7 +211,7 @@ class PurchaseOrderController extends Controller
         $original = $purchaseOrder->getOriginal();
         $fromStatus = PurchaseStatus::from((string) $purchaseOrder->getRawOriginal('purchase_status'));
         $validated = $request->validated();
-        $itemsEditable = $purchaseOrder->approval_status !== ApprovalStatus::Approved;
+        $itemsEditable = ! $purchaseOrder->purchase_status->hasReceived();
         $items = $itemsEditable ? $validated['items'] : [];
 
         try {
@@ -433,18 +450,17 @@ class PurchaseOrderController extends Controller
     /**
      * Purchase statuses selectable when editing a purchase. Effective
      * (approved) purchases — every document created under the current
-     * lifecycle — may only stay received or be cancelled; legacy documents
-     * still awaiting sign-off keep their pre-receipt options.
+     * lifecycle — may move anywhere in the receiving workflow; stock follows
+     * the received/not-received transitions. Legacy documents still awaiting
+     * sign-off keep their pre-receipt options ("Received" is only reachable
+     * for them through the approval action).
      *
      * @return array<string, string>
      */
     private function editStatusOptions(PurchaseOrder $order): array
     {
         if ($order->approval_status === ApprovalStatus::Approved) {
-            return [
-                PurchaseStatus::Received->value => PurchaseStatus::Received->label(),
-                PurchaseStatus::Cancelled->value => PurchaseStatus::Cancelled->label(),
-            ];
+            return PurchaseStatus::options();
         }
 
         return array_filter(

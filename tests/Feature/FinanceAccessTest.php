@@ -18,8 +18,7 @@ function financeRouteNames(): array
     return [
         'cash-accounts.index',
         'bank-accounts.index',
-        'income-transactions.index',
-        'expense-transactions.index',
+        'transactions.index',
         'account-transfers.index',
         'supplier-payments.index',
     ];
@@ -47,6 +46,7 @@ it('shows the finance menu when finance permissions are granted', function () {
         ->assertOk()
         ->assertSee('Finance')
         ->assertSee('Cash Accounts')
+        ->assertSee('Transactions')
         ->assertSee('Supplier Payments');
 });
 
@@ -81,12 +81,33 @@ it('allows an accountant to access finance pages', function () {
     }
 });
 
+it('redirects the legacy income and expense pages to the merged transactions section', function () {
+    actingAsSuperAdmin();
+
+    $this->get('/income-transactions')->assertRedirect(route('transactions.index'));
+    $this->get('/expense-transactions')->assertRedirect(route('transactions.index'));
+});
+
+it('blocks the legacy income and expense pages for users without finance permissions', function () {
+    $storekeeper = User::factory()->create();
+    $storekeeper->assignRole('Storekeeper');
+
+    $this->actingAs($storekeeper);
+
+    $this->get('/income-transactions')->assertForbidden();
+    $this->get('/expense-transactions')->assertForbidden();
+});
+
 it('verifies the finance menu gates in MenuHelper', function () {
     $financeNav = collect(MenuHelper::getMainNavItems())->firstWhere('name', 'Finance');
 
     expect($financeNav)->not->toBeNull()
         ->and($financeNav['canany'])->toContain('finance.view')
         ->and($financeNav['canany'])->toContain('finance.manage');
+
+    $subItemNames = collect($financeNav['subItems'])->pluck('name')->all();
+
+    expect($subItemNames)->toBe(['Cash Accounts', 'Bank Accounts', 'Transactions', 'Transfers', 'Supplier Payments']);
 
     foreach ($financeNav['subItems'] as $subItem) {
         expect($subItem)->toHaveKey('canany');

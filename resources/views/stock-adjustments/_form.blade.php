@@ -85,10 +85,10 @@
                         class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all cursor-pointer @error('location_id') border-danger @enderror">
                     <option value="">Please Select</option>
                     @foreach($locations as $location)
-                        <option value="{{ $location->id }}" @selected((string) old('location_id', $isEdit ? $stockAdjustment->location_id : (auth()->user()->location_id ?? '')) === (string) $location->id)>{{ $location->name }}</option>
+                        <option value="{{ $location->id }}" @selected((string) old('location_id', $isEdit ? $stockAdjustment->location_id : (auth()->user()->branch_id ?? '')) === (string) $location->id)>{{ $location->name }}</option>
                     @endforeach
                 </select>
-                <p class="mt-1.5 text-xs text-muted leading-snug">The location this adjustment is booked against. It is applied to stock only after approval.</p>
+                <p class="mt-1.5 text-xs text-muted leading-snug">The location this adjustment is booked against. Its stock effect is applied immediately when saved.</p>
                 @error('location_id')
                     <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
                 @enderror

@@ -3,10 +3,11 @@
 
     The approval dimension and the purchase dimension are merged so exactly one
     badge renders at a time. Purchases take effect on creation, so new documents
-    always read as their purchase status ("Received", or "Cancelled" when
-    reversed). The approval branches remain only for legacy rows created before
-    that lifecycle: "Rejected" for a refused approval and "Awaiting Approval"
-    while a legacy sign-off is still pending.
+    always read as their clerk-chosen purchase status ("Received", "Ordered" or
+    "Pending" while the goods are still out, "Cancelled" when reversed). The
+    approval branches remain only for legacy rows created before that
+    lifecycle: "Rejected" for a refused approval and "Awaiting Approval" while
+    a legacy sign-off is still pending.
 --}}
 @php
     [$status, $label] = match (true) {

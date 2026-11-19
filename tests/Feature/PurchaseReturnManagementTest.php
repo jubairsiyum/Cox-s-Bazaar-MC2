@@ -179,7 +179,7 @@ it('applies the return at submission, moving stock and the supplier return due',
 it("applies the creating manager's own return right away with no self-approval step", function () {
     $unit = Unit::factory()->create(['quantity' => 50]);
     $order = returnParentOrder($unit);
-    $manager = purchaseReturnTeamUser('Outlet Manager', ['location_id' => $order->location_id]);
+    $manager = purchaseReturnTeamUser('Outlet Manager', ['branch_id' => $order->location_id]);
 
     $this->actingAs($manager)
         ->post(route('purchase-returns.store'), purchaseReturnPayload($order))
@@ -305,8 +305,8 @@ it('sends no approval notifications anywhere in the return flow', function () {
 
     // The old awaiting-approval audience still exists, but nothing awaits
     // approval anymore: a submitted return is already applied.
-    purchaseReturnTeamUser('Outlet Manager', ['location_id' => $order->location_id]);
-    purchaseReturnTeamUser('Outlet Manager', ['location_id' => Location::factory()->create()->id]);
+    purchaseReturnTeamUser('Outlet Manager', ['branch_id' => $order->location_id]);
+    purchaseReturnTeamUser('Outlet Manager', ['branch_id' => Location::factory()->create()->id]);
 
     $this->post(route('purchase-returns.store'), purchaseReturnPayload($order))
         ->assertRedirect(route('purchase-returns.index'));

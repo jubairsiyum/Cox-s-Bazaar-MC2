@@ -65,22 +65,11 @@
                     <label for="branch_id" class="form-label">Branch</label>
                     <select id="branch_id" name="branch_id" class="form-select @error('branch_id') is-invalid @enderror">
                         <option value="">— Select —</option>
-                        @foreach($branches as $branch)
-                            <option value="{{ $branch->id }}" @selected(old('branch_id') == $branch->id)>{{ $branch->name }}</option>
+                        @foreach($locations as $location)
+                            <option value="{{ $location->id }}" @selected(old('branch_id') == $location->id)>{{ $location->name }}</option>
                         @endforeach
                     </select>
                     @error('branch_id')<div class="form-error">{{ $message }}</div>@enderror
-                </div>
-
-                <div class="form-group">
-                    <label for="location_id" class="form-label">Assigned Location (for Outlet Managers)</label>
-                    <select id="location_id" name="location_id" class="form-select @error('location_id') is-invalid @enderror">
-                        <option value="">— Select —</option>
-                        @foreach($locations as $location)
-                            <option value="{{ $location->id }}" @selected(old('location_id') == $location->id)>{{ $location->name }}</option>
-                        @endforeach
-                    </select>
-                    @error('location_id')<div class="form-error">{{ $message }}</div>@enderror
                 </div>
             </div>
 

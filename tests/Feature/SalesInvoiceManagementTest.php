@@ -214,6 +214,43 @@ it('locks posted invoices from editing and deletion', function () {
     $this->delete(route('sales-invoices.destroy', $invoice))->assertForbidden();
 });
 
+it('lets a super admin open the edit form of a draft invoice', function () {
+    // Regression: the Super Admin's Gate bypass makes @can('update') true for
+    // every invoice, which used to surface an Edit button on locked invoices
+    // that then 403'd. Draft invoices must edit fine and locked ones must not
+    // offer the action at all.
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $invoice = salesDraftInvoice($unit);
+
+    $this->get(route('sales-invoices.edit', $invoice))
+        ->assertOk()
+        ->assertSee('Edit Sales Invoice')
+        ->assertSee($invoice->invoice_no);
+});
+
+it('hides the edit and delete actions for invoices that are no longer editable', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $draft = salesDraftInvoice($unit, 1, 100.0, ['sales_order_id' => SalesOrder::factory()->create()->id]);
+    $posted = salesDraftInvoice($unit, 1, 100.0, ['sales_order_id' => SalesOrder::factory()->create()->id, 'status' => 'posted']);
+
+    $this->get(route('sales-invoices.index'))
+        ->assertOk()
+        ->assertSee(route('sales-invoices.edit', $draft), false)
+        ->assertDontSee(route('sales-invoices.edit', $posted), false);
+
+    $this->get(route('sales-invoices.show', $posted))
+        ->assertOk()
+        ->assertDontSee(route('sales-invoices.edit', $posted), false);
+
+    $this->get(route('sales-invoices.show', $draft))
+        ->assertOk()
+        ->assertSee(route('sales-invoices.edit', $draft), false);
+});
+
 it('deletes a draft invoice', function () {
     actingAsSuperAdmin();
 
@@ -253,7 +290,7 @@ it('scopes the register to the assigned location for outlet managers', function 
     $myInvoice = salesDraftInvoice($unit, 1, 100.0, ['location_id' => $mine->id, 'sales_order_id' => SalesOrder::factory()->create()->id]);
     $otherInvoice = salesDraftInvoice($unit, 1, 100.0, ['location_id' => $other->id, 'sales_order_id' => SalesOrder::factory()->create()->id]);
 
-    $manager = User::factory()->create(['email_verified_at' => now(), 'location_id' => $mine->id]);
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $mine->id]);
     $manager->assignRole('Outlet Manager');
     $manager->givePermissionTo(['sales-invoices.view', 'sales-invoices.manage', 'sales-invoices.post']);
 
@@ -322,7 +359,7 @@ it('scopes the sales invoice export to the assigned location for outlet managers
     $myInvoice = salesDraftInvoice($unit, 1, 100.0, ['location_id' => $mine->id]);
     $otherInvoice = salesDraftInvoice($unit, 1, 100.0, ['location_id' => $other->id]);
 
-    $manager = User::factory()->create(['email_verified_at' => now(), 'location_id' => $mine->id]);
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $mine->id]);
     $manager->assignRole('Outlet Manager');
     $manager->givePermissionTo(['sales-invoices.view', 'sales-invoices.manage', 'sales-invoices.post']);
 

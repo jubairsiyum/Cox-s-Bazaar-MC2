@@ -26,10 +26,18 @@ class UpdatePurchaseOrderRequest extends FormRequest
         $order = $this->route('purchaseOrder');
         $approved = $order->approval_status === ApprovalStatus::Approved;
 
-        // "Received" is only reachable through the approval action; an approved
-        // purchase keeps its status and may only be cancelled afterwards.
+        // Effective (approved) purchases carry their clerk-chosen receiving
+        // status and may move anywhere in the receiving workflow; stock
+        // follows the received/not-received transitions. Legacy documents
+        // still awaiting sign-off keep their pre-receipt options — "Received"
+        // is only reachable for them through the approval action.
         $allowedStatuses = $approved
-            ? [PurchaseStatus::Received->value, PurchaseStatus::Cancelled->value]
+            ? [
+                PurchaseStatus::Pending->value,
+                PurchaseStatus::Ordered->value,
+                PurchaseStatus::Received->value,
+                PurchaseStatus::Cancelled->value,
+            ]
             : [PurchaseStatus::Pending->value, PurchaseStatus::Ordered->value, PurchaseStatus::Cancelled->value];
 
         $rules = [
@@ -43,9 +51,9 @@ class UpdatePurchaseOrderRequest extends FormRequest
             'document' => ['nullable', 'file', 'max:5120', 'mimes:pdf,csv,zip,doc,docx,jpeg,jpg,png'],
         ];
 
-        // Line items are only editable before approval; once the purchase has
-        // been approved and received the quantities are frozen.
-        if (! $approved) {
+        // Line items are only editable before the goods are received; once a
+        // receipt has posted stock for the stored quantities they are frozen.
+        if (! $order->purchase_status->hasReceived()) {
             $rules = array_merge($rules, [
                 'items' => ['required', 'array', 'min:1'],
                 'items.*.unit_id' => ['required', 'integer', 'exists:units,id', 'distinct'],

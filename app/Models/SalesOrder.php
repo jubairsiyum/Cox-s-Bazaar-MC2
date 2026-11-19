@@ -30,6 +30,8 @@ class SalesOrder extends Model
         'tax_rate',
         'tax_amount',
         'grand_total',
+        'payment_method',
+        'paid_at',
         'note',
         'created_by',
     ];
@@ -45,6 +47,7 @@ class SalesOrder extends Model
             'tax_rate' => 'decimal:2',
             'tax_amount' => 'decimal:2',
             'grand_total' => 'decimal:2',
+            'paid_at' => 'datetime',
         ];
     }
 

@@ -334,7 +334,7 @@
                   <p class="truncate text-[11px] text-muted tabular-nums">{{ $b['amount'] }}</p>
                 </div>
               </div>
-              <span class="ml-1.5 shrink-0 text-xs font-bold tabular-nums" style="color: {{ $b['colorHex'] }}">
+              <span class="ml-1.5 shrink-0 text-xs font-bold tabular-nums" :style="{ color: '{{ $b['colorHex'] }}' }">
                 {{ rtrim(rtrim(number_format((float) $b['share'], 1, '.', ''), '0'), '.') }}%
               </span>
             </button>
@@ -431,7 +431,7 @@
                           </p>
                         </div>
                       </div>
-                      <span class="shrink-0 text-xs font-bold tabular-nums" style="color: {{ $ob['colorHex'] }}">
+                      <span class="shrink-0 text-xs font-bold tabular-nums" :style="{ color: '{{ $ob['colorHex'] }}' }">
                         {{ rtrim(rtrim(number_format((float) $ob['share'], 1, '.', ''), '0'), '.') }}%
                       </span>
                     </button>
@@ -525,7 +525,7 @@
 
                 <div class="text-right shrink-0">
                   <p class="text-xs font-bold text-ink tabular-nums">{{ $b['amount'] }}</p>
-                  <p class="text-[11px] font-bold tabular-nums" style="color: {{ $b['colorHex'] }}">
+                  <p class="text-[11px] font-bold tabular-nums" :style="{ color: '{{ $b['colorHex'] }}' }">
                     {{ rtrim(rtrim(number_format((float) $b['share'], 1, '.', ''), '0'), '.') }}%
                   </p>
                 </div>
@@ -535,7 +535,7 @@
               <div class="mt-2.5 flex items-center gap-2">
                 <div class="h-1.5 flex-1 rounded-full bg-soft overflow-hidden">
                   <div class="h-full rounded-full transition-all duration-500"
-                    style="width: {{ $barPct }}%; background-color: {{ $b['colorHex'] }};"></div>
+                    :style="{ width: '{{ $barPct }}%', backgroundColor: '{{ $b['colorHex'] }}' }"></div>
                 </div>
                 <span class="text-[10px] font-semibold text-muted opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                   View trend &rarr;

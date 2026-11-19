@@ -27,37 +27,19 @@ class StockAdjustmentPolicy
     }
 
     /**
-     * Only pending adjustments are editable: once approved the stock effect
-     * is posted and the request becomes immutable.
+     * Applied adjustments are editable while their stock effect can still be
+     * reversed safely; the controller enforces the state guard with a friendly
+     * message. There is no approval step anymore.
      */
     public function update(User $user, StockAdjustment $stockAdjustment): bool
     {
         return $user->can('stock-adjustments.manage')
-            && LocationScope::canAccess($user, $stockAdjustment->location_id)
-            && $stockAdjustment->isPending();
+            && LocationScope::canAccess($user, $stockAdjustment->location_id);
     }
 
     public function delete(User $user, StockAdjustment $stockAdjustment): bool
     {
         return $user->can('stock-adjustments.manage')
             && LocationScope::canAccess($user, $stockAdjustment->location_id);
-    }
-
-    /**
-     * Approve (apply) an adjustment: managers of the location or branch
-     * where it happened, plus head-office roles.
-     */
-    public function approve(User $user, StockAdjustment $stockAdjustment): bool
-    {
-        return $user->can('stock-adjustments.manage')
-            && LocationScope::canAccess($user, $stockAdjustment->location_id);
-    }
-
-    /**
-     * Reject an adjustment request: same audience as approval.
-     */
-    public function reject(User $user, StockAdjustment $stockAdjustment): bool
-    {
-        return $this->approve($user, $stockAdjustment);
     }
 }

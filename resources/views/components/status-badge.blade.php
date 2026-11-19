@@ -1,7 +1,11 @@
 @props(['status', 'label' => null])
 
 @php
-$classes = match($status) {
+$statusValue = $status instanceof \BackedEnum
+    ? $status->value
+    : ($status instanceof \UnitEnum ? $status->name : (string) $status);
+
+$classes = match(strtolower((string) $statusValue)) {
     'active', 'posted', 'paid', 'delivered', 'completed', 'received', 'approved' => 'badge-success',
     'draft', 'pending' => 'badge-neutral',
     'confirmed', 'partially_paid', 'partial', 'in-transit', 'ordered', 'awaiting-approval' => 'badge-info',
@@ -9,7 +13,14 @@ $classes = match($status) {
     'returned', 'reversed', 'due' => 'badge-warning',
     default => 'badge-neutral',
 };
-$label = $label ?? ucfirst(str_replace('_', ' ', $status));
+
+if ($label === null) {
+    if ($status instanceof \BackedEnum && method_exists($status, 'label')) {
+        $label = $status->label();
+    } else {
+        $label = ucfirst(str_replace(['_', '-'], ' ', (string) $statusValue));
+    }
+}
 @endphp
 
 <span class="badge {{ $classes }}">{{ $label }}</span>

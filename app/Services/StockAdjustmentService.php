@@ -16,9 +16,9 @@ use App\Models\Unit;
  *  - Remove: stock goes down by the entered quantity
  *  - Set:    stock is corrected to the entered (counted) quantity
  *
- * An adjustment only touches stock once it is approved; `apply()` then
- * re-computes each line against the stock level at approval time and stores
- * the before/after snapshot on the line, so an approved adjustment can be
+ * An adjustment touches stock the moment it is saved; `apply()` re-computes
+ * each line against the stock level at that moment and stores the
+ * before/after snapshot on the line, so an applied adjustment can be
  * reversed exactly as long as nothing has moved since.
  */
 class StockAdjustmentService
@@ -37,7 +37,7 @@ class StockAdjustmentService
 
     /**
      * Post the stock effect of every line (called when the adjustment is
-     * approved). Each line captures the stock level before and after posting.
+     * saved). Each line captures the stock level before and after posting.
      */
     public static function apply(StockAdjustment $adjustment): void
     {
@@ -73,7 +73,7 @@ class StockAdjustmentService
     /**
      * Replace the line items of an adjustment with a preview of the stock
      * level before and after each line (final values are captured when the
-     * adjustment is approved).
+     * adjustment is applied).
      *
      * @param  array<int, array<string, mixed>>  $rows
      */

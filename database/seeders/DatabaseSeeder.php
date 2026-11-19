@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
             BrandSeeder::class,
             UnitSeeder::class,
             LocationSeeder::class,
+            AccountSeeder::class,
         ]);
     }
 }

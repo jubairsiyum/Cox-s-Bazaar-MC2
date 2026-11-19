@@ -1,8 +1,7 @@
 <?php
 
-use App\Models\Branch;
+use App\Models\Location;
 use App\Models\User;
-use Database\Seeders\BranchSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 
 beforeEach(function () {
@@ -44,21 +43,22 @@ it('creates a user and assigns roles', function () {
     $this->assertTrue($user->hasRole('Manager'));
 });
 
-it('lists the seeded branches in the add user form', function () {
+it('lists the branches (outlet locations) in the add user form', function () {
     actingAsSuperAdmin();
-    $this->seed(BranchSeeder::class);
+
+    Location::factory()->create(['name' => 'Sadar Outlet']);
+    Location::factory()->create(['name' => 'Chakaria Outlet']);
 
     $this->get(route('users.create'))
         ->assertOk()
-        ->assertSee('Head Office')
-        ->assertSee('Sadar Outlet');
+        ->assertSee('Sadar Outlet')
+        ->assertSee('Chakaria Outlet');
 });
 
-it('creates a user with a branch assignment', function () {
+it('creates a user with roles and a branch assignment', function () {
     actingAsSuperAdmin();
-    $this->seed(BranchSeeder::class);
 
-    $branch = Branch::where('name', 'Sadar Outlet')->first();
+    $branch = Location::factory()->create(['name' => 'Sadar Outlet']);
 
     $this->post(route('users.store'), [
         'name' => 'Branch User',
@@ -68,9 +68,49 @@ it('creates a user with a branch assignment', function () {
         'password_confirmation' => 'Password@123',
         'status' => 'active',
         'branch_id' => $branch->id,
+        'roles' => ['Outlet Manager'],
     ])->assertRedirect(route('users.index'));
 
-    expect(User::where('email', 'branch-user@example.com')->first()?->branch_id)->toBe($branch->id);
+    $user = User::where('email', 'branch-user@example.com')->first();
+
+    expect($user)->not->toBeNull()
+        ->and($user->branch_id)->toBe($branch->id)
+        ->and($user->hasRole('Outlet Manager'))->toBeTrue();
+});
+
+it('offers a single Branch field and no location field on the user forms', function () {
+    actingAsSuperAdmin();
+
+    $branch = Location::factory()->create();
+    $user = User::factory()->create(['branch_id' => $branch->id]);
+
+    foreach ([route('users.create'), route('users.edit', $user)] as $url) {
+        $this->get($url)
+            ->assertOk()
+            ->assertSee('name="branch_id"', false)
+            ->assertDontSee('name="location_id"', false);
+    }
+});
+
+it('shows the branch on the users list and filters users by branch', function () {
+    actingAsSuperAdmin();
+
+    $sadar = Location::factory()->create(['name' => 'Sadar Outlet']);
+    $chakaria = Location::factory()->create(['name' => 'Chakaria Outlet']);
+
+    $sadarUser = User::factory()->create(['name' => 'Sadar Staff', 'branch_id' => $sadar->id]);
+    $chakariaUser = User::factory()->create(['name' => 'Chakaria Staff', 'branch_id' => $chakaria->id]);
+
+    $this->get(route('users.index'))
+        ->assertOk()
+        ->assertSee('<td data-label="Branch">Sadar Outlet</td>', false)
+        ->assertSee('<td data-label="Branch">Chakaria Outlet</td>', false);
+
+    $this->get(route('users.index', ['branch_id' => $sadar->id]))
+        ->assertOk()
+        ->assertSee('name="branch_id"', false)
+        ->assertSee($sadarUser->name)
+        ->assertDontSee($chakariaUser->name);
 });
 
 it('automatically verifies provisioned accounts created outside the admin UI', function () {

@@ -197,9 +197,14 @@
                                 <div class="flex items-center justify-end gap-1.5">
                                     <a href="{{ route('sales-invoices.show', $invoice) }}" class="rounded-lg border border-line bg-soft px-2.5 py-1 text-[11px] font-semibold text-ink hover:border-brand-500 hover:text-brand-500 transition-colors">View</a>
                                     <a href="{{ route('sales-invoices.print', $invoice) }}" target="_blank" class="rounded-lg border border-line bg-soft px-2.5 py-1 text-[11px] font-semibold text-ink hover:border-brand-500 hover:text-brand-500 transition-colors">Print</a>
-                                    @can('update', $invoice)
-                                        <a href="{{ route('sales-invoices.edit', $invoice) }}" class="rounded-lg border border-line bg-soft px-2.5 py-1 text-[11px] font-semibold text-ink hover:border-brand-500 hover:text-brand-500 transition-colors">Edit</a>
-                                    @endcan
+                                    {{-- Edit/Delete only for draft invoices: the rule lives in the
+                                         policy, but the Super Admin's Gate bypass makes @can always
+                                         true, so the document state is checked explicitly too. --}}
+                                    @if($invoice->status->isEditable())
+                                        @can('update', $invoice)
+                                            <a href="{{ route('sales-invoices.edit', $invoice) }}" class="rounded-lg border border-line bg-soft px-2.5 py-1 text-[11px] font-semibold text-ink hover:border-brand-500 hover:text-brand-500 transition-colors">Edit</a>
+                                        @endcan
+                                    @endif
                                     @can('post', $invoice)
                                         @if($invoice->status->value === 'draft')
                                             <form method="POST" action="{{ route('sales-invoices.post', $invoice) }}" class="inline" onsubmit="return confirm('Post this invoice? Stock will be issued.')">
@@ -218,13 +223,15 @@
                                             </form>
                                         @endif
                                     @endcan
-                                    @can('delete', $invoice)
-                                        <form method="POST" action="{{ route('sales-invoices.destroy', $invoice) }}" class="inline" onsubmit="return confirm('Delete this draft invoice? This cannot be undone.')">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="rounded-lg border border-danger/30 px-2.5 py-1 text-[11px] font-semibold text-danger hover:bg-danger/10 transition-colors cursor-pointer">Delete</button>
-                                        </form>
-                                    @endcan
+                                    @if($invoice->status->isEditable())
+                                        @can('delete', $invoice)
+                                            <form method="POST" action="{{ route('sales-invoices.destroy', $invoice) }}" class="inline" onsubmit="return confirm('Delete this draft invoice? This cannot be undone.')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="rounded-lg border border-danger/30 px-2.5 py-1 text-[11px] font-semibold text-danger hover:bg-danger/10 transition-colors cursor-pointer">Delete</button>
+                                            </form>
+                                        @endcan
+                                    @endif
                                 </div>
                             </td>
                         </tr>

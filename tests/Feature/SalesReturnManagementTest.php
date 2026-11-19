@@ -136,7 +136,7 @@ it('notifies the responsible branch managers when a return awaits approval', fun
     $unit = Unit::factory()->create(['quantity' => 50]);
     $invoice = salesReturnParentInvoice($unit, 5, 200.0, ['location_id' => $location->id]);
 
-    $manager = User::factory()->create(['email_verified_at' => now(), 'location_id' => $location->id]);
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
     $manager->assignRole('Outlet Manager');
 
     $salesUser = User::factory()->create(['email_verified_at' => now()]);
@@ -170,7 +170,7 @@ it('approves a restocked return: stock comes back and the invoice is credited', 
     ]);
     $return->update(['refund_amount' => 400]);
 
-    $manager = User::factory()->create(['email_verified_at' => now(), 'location_id' => $location->id]);
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
     $manager->assignRole('Outlet Manager');
 
     $this->actingAs($manager)
@@ -243,7 +243,7 @@ it('rejects a return without any effect and tells the creator', function () {
     ]);
     $return->update(['refund_amount' => 400]);
 
-    $manager = User::factory()->create(['email_verified_at' => now(), 'location_id' => $location->id]);
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
     $manager->assignRole('Outlet Manager');
 
     $this->actingAs($manager)
@@ -270,7 +270,7 @@ it('lets the responsible branch manager approve but not another branch manager',
     $myReturn = SalesReturn::factory()->forInvoice($myInvoice)->create(['refund_amount' => 200]);
     $otherReturn = SalesReturn::factory()->forInvoice($otherInvoice)->create(['refund_amount' => 200]);
 
-    $manager = User::factory()->create(['email_verified_at' => now(), 'location_id' => $mine->id]);
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $mine->id]);
     $manager->assignRole('Outlet Manager');
 
     // The branch manager can open the return from the notification link and
@@ -303,7 +303,7 @@ it('scopes the return register to the assigned branch/location', function () {
     $myReturn = SalesReturn::factory()->forInvoice($myInvoice)->create();
     $otherReturn = SalesReturn::factory()->forInvoice($otherInvoice)->create();
 
-    $manager = User::factory()->create(['email_verified_at' => now(), 'location_id' => $mine->id]);
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $mine->id]);
     $manager->assignRole('Outlet Manager');
     $manager->givePermissionTo('sales-returns.manage');
 
@@ -391,7 +391,7 @@ it('blocks double approval and shows the dynamic status labels', function () {
         'subtotal' => 200,
     ]);
 
-    $manager = User::factory()->create(['email_verified_at' => now(), 'location_id' => $location->id]);
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
     $manager->assignRole('Outlet Manager');
 
     expect($return->displayStatusFor($manager)['label'])->toBe('Awaiting Approval')
@@ -440,7 +440,7 @@ it('forbids a salesman from approving or rejecting a return', function () {
     ]);
     $return->update(['refund_amount' => 400]);
 
-    $salesman = User::factory()->create(['email_verified_at' => now(), 'location_id' => $location->id]);
+    $salesman = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
     $salesman->assignRole('Sales Staff');
 
     $this->actingAs($salesman)
@@ -470,7 +470,7 @@ it('processes a salesman return only once the manager approves it', function () 
 
     expect($return->status->value)->toBe('pending');
 
-    $manager = User::factory()->create(['email_verified_at' => now(), 'location_id' => $location->id]);
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
     $manager->assignRole('Outlet Manager');
 
     $this->actingAs($manager)
@@ -502,7 +502,7 @@ it('leaves a salesman return unprocessed when the manager rejects it', function 
 
     $return = SalesReturn::first();
 
-    $manager = User::factory()->create(['email_verified_at' => now(), 'location_id' => $location->id]);
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
     $manager->assignRole('Outlet Manager');
 
     $this->actingAs($manager)

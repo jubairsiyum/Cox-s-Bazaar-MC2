@@ -15,12 +15,16 @@
   </button>
 
   {{-- Search pill --}}
-  <label class="flex h-11 w-full max-w-xs items-center gap-3 rounded-full bg-surface px-4 text-muted shadow-card transition-shadow focus-within:ring-2 focus-within:ring-brand-500/20">
-    <x-icon name="search" class="size-4.5 shrink-0 text-muted" />
-    <input type="search"
-           placeholder="Search..."
-           class="w-full bg-transparent text-sm text-ink outline-none placeholder:text-muted">
-  </label>
+  <form method="GET" action="{{ route('products.index') }}" class="w-full max-w-xs">
+    <label class="flex h-11 w-full items-center gap-3 rounded-full bg-surface px-4 text-muted shadow-card transition-shadow focus-within:ring-2 focus-within:ring-brand-500/20 cursor-text">
+      <x-icon name="search" class="size-4.5 shrink-0 text-muted" />
+      <input type="search"
+             name="search"
+             value="{{ request()->routeIs('products.index') ? request('search') : '' }}"
+             placeholder="Search products, IMEIs... (Enter)"
+             class="w-full bg-transparent text-sm text-ink outline-none placeholder:text-muted">
+    </label>
+  </form>
 
   <div class="ml-auto flex items-center gap-2.5 sm:gap-3">
     {{-- Dark mode toggle --}}

@@ -8,6 +8,7 @@ import initCharts from "./components/chart";
 import registerUi from "./ui";
 import { initThemedSelects } from "./ui/themed-select";
 import { registerMotion, startMotion, themeSwitch } from "./motion";
+import errorScene from "./error-scene";
 
 Alpine.plugin(persist);
 
@@ -189,6 +190,8 @@ Alpine.store('theme', {
 
 registerMotion(Alpine);
 startMotion();
+
+Alpine.data("errorScene", errorScene);
 
 // Start Alpine
 Alpine.start();

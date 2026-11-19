@@ -14,7 +14,7 @@ enum SalesOrderStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::Draft => 'Draft',
+            self::Draft => 'Awaiting Payment',
             self::Confirmed => 'Confirmed',
             self::Invoiced => 'Invoiced',
             self::Cancelled => 'Cancelled',

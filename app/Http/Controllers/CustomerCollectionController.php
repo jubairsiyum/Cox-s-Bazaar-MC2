@@ -82,7 +82,7 @@ class CustomerCollectionController extends Controller
             'locations' => Location::query()->active()->orderBy('name')->get(['id', 'name']),
             'invoices' => $this->openInvoicesList($customerId, Auth::user()),
             'preselectedInvoiceId' => $invoice !== null && (int) $invoice->customer_id === $customerId ? $invoice->id : null,
-            'defaultLocationId' => old('location_id') ?: Auth::user()?->location_id,
+            'defaultLocationId' => old('location_id') ?: Auth::user()?->branch_id,
         ]);
     }
 
@@ -106,7 +106,8 @@ class CustomerCollectionController extends Controller
                 'reference_no' => $validated['reference_no'] ?? null,
                 'note' => $validated['note'] ?? null,
                 'location_id' => $validated['location_id'],
-                'branch_id' => $request->user()?->branch_id,
+                // The creator's branch: the branch of their assigned outlet.
+                'branch_id' => $request->user()?->branch?->branch_id,
                 'created_by' => $request->user()?->id,
             ]);
 

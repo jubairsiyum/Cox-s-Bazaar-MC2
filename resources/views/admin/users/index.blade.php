@@ -27,6 +27,12 @@
                     <option value="{{ $role->name }}" @selected(request('role') === $role->name)>{{ $role->name }}</option>
                 @endforeach
             </select>
+            <select name="branch_id" class="form-select" onchange="this.form.submit()" style="min-width:160px;">
+                <option value="">All Branches</option>
+                @foreach($locations as $location)
+                    <option value="{{ $location->id }}" @selected(request('branch_id') == $location->id)>{{ $location->name }}</option>
+                @endforeach
+            </select>
             <select name="status" class="form-select" onchange="this.form.submit()" style="min-width:130px;">
                 <option value="">All Statuses</option>
                 <option value="active" @selected(request('status') === 'active')>Active</option>
@@ -42,6 +48,7 @@
                         <th>User</th>
                         <th>Phone</th>
                         <th>Roles</th>
+                        <th>Branch</th>
                         <th>Status</th>
                         <th>Last Login</th>
                         <th style="text-align:right;">Actions</th>
@@ -74,6 +81,7 @@
                                     @endforelse
                                 </div>
                             </td>
+                            <td data-label="Branch">{{ $user->branch?->name ?: '—' }}</td>
                             <td data-label="Status"><x-status-badge :status="$user->status->value" /></td>
                             <td data-label="Last Login">{{ $user->last_login_at ? $user->last_login_at->diffForHumans() : 'Never' }}</td>
                             <td data-label="" style="text-align:right;white-space:nowrap;">
@@ -100,7 +108,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" data-label=""><x-empty-state message="No users found." /></td>
+                            <td colspan="7" data-label=""><x-empty-state message="No users found." /></td>
                         </tr>
                     @endforelse
                 </tbody>

@@ -4,52 +4,33 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\Location;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
- * Shared lookup for the managers responsible for a branch/location.
+ * Shared lookup for the users responsible for a branch (outlet location).
  *
- * "Managers of a branch/location" are the active users whose location_id or
- * branch_id matches — either field may be set on a user and both are honoured,
- * so outlet managers tied to a location and branch staff tied only to a branch
- * are found alike. When only a location is known, its branch is derived via
- * locations.branch_id so branch staff are still reached.
+ * "Managers of a branch" are the active users assigned to that outlet: their
+ * branch (users.branch_id) is the locations row of the outlet they work at.
+ * The legacy branches-table matching is gone — a user's branch IS their
+ * assigned outlet.
  */
 class ManagerLookup
 {
     /**
-     * Active users responsible for the given location and/or branch.
+     * Active users responsible for the given location.
      *
      * @return Collection<int, User>
      */
-    public static function managersFor(int|string|null $locationId, int|string|null $branchId = null): Collection
+    public static function managersFor(int|string|null $locationId): Collection
     {
-        $locationId = $locationId !== null ? (int) $locationId : null;
-        $branchId = $branchId !== null ? (int) $branchId : null;
-
-        if ($branchId === null && $locationId !== null) {
-            $branchId = Location::query()->whereKey($locationId)->value('branch_id');
-            $branchId = $branchId !== null ? (int) $branchId : null;
-        }
-
-        if ($locationId === null && $branchId === null) {
+        if ($locationId === null) {
             return collect();
         }
 
         return User::query()
             ->active()
-            ->where(function (Builder $query) use ($locationId, $branchId) {
-                if ($locationId !== null) {
-                    $query->orWhere('location_id', $locationId);
-                }
-
-                if ($branchId !== null) {
-                    $query->orWhere('branch_id', $branchId);
-                }
-            })
+            ->where('branch_id', (int) $locationId)
             ->get();
     }
 }

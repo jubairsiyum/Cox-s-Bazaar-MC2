@@ -76,8 +76,8 @@
       </span>
       <span>{{ $activeRoutes }} Active Field SRs</span>
     </div>
-    <a href="{{ url('/distribution') }}" class="text-xs font-medium text-muted hover:text-brand-500 transition-colors">
-      View Routes &rarr;
+    <a href="{{ route('stock-transfers.index') }}" class="text-xs font-medium text-muted hover:text-brand-500 transition-colors">
+      View Transfers &rarr;
     </a>
   </div>
 </section>
