@@ -9,6 +9,7 @@
 @import "./themes/emerald.css";
 @import "./themes/graphite.css";
 @import "./motion.css";
+@import "./error-scene.css";
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';

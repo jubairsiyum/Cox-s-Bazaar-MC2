@@ -37,6 +37,10 @@ Route::redirect('/', '/login');
 
 Route::get('/offline', fn () => view('offline'))->name('offline');
 
+if (file_exists(__DIR__.'/error-preview.php')) {
+    require __DIR__.'/error-preview.php';
+}
+
 /*
 |--------------------------------------------------------------------------
 | Guest routes
