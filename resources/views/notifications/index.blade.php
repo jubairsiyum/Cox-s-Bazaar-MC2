@@ -29,6 +29,8 @@
                     <span>Home</span>
                 </a>
                 <span class="text-muted/60">/</span>
+                <span class="text-muted">Administration</span>
+                <span class="text-muted/60">/</span>
                 <span class="font-medium text-ink">Notifications</span>
             </nav>
 
@@ -81,7 +83,11 @@
                 @endphp
                 <div class="flex items-start gap-3.5 px-5 sm:px-6 py-4 transition-colors {{ $notification->read_at ? '' : 'bg-brand-500/5' }}">
                     <span class="mt-0.5 grid size-10 shrink-0 place-items-center rounded-2xl ring-1 {{ $style['chip'] }}">
-                        <x-icon :name="$style['icon']" class="size-5" />
+                        @if($type === 'error')
+                            <x-svg.x class="size-5" />
+                        @else
+                            <x-icon :name="$style['icon']" class="size-5" />
+                        @endif
                     </span>
 
                     <div class="min-w-0 flex-1">

@@ -1,6 +1,56 @@
 @php
 use App\Helpers\MenuHelper;
 $menuGroups = MenuHelper::getMenuGroups();
+$sidebarUnreadCount = auth()->user()?->unreadNotifications()->count() ?? 0;
+
+// Move top-level "Notifications" inside "Administration" for cleaner navigation hierarchy
+foreach ($menuGroups as &$groupRef) {
+  if (($groupRef['title'] ?? '') !== 'Menu' || empty($groupRef['items'])) {
+    continue;
+  }
+
+  $notificationItem = null;
+  $adminIndex = null;
+  $filteredItems = [];
+
+  foreach ($groupRef['items'] as $navItem) {
+    if (($navItem['name'] ?? '') === 'Notifications' && ($navItem['path'] ?? '') === '/notifications') {
+      $notificationItem = [
+        'name' => $navItem['name'],
+        'path' => $navItem['path'],
+        'can' => $navItem['can'] ?? 'dashboard.view',
+        'badge' => $sidebarUnreadCount > 0 ? ($sidebarUnreadCount > 99 ? '99+' : (string) $sidebarUnreadCount) : null,
+      ];
+      continue;
+    }
+
+    if (($navItem['name'] ?? '') === 'Administration') {
+      $adminIndex = count($filteredItems);
+    }
+
+    $filteredItems[] = $navItem;
+  }
+
+  if ($notificationItem !== null && $adminIndex !== null) {
+    $adminCanAny = (array) ($filteredItems[$adminIndex]['canany'] ?? []);
+    if (!in_array($notificationItem['can'], $adminCanAny, true)) {
+      $adminCanAny[] = $notificationItem['can'];
+    }
+    $filteredItems[$adminIndex]['canany'] = $adminCanAny;
+    $filteredItems[$adminIndex]['subItems'] = $filteredItems[$adminIndex]['subItems'] ?? [];
+
+    $alreadyPresent = collect($filteredItems[$adminIndex]['subItems'])
+      ->contains(fn ($s) => ($s['path'] ?? '') === '/notifications');
+
+    if (!$alreadyPresent) {
+      $filteredItems[$adminIndex]['subItems'][] = $notificationItem;
+    }
+
+    $groupRef['items'] = $filteredItems;
+  }
+}
+unset($groupRef);
+
 $currentPath = request()->path();
 $isDashboard = request()->routeIs('dashboard') || request()->is('dashboard') || $currentPath === 'dashboard' || $currentPath === '';
 
@@ -240,7 +290,9 @@ $isTailAdminActive = true;
                     class="flex items-center justify-between gap-2 rounded-full px-3 py-1.5 text-xs font-medium transition"
                     :class="isActive('{{ $subItem['path'] }}') ? 'bg-soft text-brand-500 font-semibold' : 'text-muted hover:bg-soft/60 hover:text-ink'">
                     <span class="truncate">{{ __($subItem['name']) }}</span>
-                    @if (!empty($subItem['new']))
+                    @if (!empty($subItem['badge']))
+                    <span class="rounded-full bg-danger/15 px-1.5 py-0.5 text-[10px] font-bold text-danger tabular-nums leading-none">{{ $subItem['badge'] }}</span>
+                    @elseif (!empty($subItem['new']))
                     <span class="rounded-full bg-brand-500/10 px-1.5 py-0.2 text-[9px] font-bold text-brand-500 uppercase">New</span>
                     @endif
                   </a>
