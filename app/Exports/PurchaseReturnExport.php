@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exports;
 
+use App\Helpers\Money;
 use App\Models\PurchaseReturn;
 use App\Models\User;
 use App\Services\LocationScope;
@@ -85,8 +86,8 @@ class PurchaseReturnExport implements FromCollection, WithHeadings, WithMapping
                 'supplier' => $return->supplier?->name ?? '—',
                 'reason' => $return->reason ?: '—',
                 'payment_status' => $return->payment_status->label(),
-                'grand_total' => number_format((float) $return->grand_total, 2),
-                'payment_due' => number_format((float) $return->payment_due, 2),
+                'grand_total' => Money::format($return->grand_total),
+                'payment_due' => Money::format($return->payment_due),
                 default => $return->{$col} ?? '',
             };
         }

@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\AccountEntryStatus;
 use App\Exceptions\InsufficientAccountBalanceException;
+use App\Helpers\Money;
 use App\Http\Requests\AccountTransfer\StoreAccountTransferRequest;
 use App\Http\Requests\AccountTransfer\UpdateAccountTransferRequest;
 use App\Models\Account;
@@ -111,7 +112,7 @@ class AccountTransferController extends Controller
 
         AuditService::created($transfer, sprintf(
             'Transfer of %s from %s to %s recorded, awaiting approval.',
-            number_format((float) $transfer->amount, 2),
+            Money::format($transfer->amount),
             $transfer->fromAccount?->name ?? '',
             $transfer->toAccount?->name ?? ''
         ));
@@ -238,7 +239,7 @@ class AccountTransferController extends Controller
         AuditService::log('approved', $accountTransfer, [], $accountTransfer->toArray(), sprintf(
             'Approved transfer %s of %s from %s to %s.',
             $accountTransfer->reference_no,
-            number_format((float) $accountTransfer->amount, 2),
+            Money::format($accountTransfer->amount),
             $accountTransfer->fromAccount?->name ?? '',
             $accountTransfer->toAccount?->name ?? ''
         ));

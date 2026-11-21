@@ -1,5 +1,4 @@
 @php
-    $currencySymbol = \App\Models\Setting::get('currency_symbol', '৳');
     $totalInReport = count($suppliers);
     $totalDueInReport = (float) $suppliers->sum('purchase_due');
     $totalReturnDueInReport = (float) $suppliers->sum('purchase_return_due');
@@ -13,8 +12,8 @@
 >
     <x-slot:summary>
         Showing <strong>{{ number_format($totalInReport) }}</strong> {{ Str::plural('supplier', $totalInReport) }}
-        &middot; Purchase Due: <strong>{{ $currencySymbol }}{{ number_format($totalDueInReport, 2) }}</strong>
-        &middot; Return Due: <strong>{{ $currencySymbol }}{{ number_format($totalReturnDueInReport, 2) }}</strong>
+        &middot; Purchase Due: <strong>{{ \App\Helpers\Money::format($totalDueInReport) }}</strong>
+        &middot; Return Due: <strong>{{ \App\Helpers\Money::format($totalReturnDueInReport) }}</strong>
         @if(!empty($search))
             &middot; Search: <strong>"{{ $search }}"</strong>
         @endif

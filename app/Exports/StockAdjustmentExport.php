@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exports;
 
+use App\Helpers\Money;
 use App\Models\StockAdjustment;
 use App\Models\User;
 use App\Services\LocationScope;
@@ -77,7 +78,7 @@ class StockAdjustmentExport implements FromCollection, WithHeadings, WithMapping
             $mapped[] = match ($col) {
                 'adjustment_date' => $adjustment->adjustment_date->format('d/m/Y H:i'),
                 'type' => $adjustment->type->label(),
-                'total_amount' => number_format((float) $adjustment->total_amount, 2),
+                'total_amount' => Money::format($adjustment->total_amount),
                 'reason' => $adjustment->reason ?: '—',
                 'creator' => $adjustment->creator?->name ?? '—',
                 default => $adjustment->{$col} ?? '',

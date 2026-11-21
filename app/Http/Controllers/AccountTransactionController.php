@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\AccountEntryStatus;
 use App\Exceptions\InsufficientAccountBalanceException;
+use App\Helpers\Money;
 use App\Http\Requests\AccountTransaction\StoreAccountTransactionRequest;
 use App\Http\Requests\AccountTransaction\UpdateAccountTransactionRequest;
 use App\Models\Account;
@@ -116,7 +117,7 @@ class AccountTransactionController extends Controller
         AuditService::created($transaction, sprintf(
             '%s entry of %s (%s) recorded on account %s, awaiting approval.',
             $transaction->type->label(),
-            number_format((float) $transaction->amount, 2),
+            Money::format($transaction->amount),
             $transaction->category,
             $transaction->account?->name ?? ''
         ));
@@ -247,7 +248,7 @@ class AccountTransactionController extends Controller
             'Approved %s entry %s of %s.',
             $accountTransaction->type->value,
             $accountTransaction->reference_no,
-            number_format((float) $accountTransaction->amount, 2)
+            Money::format($accountTransaction->amount)
         ));
 
         return back()->with('success', 'Transaction approved and account balance updated.');

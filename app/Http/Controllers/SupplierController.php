@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Exports\SupplierExport;
+use App\Helpers\Money;
 use App\Http\Requests\Supplier\ImportSupplierRequest;
 use App\Http\Requests\Supplier\StoreSupplierRequest;
 use App\Http\Requests\Supplier\UpdateSupplierRequest;
@@ -224,7 +225,7 @@ class SupplierController extends Controller
 
         AuditService::log('paid', $payment, [], $validated, "Recorded payment of {$amount} for supplier '{$supplier->name}'.");
 
-        return back()->with('success', 'Payment of '.number_format($amount, 2).' recorded successfully.');
+        return back()->with('success', 'Payment of '.Money::format($amount).' recorded successfully.');
     }
 
     /**
@@ -258,7 +259,7 @@ class SupplierController extends Controller
 
         AuditService::log('paid', $payment, [], $validated, "Recorded return payment of {$amount} for supplier '{$supplier->name}'.");
 
-        return back()->with('success', 'Return payment of '.number_format($amount, 2).' recorded successfully.');
+        return back()->with('success', 'Return payment of '.Money::format($amount).' recorded successfully.');
     }
 
     /**
@@ -356,7 +357,7 @@ class SupplierController extends Controller
         fclose($handle);
 
         return response($csv, 200, [
-            'Content-Type' => 'text/csv',
+            'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="supplier_import_template.csv"',
         ]);
     }
