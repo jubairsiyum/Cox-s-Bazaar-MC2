@@ -24,12 +24,14 @@
     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
             <nav class="flex items-center gap-1.5 text-xs text-muted mb-2" aria-label="Breadcrumb">
-                <a href="{{ route('dashboard') }}" class="inline-flex items-center gap-1 hover:text-brand-500 transition-colors">
+                <a href="{{ route(auth()->user()?->isSupplierPortalUser() ? 'suppliers.my-profile' : 'dashboard') }}" class="inline-flex items-center gap-1 hover:text-brand-500 transition-colors">
                     <x-icon name="dashboard" class="size-3.5" />
                     <span>Home</span>
                 </a>
-                <span class="text-muted/60">/</span>
-                <span class="text-muted">Administration</span>
+                @unless(auth()->user()?->isSupplierPortalUser())
+                    <span class="text-muted/60">/</span>
+                    <span class="text-muted">Administration</span>
+                @endunless
                 <span class="text-muted/60">/</span>
                 <span class="font-medium text-ink">Notifications</span>
             </nav>

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\AccountEntryStatus;
 use App\Models\Account;
 use App\Models\AccountTransaction;
+use App\Models\Location;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\SettingsSeeder;
@@ -15,11 +16,12 @@ beforeEach(function () {
 });
 
 /**
- * An accountant-style approver with full finance transaction rights.
+ * An accountant-style approver with full finance transaction rights, working
+ * at the given branch (strict branch isolation).
  */
-function financeApproverUser(): User
+function financeApproverUser(?Location $location = null): User
 {
-    $user = User::factory()->create(['status' => 'active']);
+    $user = User::factory()->create(['status' => 'active', 'branch_id' => $location?->id]);
     $user->assignRole('Accountant');
 
     return $user;
@@ -95,10 +97,12 @@ it('cancelling a pending entry never moves money', function () {
 });
 
 it('blocks self-approval when another qualified approver exists', function () {
-    $creator = financeApproverUser();
-    $otherApprover = financeApproverUser();
+    $location = Location::factory()->create();
 
-    $account = Account::factory()->cash()->withBalance(0)->create();
+    $creator = financeApproverUser($location);
+    $otherApprover = financeApproverUser($location);
+
+    $account = Account::factory()->cash()->withBalance(0)->create(['location_id' => $location->id]);
 
     $this->actingAs($creator)->post(route('transactions.store'), [
         'account_id' => $account->id,
@@ -124,10 +128,12 @@ it('blocks self-approval when another qualified approver exists', function () {
 });
 
 it('allows self-approval when no other qualified approver exists', function () {
-    $soleApprover = User::factory()->create(['status' => 'active']);
+    $location = Location::factory()->create();
+
+    $soleApprover = User::factory()->create(['status' => 'active', 'branch_id' => $location->id]);
     $soleApprover->givePermissionTo('income-transactions.manage');
 
-    $account = Account::factory()->cash()->withBalance(0)->create();
+    $account = Account::factory()->cash()->withBalance(0)->create(['location_id' => $location->id]);
 
     $this->actingAs($soleApprover)->post(route('transactions.store'), [
         'account_id' => $account->id,
@@ -207,10 +213,12 @@ it('blocks an expense approval that would overdraw the account', function () {
 });
 
 it('gates income and expense management by their own permissions', function () {
-    $expenseOnly = User::factory()->create(['status' => 'active']);
+    $location = Location::factory()->create();
+
+    $expenseOnly = User::factory()->create(['status' => 'active', 'branch_id' => $location->id]);
     $expenseOnly->givePermissionTo('expense-transactions.manage');
 
-    $account = Account::factory()->cash()->withBalance(1000)->create();
+    $account = Account::factory()->cash()->withBalance(1000)->create(['location_id' => $location->id]);
 
     // The expense manager may record expenses...
     $this->actingAs($expenseOnly)->post(route('transactions.store'), [

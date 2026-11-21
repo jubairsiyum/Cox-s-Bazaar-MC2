@@ -12,13 +12,22 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Notifications\Notifiable;
 
+/**
+ * Suppliers have no logins by default — their "profile" is a page inside the
+ * admin app that staff use on the supplier's behalf. A supplier may be linked
+ * to a user with the Supplier role (user_id), which lets them open their own
+ * profile. Notifiable powers the supplier's own activity feed (database
+ * notifications addressed to the supplier row).
+ */
 class Supplier extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, Notifiable, SoftDeletes;
 
     protected $fillable = [
         'supplier_id',
+        'user_id',
         'name',
         'mobile',
         'email',
@@ -61,9 +70,27 @@ class Supplier extends Model
         return $this->hasMany(SupplierOpeningPayment::class);
     }
 
+    public function purchaseOrders(): HasMany
+    {
+        return $this->hasMany(PurchaseOrder::class);
+    }
+
+    public function paymentRequests(): HasMany
+    {
+        return $this->hasMany(SupplierPaymentRequest::class);
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * The login account of a supplier with the Supplier role, when one is linked.
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     public function isActive(): bool

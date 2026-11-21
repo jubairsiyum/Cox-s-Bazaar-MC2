@@ -120,7 +120,7 @@
                     @endforeach
                 </select>
                 <p class="mt-1.5 text-xs text-muted">
-                    Stock follows this status: "Received" posts the goods into stock right away, while "Pending" / "Ordered" hold them until the purchase is marked Received. "Cancelled" reverses a receipt.
+                    "Ordered" places the order with the supplier — it displays as "Pending" on the purchase list until the supplier accepts it. "Received" is a direct receipt of goods already taken and posts stock right away. Full payment or the supplier's delivery confirmation flips an ordered purchase to "Received" automatically.
                 </p>
                 @error('purchase_status')
                     <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>

@@ -88,6 +88,13 @@
                 @error('roles.*')<div class="form-error">{{ $message }}</div>@enderror
             </div>
 
+            <div class="form-group">
+                <label for="supplier_name" class="form-label">Supplier Name <span style="color:var(--color-text-muted);font-weight:400;">(required when the Supplier role is selected — creates the supplier profile)</span></label>
+                <input type="text" id="supplier_name" name="supplier_name" value="{{ old('supplier_name') }}"
+                       class="form-control @error('supplier_name') is-invalid @enderror">
+                @error('supplier_name')<div class="form-error">{{ $message }}</div>@enderror
+            </div>
+
             <button type="submit" class="btn btn-primary">Create User</button>
         </form>
     </div>

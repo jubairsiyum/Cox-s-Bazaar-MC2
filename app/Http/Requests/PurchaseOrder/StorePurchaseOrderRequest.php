@@ -6,6 +6,8 @@ namespace App\Http\Requests\PurchaseOrder;
 
 use App\Enums\PurchaseStatus;
 use App\Models\PurchaseOrder;
+use App\Services\LocationScope;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -17,16 +19,19 @@ class StorePurchaseOrderRequest extends FormRequest
     }
 
     /**
-     * Receiving statuses selectable at entry time. "Cancelled" is a lifecycle
-     * end state (edit / delete) and never an entry state; "Partially Received"
-     * does not exist because receipts are posted for whole orders.
+     * Receiving statuses selectable at entry time: "Ordered" places the order
+     * with the supplier (the manager side then displays "Pending" until the
+     * supplier accepts) and "Received" is a direct receipt of goods already
+     * taken. "Pending" is a system-driven display state, "Cancelled" a
+     * lifecycle end state (edit / delete) — neither is an entry state, and
+     * "Partially Received" does not exist because receipts are posted for
+     * whole orders.
      *
      * @return array<string>
      */
     public static function entryStatuses(): array
     {
         return [
-            PurchaseStatus::Pending->value,
             PurchaseStatus::Ordered->value,
             PurchaseStatus::Received->value,
         ];
@@ -41,7 +46,7 @@ class StorePurchaseOrderRequest extends FormRequest
             'order_date' => ['required', 'date'],
             'reference_no' => ['nullable', 'string', 'max:50', Rule::unique('purchase_orders', 'reference_no')->whereNull('deleted_at')],
             'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
-            'location_id' => ['required', 'integer', 'exists:locations,id'],
+            'location_id' => ['required', 'integer', 'exists:locations,id', $this->accessibleLocationRule()],
             'purchase_status' => ['required', Rule::in(self::entryStatuses())],
             'tax_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'paid_amount' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
@@ -51,6 +56,19 @@ class StorePurchaseOrderRequest extends FormRequest
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
         ];
+    }
+
+    /**
+     * Strict branch isolation: purchases may only be recorded for the user's
+     * own branch (the Super Admin may purchase for any branch).
+     */
+    protected function accessibleLocationRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if ($this->user() === null || ! LocationScope::canAccess($this->user(), $value)) {
+                $fail('You may only record purchases for your own branch.');
+            }
+        };
     }
 
     /**

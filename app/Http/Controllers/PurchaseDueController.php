@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\ApprovalStatus;
-use App\Enums\PaymentMethod;
 use App\Enums\PurchaseStatus;
 use App\Helpers\Money;
 use App\Http\Requests\PurchaseDue\StorePurchaseDueRequest;
 use App\Http\Requests\PurchaseDue\UpdatePurchaseDueRequest;
 use App\Models\Branch;
 use App\Models\Location;
+use App\Models\PaymentMethod;
 use App\Models\PurchaseOrder;
 use App\Models\PurchasePayment;
 use App\Models\User;
@@ -19,7 +19,9 @@ use App\Services\AuditService;
 use App\Services\LocationScope;
 use App\Services\ManagerLookup;
 use App\Services\NotificationService;
+use App\Services\PurchaseOrderWorkflow;
 use App\Services\SalesScope;
+use App\Services\SupplierScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\RedirectResponse;
@@ -89,6 +91,8 @@ class PurchaseDueController extends Controller
      */
     public function store(StorePurchaseDueRequest $request): RedirectResponse
     {
+        abort_if($request->user()->isSupplierPortalUser(), 403);
+
         $validated = $request->validated();
 
         /** @var PurchaseOrder $order */
@@ -157,6 +161,8 @@ class PurchaseDueController extends Controller
      */
     public function update(UpdatePurchaseDueRequest $request, PurchasePayment $purchasePayment): RedirectResponse
     {
+        abort_if($request->user()->isSupplierPortalUser(), 403);
+
         $validated = $request->validated();
         $original = $purchasePayment->toArray();
 
@@ -324,7 +330,9 @@ class PurchaseDueController extends Controller
 
     /**
      * Apply a due payment to the purchase invoice and the supplier's purchase
-     * due balance, marking the payment approved by the given user.
+     * due balance, marking the payment approved by the given user. A payment
+     * never changes the order's status; every applied payment is announced
+     * on the supplier's profile feed, handled by {@see PurchaseOrderWorkflow}.
      */
     private function applyPayment(PurchasePayment $purchasePayment, PurchaseOrder $order, ?int $approvedBy): void
     {
@@ -345,6 +353,8 @@ class PurchaseDueController extends Controller
                 'approved_by' => $approvedBy,
                 'approved_at' => now(),
             ]);
+
+            PurchaseOrderWorkflow::paymentApplied($purchasePayment);
         });
     }
 
@@ -438,14 +448,14 @@ class PurchaseDueController extends Controller
                         });
                 });
             })
-            ->when($request->filled('branch_id'), function (Builder $q) use ($request): void {
+            ->when($request->filled('branch_id') && ! LocationScope::isRestricted($request->user()), function (Builder $q) use ($request): void {
                 $q->whereIn(
                     'location_id',
                     Location::query()->where('branch_id', (int) $request->input('branch_id'))->pluck('id')
                 );
             });
 
-        return LocationScope::scopeQuery($query, $request->user())
+        return SupplierScope::scopeQuery(LocationScope::scopeQuery($query, $request->user()), $request->user())
             ->orderByDesc('order_date')
             ->orderByDesc('id');
     }

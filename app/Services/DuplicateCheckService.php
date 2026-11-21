@@ -8,7 +8,9 @@ use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Location;
+use App\Models\PaymentMethod;
 use App\Models\Supplier;
+use App\Models\TransactionCategory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
@@ -26,6 +28,8 @@ class DuplicateCheckService
             Supplier::class => ['name', 'mobile', 'tel_no', 'email', 'tax_number'],
             Brand::class => ['name'],
             Category::class => ['name'],
+            TransactionCategory::class => ['name'],
+            PaymentMethod::class => ['name'],
             Location::class => ['code'],
             default => [],
         };

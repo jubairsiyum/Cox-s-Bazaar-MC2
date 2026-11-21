@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -12,6 +13,12 @@ use Illuminate\View\View;
 /**
  * In-app notification center (Module 12): list, mark-as-read and
  * mark-all-read for the logged-in user's own notifications.
+ *
+ * Notifications are delivered branch-targeted (payment requests to their
+ * branch, approvals for their outlet, …). Strict branch isolation is kept
+ * on read too: branch-tagged entries only surface for the matching branch,
+ * while personal entries without a branch tag always stay visible. Super
+ * Admin sees everything.
  */
 class NotificationController extends Controller
 {
@@ -30,7 +37,7 @@ class NotificationController extends Controller
             ? $request->string('filter')->toString()
             : 'all';
 
-        $notifications = $request->user()->notifications()
+        $notifications = NotificationService::scopeFor($request->user()->notifications(), $request->user())
             ->when($filter === 'unread', fn ($query) => $query->whereNull('read_at'))
             ->latest()
             ->paginate($perPage)
@@ -38,7 +45,7 @@ class NotificationController extends Controller
 
         return view('notifications.index', [
             'notifications' => $notifications,
-            'unreadCount' => $request->user()->unreadNotifications()->count(),
+            'unreadCount' => NotificationService::scopeFor($request->user()->unreadNotifications(), $request->user())->count(),
             'filter' => $filter,
             'perPage' => $perPage,
         ]);

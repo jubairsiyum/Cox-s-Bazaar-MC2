@@ -7,6 +7,8 @@ namespace App\Http\Requests\PurchaseOrder;
 use App\Enums\ApprovalStatus;
 use App\Enums\PurchaseStatus;
 use App\Models\PurchaseOrder;
+use App\Services\LocationScope;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -26,14 +28,15 @@ class UpdatePurchaseOrderRequest extends FormRequest
         $order = $this->route('purchaseOrder');
         $approved = $order->approval_status === ApprovalStatus::Approved;
 
-        // Effective (approved) purchases carry their clerk-chosen receiving
-        // status and may move anywhere in the receiving workflow; stock
-        // follows the received/not-received transitions. Legacy documents
-        // still awaiting sign-off keep their pre-receipt options — "Received"
-        // is only reachable for them through the approval action.
+        // Effective (approved) purchases move inside the state machine:
+        // "Ordered" places the order with the supplier (displayed as "Pending"
+        // until the supplier accepts), "Received" posts the goods and
+        // "Cancelled" reverses a receipt. "Pending" is a system-driven
+        // display state and never selectable. Legacy documents still awaiting
+        // sign-off keep their pre-receipt options — "Received" is only
+        // reachable for them through the approval action.
         $allowedStatuses = $approved
             ? [
-                PurchaseStatus::Pending->value,
                 PurchaseStatus::Ordered->value,
                 PurchaseStatus::Received->value,
                 PurchaseStatus::Cancelled->value,
@@ -44,7 +47,7 @@ class UpdatePurchaseOrderRequest extends FormRequest
             'order_date' => ['required', 'date'],
             'reference_no' => ['nullable', 'string', 'max:50', Rule::unique('purchase_orders', 'reference_no')->ignore($order->id)->whereNull('deleted_at')],
             'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
-            'location_id' => ['required', 'integer', 'exists:locations,id'],
+            'location_id' => ['required', 'integer', 'exists:locations,id', $this->accessibleLocationRule()],
             'purchase_status' => ['required', Rule::in($allowedStatuses)],
             'tax_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'paid_amount' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
@@ -63,6 +66,19 @@ class UpdatePurchaseOrderRequest extends FormRequest
         }
 
         return $rules;
+    }
+
+    /**
+     * Strict branch isolation: purchases may only be edited for the user's
+     * own branch (the Super Admin may purchase for any branch).
+     */
+    protected function accessibleLocationRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if ($this->user() === null || ! LocationScope::canAccess($this->user(), $value)) {
+                $fail('You may only manage purchases of your own branch.');
+            }
+        };
     }
 
     /**

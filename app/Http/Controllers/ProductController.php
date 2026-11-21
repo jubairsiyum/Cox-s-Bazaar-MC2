@@ -9,10 +9,13 @@ use App\Http\Requests\Product\UpdateProductRequest;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\Unit;
 use App\Services\AuditService;
+use App\Services\BranchScope;
 use App\Services\StockService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
@@ -20,31 +23,106 @@ class ProductController extends Controller
 {
     /**
      * Display a listing of products.
+     *
+     * Strict branch isolation — the Products section is availability-based:
+     *  - Super Admin sees the full shared catalog;
+     *  - branch users see only the products currently in stock at their own
+     *    branch. When they search for a product that is NOT available there,
+     *    its details are still shown together with the branch(es) that do
+     *    have it in stock (name + available quantity) — "out of stock here,
+     *    available at X";
+     *  - restricted users without a branch assignment see nothing.
      */
     public function index(Request $request): View
     {
         $this->authorize('viewAny', Product::class);
+
+        $user = $request->user();
 
         $perPage = (int) $request->input('per_page', 10);
         if (! in_array($perPage, [10, 25, 50, 100], true)) {
             $perPage = 10;
         }
 
-        $products = Product::query()
+        $catalogQuery = Product::query()
             ->with(['brand', 'category'])
             ->when($request->filled('search'), fn ($q) => $q->search($request->string('search')->toString()))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')->toString()))
             ->when($request->filled('brand_id'), fn ($q) => $q->where('brand_id', $request->integer('brand_id')))
-            ->when($request->filled('category_id'), fn ($q) => $q->where('category_id', $request->integer('category_id')))
+            ->when($request->filled('category_id'), fn ($q) => $q->where('category_id', $request->integer('category_id')));
+
+        // Super Admin: the full catalog, unfiltered by availability.
+        if (BranchScope::isUnrestricted($user)) {
+            return view('products.index', [
+                'products' => (clone $catalogQuery)->latest('id')->paginate($perPage)->withQueryString(),
+                'perPage' => $perPage,
+                'brands' => Brand::orderBy('name')->get(),
+                'categories' => Category::orderBy('name')->get(),
+                'catalogScopeIds' => null,
+                'branchQtyByProduct' => [],
+                'crossBranchResults' => collect(),
+            ]);
+        }
+
+        $branchId = BranchScope::locationId($user);
+        $quantitiesByUnit = $branchId === null ? [] : StockService::quantitiesByUnitAt($branchId);
+
+        // Unassigned users see no operational data at all.
+        $unitProductIds = $quantitiesByUnit === []
+            ? collect()
+            : Unit::query()->whereIn('id', array_keys($quantitiesByUnit))->pluck('product_id', 'id');
+
+        $availableProductIds = $unitProductIds
+            ->filter(fn ($productId, $unitId): bool => ($quantitiesByUnit[$unitId] ?? 0) > 0)
+            ->values()
+            ->map(fn ($productId): int => (int) $productId)
+            ->all();
+
+        $branchQtyByProduct = $unitProductIds
+            ->mapWithKeys(fn ($productId, $unitId): array => [
+                (int) $productId => $quantitiesByUnit[(int) $unitId] ?? 0,
+            ])
+            ->all();
+
+        $products = (clone $catalogQuery)
+            ->whereIn('id', $availableProductIds)
             ->latest('id')
             ->paginate($perPage)
             ->withQueryString();
+
+        // Cross-branch search: products matching the search that are not
+        // available at the user's own branch, with the branch(es) that do
+        // have them in stock (name + available quantity). Only assigned
+        // users get this — unassigned users see nothing operational.
+        $crossBranchResults = collect();
+
+        if ($request->filled('search') && $branchId !== null) {
+            $availableLookup = array_flip($availableProductIds);
+
+            $missing = (clone $catalogQuery)
+                ->latest('id')
+                ->limit(50)
+                ->get()
+                ->reject(fn (Product $product): bool => isset($availableLookup[$product->id]));
+
+            $availability = StockService::availabilityAcross(
+                $missing->map(fn (Product $product): ?int => $product->stockRow?->id)->filter()->all()
+            )->groupBy('unit_id');
+
+            $crossBranchResults = $missing->values()->map(fn (Product $product): array => [
+                'product' => $product,
+                'branches' => $availability->get($product->stockRow?->id, collect()),
+            ]);
+        }
 
         return view('products.index', [
             'products' => $products,
             'perPage' => $perPage,
             'brands' => Brand::orderBy('name')->get(),
             'categories' => Category::orderBy('name')->get(),
+            'catalogScopeIds' => $availableProductIds,
+            'branchQtyByProduct' => $branchQtyByProduct,
+            'crossBranchResults' => $crossBranchResults,
         ]);
     }
 
@@ -170,7 +248,14 @@ class ProductController extends Controller
 
     /**
      * Keep the product's single stock row in sync with the form's quantity and unit.
-     * Quantity changes go through the stock ledger (StockService::adjust).
+     *
+     * Quantity changes go through the stock ledger: Super Admin (and other
+     * unrestricted users) correct the shared stock row as a whole
+     * (StockService::adjust), while branch users record a stock count of
+     * THEIR OWN BRANCH — the form quantity is the counted quantity at their
+     * branch and only that branch's ledger balance moves
+     * (StockService::countAt). Users without a branch assignment change no
+     * stock at all.
      */
     private function syncStockRow(Product $product, ?int $quantity, ?string $unitOfMeasure, int $userId): void
     {
@@ -186,8 +271,16 @@ class ProductController extends Controller
             return;
         }
 
-        if ($quantity !== null && $quantity !== $stockRow->quantity) {
-            StockService::adjust($stockRow, $quantity);
+        if ($quantity !== null) {
+            $branchId = BranchScope::locationId(Auth::user());
+
+            if (Auth::user() !== null && BranchScope::isRestricted(Auth::user())) {
+                if ($branchId !== null && $quantity !== StockService::quantityAt($stockRow, $branchId)) {
+                    StockService::countAt($stockRow, $quantity, $branchId);
+                }
+            } elseif ($quantity !== $stockRow->quantity) {
+                StockService::adjust($stockRow, $quantity);
+            }
         }
 
         if ($unitOfMeasure !== null && $unitOfMeasure !== $stockRow->unit) {

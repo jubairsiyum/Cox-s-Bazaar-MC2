@@ -8,19 +8,20 @@ use App\Models\Customer;
 
 /**
  * Resolves the customer fields of a sales order form to a stored customer
- * profile, or creates one, following the customer identity rules (name and
- * phone are unique identities — see the customer/supplier identity migration
- * and {@see DuplicateCheckService}).
+ * profile, or creates one, following the customer identity rules (name,
+ * phone and email are unique identities — see the customer/supplier identity
+ * migration and {@see DuplicateCheckService}).
  *
  * Resolution order:
- * 1. An explicitly selected customer id wins; an edited phone number is
- *    saved back to that customer's profile for future tracking.
+ * 1. An explicitly selected customer id wins; an edited phone number or
+ *    email is saved back to that customer's profile for future tracking.
  * 2. A typed name matching an existing customer resolves to that customer —
  *    names are unique identities, so typing one never duplicates it.
- * 3. A soft-deleted customer with the same name/phone is restored and
+ * 3. A soft-deleted customer with the same name/phone/email is restored and
  *    updated instead of leaving a redundant row behind (the same rule
  *    CustomerController::store applies).
- * 4. Otherwise a new customer is created with the typed name + phone.
+ * 4. Otherwise a new customer is created with the typed name + contact
+ *    details.
  */
 class CustomerResolver
 {
@@ -48,46 +49,53 @@ class CustomerResolver
      *
      * @return array<string, Customer> form field => conflicting customer
      */
-    public static function identityConflicts(?int $customerId, ?string $name, ?string $phone): array
+    public static function identityConflicts(?int $customerId, ?string $name, ?string $phone, ?string $email = null): array
     {
         $ignoreId = $customerId ?? self::matchByName($name)?->id;
 
         $conflicts = DuplicateCheckService::liveConflicts(
             Customer::class,
-            ['name' => $name, 'tel_no' => $phone],
+            ['name' => $name, 'mobile' => $phone, 'email' => $email],
             $ignoreId
         );
 
-        $fields = [];
+        $fields = [
+            'name' => 'customer_name',
+            'mobile' => 'mobile_no',
+            'email' => 'customer_email',
+        ];
+
+        $mapped = [];
 
         foreach ($conflicts as $column => $record) {
-            $fields[$column === 'name' ? 'customer_name' : 'customer_phone'] = $record;
+            $mapped[$fields[$column] ?? $column] = $record;
         }
 
-        return $fields;
+        return $mapped;
     }
 
     /**
      * Resolve the submitted customer fields to a stored customer profile.
      */
-    public static function resolveOrCreate(?int $customerId, ?string $name, ?string $phone, ?int $createdBy = null): Customer
+    public static function resolveOrCreate(?int $customerId, ?string $name, ?string $phone, ?string $email = null, ?int $createdBy = null): Customer
     {
-        $phone = DuplicateCheckService::normalize('tel_no', $phone);
+        $phone = DuplicateCheckService::normalize('mobile', $phone);
+        $email = DuplicateCheckService::normalize('email', $email);
 
         if ($customerId !== null) {
             $customer = Customer::query()->findOrFail($customerId);
-            self::syncPhone($customer, $phone);
+            self::syncContact($customer, $phone, $email);
 
             return $customer;
         }
 
         $name = DuplicateCheckService::normalize('name', $name);
-        $attributes = ['name' => $name, 'tel_no' => $phone];
+        $attributes = ['name' => $name, 'mobile' => $phone, 'email' => $email];
 
         $matched = self::matchByName($name);
 
         if ($matched instanceof Customer) {
-            self::syncPhone($matched, $phone);
+            self::syncContact($matched, $phone, $email);
 
             return $matched;
         }
@@ -107,7 +115,8 @@ class CustomerResolver
 
         $customer = Customer::create([
             'name' => $name,
-            'tel_no' => $phone,
+            'mobile' => $phone,
+            'email' => $email,
             'created_by' => $createdBy,
         ]);
 
@@ -117,18 +126,31 @@ class CustomerResolver
     }
 
     /**
-     * Persist an edited phone number back to the customer's profile.
+     * Persist an edited mobile number or email back to the customer's profile.
      */
-    private static function syncPhone(Customer $customer, ?string $phone): void
+    private static function syncContact(Customer $customer, ?string $phone, ?string $email): void
     {
-        if ($phone === $customer->tel_no) {
+        $labels = ['mobile' => 'mobile number', 'email' => 'email'];
+        $changes = [];
+
+        if ($phone !== null && $phone !== $customer->mobile) {
+            $changes['mobile'] = $phone;
+        }
+
+        if ($email !== $customer->email) {
+            $changes['email'] = $email;
+        }
+
+        if ($changes === []) {
             return;
         }
 
         $original = $customer->getOriginal();
 
-        $customer->update(['tel_no' => $phone]);
+        $customer->update($changes);
 
-        AuditService::updated($customer, $original, "Customer '{$customer->name}' ({$customer->customer_id}) phone updated from a sales order.");
+        $updated = implode(' and ', array_map(fn (string $column): string => $labels[$column], array_keys($changes)));
+
+        AuditService::updated($customer, $original, "Customer '{$customer->name}' ({$customer->customer_id}) {$updated} updated from a sales order.");
     }
 }

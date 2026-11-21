@@ -68,7 +68,8 @@
             </div>
         </div>
 
-        <form method="POST" action="{{ route('transactions.store') }}" class="space-y-6">
+        <form method="POST" action="{{ route('transactions.store') }}" class="space-y-6"
+              x-data="{ entryType: @js(old('type', $defaultType) ?: '') }">
             @csrf
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -77,7 +78,7 @@
                     <label for="type" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
                         Entry Type <span class="text-danger">*</span>
                     </label>
-                    <select id="type" name="type" required
+                    <select id="type" name="type" required x-model="entryType"
                             class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all cursor-pointer @error('type') border-danger @enderror">
                         <option value="">Please Select</option>
                         @foreach(\App\Enums\AccountTransactionType::options() as $value => $label)
@@ -108,18 +109,27 @@
                     @enderror
                 </div>
 
-                {{-- Category --}}
+                {{-- Category (populated from Transaction Category reference data) --}}
                 <div>
                     <label for="category" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
                         Category <span class="text-danger">*</span>
                     </label>
-                    <select id="category" name="category" required
-                            class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all cursor-pointer @error('category') border-danger @enderror">
-                        <option value="">Please Select</option>
-                        @foreach($categories as $category)
-                            <option value="{{ $category }}" @selected(old('category') === $category)>{{ $category }}</option>
-                        @endforeach
-                    </select>
+                    @if($categories->isNotEmpty())
+                        <select id="category" name="category" required
+                                class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all cursor-pointer @error('category') border-danger @enderror">
+                            <option value="">Please Select</option>
+                            @foreach($categories as $category)
+                                <option value="{{ $category->name }}" @selected(old('category') === $category->name)
+                                        :hidden="(entryType === 'income' && '{{ $category->type->value }}' === 'expense') || (entryType === 'expense' && '{{ $category->type->value }}' === 'income')">
+                                    {{ $category->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    @else
+                        <input type="text" id="category" name="category" value="{{ old('category') }}" required maxlength="50"
+                               placeholder="No categories configured yet — type one"
+                               class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('category') border-danger @enderror">
+                    @endif
                     @error('category')
                         <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
                     @enderror
@@ -150,7 +160,7 @@
                     @enderror
                 </div>
 
-                {{-- Method --}}
+                {{-- Method (populated from the Method reference data) --}}
                 <div>
                     <label for="method" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
                         Method
@@ -158,7 +168,7 @@
                     <select id="method" name="method"
                             class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all cursor-pointer @error('method') border-danger @enderror">
                         <option value="">Please Select</option>
-                        @foreach(\App\Enums\AccountMethod::options() as $value => $label)
+                        @foreach($methods as $value => $label)
                             <option value="{{ $value }}" @selected(old('method') === $value)>{{ $label }}</option>
                         @endforeach
                     </select>

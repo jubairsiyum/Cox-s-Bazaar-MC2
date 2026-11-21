@@ -11,6 +11,7 @@ use App\Models\Location;
 use App\Models\Setting;
 use App\Models\StockMovement;
 use App\Models\Unit;
+use App\Services\BranchScope;
 use App\Services\LocationScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -31,11 +32,12 @@ class InventoryController extends Controller
      * Stock overview: every product variant with its quantity, valuation and
      * low/out-of-stock alerts (threshold from settings).
      *
-     * Stock rows are shared across locations (one row per product variant),
-     * so the location and branch filters scope the ledger activity shown on
-     * the page and in the movement modal. Restricted users see their own
-     * scope only; Super Admins get the full overview plus the location and
-     * branch filters.
+     * Strict branch isolation: Super Admin gets the full shared overview
+     * (plus the location and branch filters); every other user sees only
+     * their own branch's stock — the quantities, valuation and alerts are
+     * derived from that branch's movement ledger (StockService), and only
+     * stock lines their branch has handled are listed. Restricted users
+     * without a branch assignment see nothing.
      */
     public function index(Request $request): View
     {
@@ -53,8 +55,14 @@ class InventoryController extends Controller
             : 'product_name';
         $direction = $request->string('direction')->toString() === 'desc' ? 'desc' : 'asc';
 
+        $user = $request->user();
         $locationFilter = $this->resolveLocationFilter($request);
         $branchLocationIds = $this->resolveBranchLocationIds($request);
+
+        // Branch users read every quantity from their own branch's ledger.
+        $branchScoped = BranchScope::isRestricted($user);
+        $branchId = BranchScope::locationId($user);
+        $qtyExpr = 'units.quantity';
 
         $base = Unit::query()
             ->with(['product.brand', 'product.category'])
@@ -62,28 +70,49 @@ class InventoryController extends Controller
             ->whereNull('products.deleted_at')
             ->when($request->filled('search'), fn ($q) => $q->search($request->string('search')->toString()))
             ->when($request->filled('brand_id'), fn ($q) => $q->where('products.brand_id', $request->integer('brand_id')))
-            ->when($request->filled('category_id'), fn ($q) => $q->where('products.category_id', $request->integer('category_id')))
-            ->when($request->string('stock_status')->toString() === 'out', fn ($q) => $q->where('units.quantity', '<=', 0))
-            ->when($request->string('stock_status')->toString() === 'low', fn ($q) => $q->where('units.quantity', '>', 0)->where('units.quantity', '<=', $threshold))
-            ->when($request->string('stock_status')->toString() === 'in', fn ($q) => $q->where('units.quantity', '>', $threshold));
+            ->when($request->filled('category_id'), fn ($q) => $q->where('products.category_id', $request->integer('category_id')));
+
+        if ($branchScoped) {
+            // No branch assignment: no operational data at all.
+            if ($branchId === null) {
+                $base->whereRaw('1 = 0');
+            } else {
+                $qtyExpr = 'COALESCE(branch_stock.quantity, 0)';
+
+                $base->joinSub(
+                    StockMovement::query()
+                        ->selectRaw('unit_id, COALESCE(SUM(quantity), 0) as quantity')
+                        ->where('location_id', $branchId)
+                        ->groupBy('unit_id'),
+                    'branch_stock',
+                    fn ($join) => $join->on('branch_stock.unit_id', '=', 'units.id')
+                );
+            }
+        }
+
+        $base
+            ->when($request->string('stock_status')->toString() === 'out', fn ($q) => $q->whereRaw("{$qtyExpr} <= 0"))
+            ->when($request->string('stock_status')->toString() === 'low', fn ($q) => $q->whereRaw("{$qtyExpr} > 0")->whereRaw("{$qtyExpr} <= ?", [$threshold]))
+            ->when($request->string('stock_status')->toString() === 'in', fn ($q) => $q->whereRaw("{$qtyExpr} > ?", [$threshold]));
 
         $summary = (clone $base)
-            ->selectRaw('
+            ->selectRaw("
                 COUNT(*) AS skus,
-                COALESCE(SUM(units.quantity), 0) AS total_quantity,
-                COALESCE(SUM(units.quantity * COALESCE(products.purchase_price, 0)), 0) AS stock_value,
-                SUM(CASE WHEN units.quantity <= 0 THEN 1 ELSE 0 END) AS out_of_stock,
-                SUM(CASE WHEN units.quantity > 0 AND units.quantity <= ? THEN 1 ELSE 0 END) AS low_stock
-            ', [$threshold])
+                COALESCE(SUM({$qtyExpr}), 0) AS total_quantity,
+                COALESCE(SUM({$qtyExpr} * COALESCE(products.purchase_price, 0)), 0) AS stock_value,
+                SUM(CASE WHEN {$qtyExpr} <= 0 THEN 1 ELSE 0 END) AS out_of_stock,
+                SUM(CASE WHEN {$qtyExpr} > 0 AND {$qtyExpr} <= ? THEN 1 ELSE 0 END) AS low_stock
+            ", [$threshold])
             ->first();
 
         $stockLevels = (clone $base)
             ->select('units.*', 'products.purchase_price AS unit_cost')
+            ->when($branchScoped && $branchId !== null, fn ($q) => $q->selectRaw("{$qtyExpr} AS quantity"))
             ->tap(fn ($q) => match ($sort) {
                 'product_name' => $q->orderBy('products.name', $direction),
                 'unit_cost' => $q->orderBy('products.purchase_price', $direction),
-                'stock_value' => $q->orderByRaw('units.quantity * COALESCE(products.purchase_price, 0) '.$direction),
-                default => $q->orderBy('units.quantity', $direction),
+                'stock_value' => $q->orderByRaw("{$qtyExpr} * COALESCE(products.purchase_price, 0) ".$direction),
+                default => $q->orderByRaw("{$qtyExpr} ".$direction),
             })
             ->paginate($perPage)
             ->withQueryString();
@@ -97,9 +126,11 @@ class InventoryController extends Controller
             'direction' => $direction,
             'brands' => Brand::orderBy('name')->get(),
             'categories' => Category::orderBy('name')->get(),
-            'locations' => Location::query()->active()->orderBy('name')->get(),
+            'locations' => BranchScope::scopeQuery(Location::query()->active(), $user, 'id')->orderBy('name')->get(),
             'locationFilter' => $locationFilter,
-            'branches' => Branch::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
+            'branches' => BranchScope::isUnrestricted($user)
+                ? Branch::query()->where('status', 'active')->orderBy('name')->get(['id', 'name'])
+                : collect(),
             'scopedMovements' => $this->scopedMovements($locationFilter, $branchLocationIds, $base),
         ]);
     }

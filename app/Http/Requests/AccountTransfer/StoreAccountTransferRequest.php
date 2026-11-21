@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\AccountTransfer;
 
-use App\Enums\AccountMethod;
 use App\Models\AccountTransfer;
+use App\Models\PaymentMethod;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\ValidationRule;
 
 class StoreAccountTransferRequest extends FormRequest
@@ -27,7 +26,7 @@ class StoreAccountTransferRequest extends FormRequest
             'to_account_id' => ['required', 'integer', 'exists:accounts,id'],
             'amount' => ['required', 'numeric', 'min:0.01', 'max:99999999999.99'],
             'transfer_date' => ['required', 'date'],
-            'method' => ['nullable', new Enum(AccountMethod::class)],
+            'method' => ['nullable', 'string', 'max:20', ...PaymentMethod::nameRules()],
             'reference_no' => ['nullable', 'string', 'max:50'],
             'note' => ['nullable', 'string', 'max:500'],
         ];

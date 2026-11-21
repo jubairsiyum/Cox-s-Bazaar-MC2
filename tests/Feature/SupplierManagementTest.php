@@ -15,6 +15,39 @@ it('forbids guests from viewing the suppliers list', function () {
     $this->get(route('suppliers.index'))->assertRedirect(route('login'));
 });
 
+it('announces supplier due payments on the supplier profile feed', function () {
+    $admin = actingAsSuperAdmin();
+
+    $supplier = Supplier::factory()->create([
+        'opening_balance' => 0,
+        'purchase_due' => 500,
+        'purchase_return_due' => 0,
+    ]);
+
+    $this->actingAs($admin)->post(route('suppliers.pay-due', $supplier), [
+        'payment_date' => now()->toDateString(),
+        'amount' => 500,
+        'payment_type' => 'cash',
+        'payment_note' => 'Monthly settlement',
+    ])->assertRedirect();
+
+    // Issue 6: every payment recorded against a supplier lands on their
+    // profile feed with full detail and the branch-wise dues summary.
+    $entry = $supplier->notifications()
+        ->get()
+        ->first(fn ($notification) => str_contains($notification->data['body'] ?? '', 'recorded on'));
+
+    expect($entry)->not->toBeNull()
+        ->and($entry->data['title'])->toBe('Payment recorded')
+        ->and($entry->data['body'])->toContain('500.00')
+        ->and($entry->data['body'])->toContain('via cash')
+        ->and($entry->data['body'])->toContain('Branches with dues cleared');
+
+    $this->get(route('suppliers.profile', $supplier))
+        ->assertOk()
+        ->assertSee('Payment recorded');
+});
+
 it('forbids users without permission from viewing suppliers', function () {
     $user = User::factory()->create(['email_verified_at' => now()]);
 

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Exports;
 
 use App\Models\StockAdjustment;
+use App\Models\User;
+use App\Services\LocationScope;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -32,6 +34,7 @@ class StockAdjustmentExport implements FromCollection, WithHeadings, WithMapping
     public function __construct(
         protected ?string $search = null,
         ?string $columns = null,
+        protected ?User $user = null,
     ) {
         if (! empty($columns)) {
             $requested = array_filter(array_map('trim', explode(',', $columns)));
@@ -45,9 +48,16 @@ class StockAdjustmentExport implements FromCollection, WithHeadings, WithMapping
 
     public function collection(): Collection
     {
-        return StockAdjustment::query()
+        $query = StockAdjustment::query()
             ->with('creator')
-            ->when($this->search, fn ($q) => $q->search($this->search))
+            ->when($this->search, fn ($q) => $q->search($this->search));
+
+        // Strict branch isolation: exports honour the user's scope too.
+        if ($this->user !== null) {
+            $query = LocationScope::scopeQuery($query, $this->user);
+        }
+
+        return $query
             ->orderBy('adjustment_date', 'desc')
             ->get();
     }

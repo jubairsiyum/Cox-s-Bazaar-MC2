@@ -18,6 +18,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\PlaceholderController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\ProductController;
@@ -33,6 +34,8 @@ use App\Http\Controllers\StockAdjustmentController;
 use App\Http\Controllers\StockTransferController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SupplierPaymentController;
+use App\Http\Controllers\SupplierProfileController;
+use App\Http\Controllers\TransactionCategoryController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\WarehouseController;
 use Illuminate\Support\Facades\Route;
@@ -215,6 +218,28 @@ Route::middleware('auth')->group(function () {
         Route::get('suppliers/import/template', [SupplierController::class, 'downloadTemplate'])->name('suppliers.import-template');
     });
 
+    // Profile access is decided by SupplierPolicy (staff with suppliers.view/manage, or the linked supplier login).
+    Route::middleware(['verified'])->group(function () {
+        Route::get('suppliers/{supplier}/profile', [SupplierProfileController::class, 'profile'])->name('suppliers.profile');
+        Route::patch('suppliers/{supplier}/profile/purchase-orders/{purchaseOrder}/accept', [SupplierProfileController::class, 'acceptOrder'])->name('suppliers.profile.accept-order');
+        Route::post('suppliers/{supplier}/profile/payment-requests', [SupplierProfileController::class, 'sendPaymentRequest'])->name('suppliers.profile.payment-requests.store');
+        Route::patch('suppliers/{supplier}/profile/payment-requests/{paymentRequest}/cancel', [SupplierProfileController::class, 'cancelPaymentRequest'])->name('suppliers.profile.payment-requests.cancel');
+    });
+
+    Route::middleware(['verified'])->group(function () {
+        Route::get('my-supplier-profile', [SupplierProfileController::class, 'ownProfile'])->name('suppliers.my-profile');
+        Route::get('my-supplier-profile/{section}', [SupplierProfileController::class, 'ownSection'])
+            ->whereIn('section', ['details', 'dues', 'orders', 'payments', 'returns', 'requests', 'activity'])
+            ->name('suppliers.my-profile.section');
+        Route::patch('my-supplier-profile/password', [SupplierProfileController::class, 'updateOwnPassword'])->name('suppliers.my-profile.password');
+        Route::patch('my-supplier-profile/requests/{paymentRequest}', [SupplierProfileController::class, 'updateOwnPaymentRequest'])
+            ->whereNumber('paymentRequest')
+            ->name('suppliers.my-profile.requests.update');
+        Route::patch('my-supplier-profile/{supplier}', [SupplierProfileController::class, 'updateOwnProfile'])
+            ->whereNumber('supplier')
+            ->name('suppliers.my-profile.update');
+    });
+
     Route::middleware(['verified', 'permission:suppliers.manage'])->group(function () {
         Route::get('suppliers/create', [SupplierController::class, 'create'])->name('suppliers.create');
         Route::post('suppliers', [SupplierController::class, 'store'])->name('suppliers.store');
@@ -364,6 +389,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware(['verified', 'permission:purchase-invoices.manage'])->group(function () {
         Route::get('purchase-invoices/{purchaseOrder}/edit', [PurchaseOrderController::class, 'edit'])->name('purchase-invoices.edit');
         Route::patch('purchase-invoices/{purchaseOrder}', [PurchaseOrderController::class, 'update'])->name('purchase-invoices.update');
+        Route::patch('purchase-invoices/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])->name('purchase-invoices.receive');
         Route::delete('purchase-invoices/{purchaseOrder}', [PurchaseOrderController::class, 'destroy'])->name('purchase-invoices.destroy');
     });
 
@@ -520,6 +546,31 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('permission:finance.view|finance.manage|income-transactions.manage|expense-transactions.manage')->group(function () {
         Route::redirect('income-transactions', '/transactions', 302)->name('income-transactions.index');
         Route::redirect('expense-transactions', '/transactions', 302)->name('expense-transactions.index');
+    });
+
+    /*
+    | Transactions reference data — the "Transaction Category" and "Method"
+    | master lists that populate the Finance dropdowns
+    */
+    Route::middleware('permission:finance.view|finance.manage|income-transactions.manage|expense-transactions.manage')->group(function () {
+        Route::get('transaction-categories', [TransactionCategoryController::class, 'index'])->name('transaction-categories.index');
+        Route::get('payment-methods', [PaymentMethodController::class, 'index'])->name('payment-methods.index');
+    });
+
+    Route::middleware('permission:finance.manage|income-transactions.manage|expense-transactions.manage')->group(function () {
+        Route::get('transaction-categories/create', [TransactionCategoryController::class, 'create'])->name('transaction-categories.create');
+        Route::post('transaction-categories', [TransactionCategoryController::class, 'store'])->name('transaction-categories.store');
+        Route::get('transaction-categories/{transactionCategory}/edit', [TransactionCategoryController::class, 'edit'])->name('transaction-categories.edit');
+        Route::patch('transaction-categories/{transactionCategory}', [TransactionCategoryController::class, 'update'])->name('transaction-categories.update');
+        Route::patch('transaction-categories/{transactionCategory}/toggle-status', [TransactionCategoryController::class, 'toggleStatus'])->name('transaction-categories.toggle-status');
+        Route::delete('transaction-categories/{transactionCategory}', [TransactionCategoryController::class, 'destroy'])->name('transaction-categories.destroy');
+
+        Route::get('payment-methods/create', [PaymentMethodController::class, 'create'])->name('payment-methods.create');
+        Route::post('payment-methods', [PaymentMethodController::class, 'store'])->name('payment-methods.store');
+        Route::get('payment-methods/{paymentMethod}/edit', [PaymentMethodController::class, 'edit'])->name('payment-methods.edit');
+        Route::patch('payment-methods/{paymentMethod}', [PaymentMethodController::class, 'update'])->name('payment-methods.update');
+        Route::patch('payment-methods/{paymentMethod}/toggle-status', [PaymentMethodController::class, 'toggleStatus'])->name('payment-methods.toggle-status');
+        Route::delete('payment-methods/{paymentMethod}', [PaymentMethodController::class, 'destroy'])->name('payment-methods.destroy');
     });
 
     /*

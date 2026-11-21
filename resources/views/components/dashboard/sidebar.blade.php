@@ -1,11 +1,13 @@
 @php
 use App\Helpers\MenuHelper;
-$menuGroups = MenuHelper::getMenuGroups();
-$sidebarUnreadCount = auth()->user()?->unreadNotifications()->count() ?? 0;
+$isSupplierPortal = auth()->user()?->isSupplierPortalUser() ?? false;
+$sidebarUnreadCount = auth()->user() === null ? 0 : \App\Services\NotificationService::scopeFor(auth()->user()->unreadNotifications(), auth()->user())->count();
+$sidebarUnreadBadge = $sidebarUnreadCount > 0 ? ($sidebarUnreadCount > 99 ? '99+' : (string) $sidebarUnreadCount) : null;
+$menuGroups = $isSupplierPortal ? MenuHelper::getSupplierPortalGroups($sidebarUnreadBadge) : MenuHelper::getMenuGroups();
 
 // Move top-level "Notifications" inside "Administration" for cleaner navigation hierarchy
 foreach ($menuGroups as &$groupRef) {
-  if (($groupRef['title'] ?? '') !== 'Menu' || empty($groupRef['items'])) {
+  if (($groupRef['title'] ?? '') !== 'Menu' || empty($groupRef['items']) || $isSupplierPortal) {
     continue;
   }
 
@@ -178,7 +180,7 @@ $isTailAdminActive = true;
 
   {{-- Brand Logo --}}
   <div class="shrink-0">
-    <a href="{{ route('dashboard') }}" class="flex items-center gap-3 px-2 pt-1">
+    <a href="{{ route($isSupplierPortal ? 'suppliers.my-profile' : 'dashboard') }}" class="flex items-center gap-3 px-2 pt-1">
       <img src="{{ asset('cmc2-logo.jpeg') }}" alt="{{ config('app.name') }}" class="h-9 w-9 shrink-0 rounded-xl object-contain bg-surface p-0.5 shadow-sm">
       <div class="min-w-0">
         <span class="block text-base font-extrabold tracking-tight text-ink truncate">{{ config('app.name', 'Swift Track') }}</span>
@@ -312,13 +314,20 @@ $isTailAdminActive = true;
                 </span>
                 <span class="truncate">{{ __($item['name']) }}</span>
               </span>
-              @if (!empty($item['new']))
+              @if (!empty($item['badge']))
+              <span class="rounded-full bg-danger/15 px-1.5 py-0.5 text-[10px] font-bold text-danger tabular-nums leading-none">{{ $item['badge'] }}</span>
+              @elseif (!empty($item['new']))
               <span class="rounded-full bg-brand-500/10 px-2 py-0.5 text-[10px] font-bold text-brand-500 uppercase">New</span>
               @endif
             </a>
             @endif
           </li>
           @endforeach
+          @if ($menuGroup['title'] === 'Menu' && ! $isSupplierPortal)
+          @hasSection('sidebar_sections')
+          @yield('sidebar_sections')
+          @endif
+          @endif
         </ul>
       </div>
     </div>

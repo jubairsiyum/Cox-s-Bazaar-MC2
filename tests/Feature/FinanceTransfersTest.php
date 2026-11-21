@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\AccountEntryStatus;
 use App\Models\Account;
 use App\Models\AccountTransfer;
+use App\Models\Location;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\SettingsSeeder;
@@ -149,13 +150,15 @@ it('re-applies balances when a completed transfer is edited', function () {
 });
 
 it('blocks self-approval of transfers when another approver exists', function () {
-    $creator = User::factory()->create(['status' => 'active']);
+    $location = Location::factory()->create();
+
+    $creator = User::factory()->create(['status' => 'active', 'branch_id' => $location->id]);
     $creator->assignRole('Accountant');
-    $otherApprover = User::factory()->create(['status' => 'active']);
+    $otherApprover = User::factory()->create(['status' => 'active', 'branch_id' => $location->id]);
     $otherApprover->assignRole('Accountant');
 
-    $from = Account::factory()->cash()->withBalance(500)->create();
-    $to = Account::factory()->bank()->withBalance(0)->create();
+    $from = Account::factory()->cash()->withBalance(500)->create(['location_id' => $location->id]);
+    $to = Account::factory()->bank()->withBalance(0)->create(['location_id' => $location->id]);
 
     $this->actingAs($creator)->post(route('account-transfers.store'), [
         'from_account_id' => $from->id,

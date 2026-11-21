@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\PurchaseDue;
 
-use App\Enums\PaymentMethod;
 use App\Models\PurchaseOrder;
 use App\Models\PurchasePayment;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\ValidationRule;
 
 class UpdatePurchaseDueRequest extends FormRequest
@@ -23,9 +21,12 @@ class UpdatePurchaseDueRequest extends FormRequest
      */
     public function rules(): array
     {
+        /** @var PurchasePayment|null $current */
+        $current = $this->route('purchasePayment');
+
         return [
             'amount' => ['required', 'numeric', 'min:0.01', 'max:'.$this->remainingDue()],
-            'method' => ['nullable', new Enum(PaymentMethod::class)],
+            'method' => ['nullable', 'string', 'max:20', ...PurchasePayment::methodRules($current?->method)],
             'note' => ['nullable', 'string', 'max:500'],
         ];
     }

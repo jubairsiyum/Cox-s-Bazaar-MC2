@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\PurchaseDue;
 
-use App\Enums\PaymentMethod;
 use App\Models\PurchaseOrder;
 use App\Models\PurchasePayment;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\ValidationRule;
 
 class StorePurchaseDueRequest extends FormRequest
@@ -26,7 +24,7 @@ class StorePurchaseDueRequest extends FormRequest
         return [
             'purchase_order_id' => ['required', 'integer', 'exists:purchase_orders,id'],
             'amount' => ['required', 'numeric', 'min:0.01', 'max:'.$this->remainingDue()],
-            'method' => ['nullable', new Enum(PaymentMethod::class)],
+            'method' => ['nullable', 'string', 'max:20', ...PurchasePayment::methodRules()],
             'note' => ['nullable', 'string', 'max:500'],
         ];
     }
