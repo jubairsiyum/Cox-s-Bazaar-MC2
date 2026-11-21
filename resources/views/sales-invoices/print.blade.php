@@ -68,6 +68,9 @@
             <div class="doc-detail">Date: <strong>{{ $invoice->invoice_date->format('d/m/Y h:i A') }}</strong></div>
             <div class="doc-detail">Status: <strong>{{ $invoice->status->label() }}</strong></div>
             <div class="doc-detail">Location: <strong>{{ $invoice->location?->name ?? '—' }}</strong></div>
+            @if($invoice->salesOrder?->expected_date)
+                <div class="doc-detail">Expected: <strong>{{ $invoice->salesOrder->expected_date->format('d/m/Y') }}</strong></div>
+            @endif
         </div>
     </div>
 

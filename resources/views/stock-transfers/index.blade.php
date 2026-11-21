@@ -311,7 +311,7 @@
                         </div>
                     </form>
 
-                    @unless(\App\Services\LocationScope::isRestricted(auth()->user()))
+                    @if(auth()->user()?->hasRole('Super Admin'))
                         <form method="GET" action="{{ route('stock-transfers.index') }}" class="flex items-center gap-2 shrink-0">
                             @if(request('search'))<input type="hidden" name="search" value="{{ request('search') }}">@endif
                             @if(request('per_page'))<input type="hidden" name="per_page" value="{{ request('per_page') }}">@endif
@@ -325,7 +325,7 @@
                                 @endforeach
                             </select>
                         </form>
-                    @endunless
+                    @endif
                 </div>
 
                 {{-- Right: Segmented Export Bar + Column Visibility Dropdown --}}

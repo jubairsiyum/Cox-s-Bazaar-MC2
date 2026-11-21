@@ -39,7 +39,7 @@
     $maxQtyOnPage = max(1, (int) ($stockLevels->max('quantity') ?? 1), $threshold * 3);
     $activeStatus = (string) request('stock_status', '');
     $hasActiveFilters = request()->filled('search') || request()->filled('brand_id') || request()->filled('category_id') || request()->filled('stock_status');
-    $branchFilter = ! \App\Services\LocationScope::isRestricted(auth()->user()) && request()->filled('branch')
+    $branchFilter = auth()->user()?->hasRole('Super Admin') && request()->filled('branch')
         ? (int) request('branch')
         : null;
     $branchFilterName = $branchFilter !== null
@@ -248,7 +248,7 @@
                 </div>
             </div>
 
-            @unless(\App\Services\LocationScope::isRestricted(auth()->user()))
+            @if(auth()->user()?->hasRole('Super Admin'))
                 <form method="GET" action="{{ route('inventory.index') }}" class="flex items-center gap-2 shrink-0">
                     @if(request('search'))<input type="hidden" name="search" value="{{ request('search') }}">@endif
                     @if(request('brand_id'))<input type="hidden" name="brand_id" value="{{ request('brand_id') }}">@endif
@@ -272,7 +272,7 @@
                         @endforeach
                     </select>
                 </form>
-            @endunless
+            @endif
         </div>
 
         {{-- Filter Command Toolbar --}}

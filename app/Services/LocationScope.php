@@ -8,23 +8,22 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Branch (location) scoping for outlet-level users.
+ * Branch (location) scoping facade.
  *
- * Outlet Managers are tied to a single branch — the outlet/location they work
- * at (users.branch_id is a locations id) — and may only see and act on
- * documents of that location. Super Admins and Managers (head office) keep
- * complete visibility across all locations. Users without a branch assignment
- * are unrestricted as well.
+ * The strict branch-isolation concept lives in {@see BranchScope}: full
+ * cross-branch access for the Super Admin only, own-branch matching for every
+ * assigned user, and no operational data for restricted users without a
+ * branch assignment. This class is a thin facade kept for existing call
+ * sites; new code should use BranchScope directly.
  */
 class LocationScope
 {
     /**
-     * Whether the user is limited to specific locations.
+     * Whether the user is limited to their own branch/location.
      */
     public static function isRestricted(User $user): bool
     {
-        return $user->hasRole('Outlet Manager')
-            && ! $user->hasAnyRole(['Super Admin', 'Manager']);
+        return BranchScope::isRestricted($user);
     }
 
     /**
@@ -34,11 +33,7 @@ class LocationScope
      */
     public static function accessibleLocationIds(User $user): ?array
     {
-        if (! self::isRestricted($user)) {
-            return null;
-        }
-
-        return $user->branch_id !== null ? [(int) $user->branch_id] : [];
+        return BranchScope::accessibleLocationIds($user);
     }
 
     /**
@@ -46,13 +41,7 @@ class LocationScope
      */
     public static function canAccess(User $user, int|string|null $locationId): bool
     {
-        if (! self::isRestricted($user)) {
-            return true;
-        }
-
-        return $locationId !== null
-            && $user->branch_id !== null
-            && (int) $user->branch_id === (int) $locationId;
+        return BranchScope::canAccess($user, $locationId);
     }
 
     /**
@@ -60,12 +49,6 @@ class LocationScope
      */
     public static function scopeQuery(Builder $query, User $user, string $column = 'location_id'): Builder
     {
-        $ids = self::accessibleLocationIds($user);
-
-        if ($ids === null) {
-            return $query;
-        }
-
-        return $query->whereIn($column, $ids);
+        return BranchScope::scopeQuery($query, $user, $column);
     }
 }

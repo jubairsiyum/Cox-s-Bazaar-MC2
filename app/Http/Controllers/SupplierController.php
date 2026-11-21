@@ -13,6 +13,8 @@ use App\Models\Supplier;
 use App\Models\SupplierOpeningPayment;
 use App\Services\AuditService;
 use App\Services\DuplicateCheckService;
+use App\Services\SupplierNotifier;
+use App\Services\SupplierScope;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -34,7 +36,7 @@ class SupplierController extends Controller
             $perPage = 10;
         }
 
-        $query = Supplier::query()
+        $query = SupplierScope::scopeQuery(Supplier::query(), $request->user(), 'id')
             ->when($request->filled('search'), fn ($q) => $q->search($request->string('search')->toString()))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')->toString()))
             ->latest('id');
@@ -82,6 +84,8 @@ class SupplierController extends Controller
      */
     public function store(StoreSupplierRequest $request): RedirectResponse
     {
+        $this->authorize('create', Supplier::class);
+
         $validated = $request->validated();
         $validated['created_by'] = $request->user()->id;
 
@@ -132,6 +136,8 @@ class SupplierController extends Controller
      */
     public function update(UpdateSupplierRequest $request, Supplier $supplier): RedirectResponse
     {
+        $this->authorize('update', $supplier);
+
         $original = $supplier->getOriginal();
         $validated = $request->validated();
 
@@ -214,6 +220,8 @@ class SupplierController extends Controller
         $newDue = max(0, (float) $supplier->purchase_due - $amount);
         $supplier->update(['purchase_due' => $newDue]);
 
+        SupplierNotifier::openingPaymentRecorded($payment, $request->user());
+
         AuditService::log('paid', $payment, [], $validated, "Recorded payment of {$amount} for supplier '{$supplier->name}'.");
 
         return back()->with('success', 'Payment of '.number_format($amount, 2).' recorded successfully.');
@@ -245,6 +253,8 @@ class SupplierController extends Controller
 
         $newDue = max(0, (float) $supplier->purchase_return_due - $amount);
         $supplier->update(['purchase_return_due' => $newDue]);
+
+        SupplierNotifier::openingPaymentRecorded($payment, $request->user());
 
         AuditService::log('paid', $payment, [], $validated, "Recorded return payment of {$amount} for supplier '{$supplier->name}'.");
 
@@ -284,6 +294,8 @@ class SupplierController extends Controller
      */
     public function import(ImportSupplierRequest $request): RedirectResponse
     {
+        $this->authorize('import', Supplier::class);
+
         $import = new SupplierImport;
         Excel::import($import, $request->file('file'));
 
@@ -394,7 +406,7 @@ class SupplierController extends Controller
             $columns = $defaultColumns;
         }
 
-        $suppliers = Supplier::query()
+        $suppliers = SupplierScope::scopeQuery(Supplier::query(), $request->user(), 'id')
             ->when($search !== '', fn ($q) => $q->search($search))
             ->when($status !== '', fn ($q) => $q->where('status', $status))
             ->latest('id')
@@ -453,7 +465,7 @@ class SupplierController extends Controller
             $columns = $defaultColumns;
         }
 
-        $suppliers = Supplier::query()
+        $suppliers = SupplierScope::scopeQuery(Supplier::query(), $request->user(), 'id')
             ->when($search !== '', fn ($q) => $q->search($search))
             ->when($status !== '', fn ($q) => $q->where('status', $status))
             ->latest('id')
@@ -481,7 +493,7 @@ class SupplierController extends Controller
         $filename = 'suppliers_'.now()->format('Y-m-d_His').'.'.($format === 'csv' ? 'csv' : 'xlsx');
 
         return Excel::download(
-            new SupplierExport($search ?: null, $status ?: null, $columns ?: null),
+            new SupplierExport($search ?: null, $status ?: null, $columns ?: null, $request->user()),
             $filename
         );
     }

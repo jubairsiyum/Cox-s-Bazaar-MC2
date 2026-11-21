@@ -18,6 +18,7 @@ use App\Models\Unit;
 use App\Services\AuditService;
 use App\Services\SalesInvoiceService;
 use App\Services\SalesScope;
+use App\Services\StockService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -335,13 +336,15 @@ class SalesInvoiceController extends Controller
             ->limit(20)
             ->get();
 
+        $quantities = StockService::scopedQuantitiesFor($units, $request->user());
+
         return response()->json([
             'success' => true,
             'units' => $units->map(fn (Unit $unit) => [
                 'id' => (int) $unit->id,
                 'display_name' => $unit->displayName(),
                 'unit' => $unit->unit,
-                'quantity' => (float) $unit->quantity,
+                'quantity' => (float) ($quantities[$unit->id] ?? 0),
                 'sale_price' => (float) ($unit->product?->sale_price ?? 0),
                 'barcode' => $unit->product?->barcode,
             ])->values()->all(),
@@ -397,8 +400,8 @@ class SalesInvoiceController extends Controller
         $query = SalesScope::scopeQuery($query, $request->user());
 
         return $query
-            ->when($request->filled('location_id'), fn ($q) => $q->where('location_id', (int) $request->input('location_id')))
-            ->when($request->filled('branch_id'), fn ($q) => $q->where('branch_id', (int) $request->input('branch_id')));
+            ->when($request->filled('location_id') && ! SalesScope::isRestricted($request->user()), fn ($q) => $q->where('location_id', (int) $request->input('location_id')))
+            ->when($request->filled('branch_id') && ! SalesScope::isRestricted($request->user()), fn ($q) => $q->where('branch_id', (int) $request->input('branch_id')));
     }
 
     /**
@@ -415,7 +418,7 @@ class SalesInvoiceController extends Controller
             ->when($request->filled('payment_status'), fn ($q) => $q->where('payment_status', $request->string('payment_status')->toString()));
 
         return SalesScope::scopeQuery($query, $request->user())
-            ->when($request->filled('branch_id'), function (Builder $q) use ($request): void {
+            ->when($request->filled('branch_id') && ! SalesScope::isRestricted($request->user()), function (Builder $q) use ($request): void {
                 // POS/walk-in invoices carry no branch of their own: their
                 // location's branch counts as the branch for filtering.
                 $branchId = (int) $request->input('branch_id');

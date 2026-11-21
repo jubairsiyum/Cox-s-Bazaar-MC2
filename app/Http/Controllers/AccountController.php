@@ -11,8 +11,10 @@ use App\Models\Account;
 use App\Models\AccountTransaction;
 use App\Models\Location;
 use App\Services\AuditService;
+use App\Services\BranchScope;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -25,6 +27,10 @@ class AccountController extends Controller
 {
     /**
      * List the accounts of one type with balance KPIs.
+     *
+     * Strict branch isolation: branch users see their own branch's accounts
+     * only. NULL-location accounts are shared/head-office accounts and stay
+     * visible to the Super Admin alone.
      */
     public function index(Request $request, string $type): View
     {
@@ -32,12 +38,14 @@ class AccountController extends Controller
 
         $this->authorize('viewAny', Account::class);
 
+        $user = $request->user();
+
         $perPage = (int) $request->input('per_page', 10);
         if (! in_array($perPage, [10, 25, 50, 100], true)) {
             $perPage = 10;
         }
 
-        $accounts = Account::query()
+        $accounts = BranchScope::scopeQuery(Account::query(), $user)
             ->type($accountType)
             ->search($request->string('search')->toString())
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')->toString()))
@@ -46,7 +54,7 @@ class AccountController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
-        $balanceTotals = Account::query()
+        $balanceTotals = BranchScope::scopeQuery(Account::query(), $user)
             ->selectRaw("
                 COALESCE(SUM(CASE WHEN type = 'cash' THEN current_balance ELSE 0 END), 0) as cash_total,
                 COALESCE(SUM(CASE WHEN type = 'bank' THEN current_balance ELSE 0 END), 0) as bank_total,
@@ -55,7 +63,7 @@ class AccountController extends Controller
             ")
             ->first();
 
-        $monthMovement = AccountTransaction::query()
+        $monthMovement = BranchScope::scopeQuery(AccountTransaction::query(), $user)
             ->selectRaw("
                 COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as income_total,
                 COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as expense_total
@@ -89,7 +97,7 @@ class AccountController extends Controller
 
         return view('accounts.create', [
             'type' => $accountType,
-            'locations' => Location::query()->orderBy('name')->get(['id', 'name']),
+            'locations' => $this->scopedLocations(),
         ]);
     }
 
@@ -105,6 +113,13 @@ class AccountController extends Controller
         $validated['opening_balance'] = round((float) ($validated['opening_balance'] ?? 0), 2);
         $validated['current_balance'] = $validated['opening_balance'];
         $validated['created_by'] = $request->user()?->id;
+
+        // Strict branch isolation: branch users can only open accounts for
+        // their own branch (Super Admin may choose any branch, or none —
+        // a shared/head-office account).
+        if (BranchScope::isRestricted($request->user())) {
+            $validated['location_id'] = BranchScope::locationId($request->user());
+        }
 
         $account = Account::create($validated);
 
@@ -125,7 +140,7 @@ class AccountController extends Controller
         return view('accounts.edit', [
             'type' => $account->type,
             'account' => $account,
-            'locations' => Location::query()->orderBy('name')->get(['id', 'name']),
+            'locations' => $this->scopedLocations(),
         ]);
     }
 
@@ -140,6 +155,11 @@ class AccountController extends Controller
         $original = $account->getOriginal();
         $validated = $request->validated();
         $validated['type'] = $account->type->value;
+
+        // Strict branch isolation: branch users stay locked to their own branch.
+        if (BranchScope::isRestricted($request->user())) {
+            $validated['location_id'] = BranchScope::locationId($request->user());
+        }
 
         $openingDelta = round((float) ($validated['opening_balance'] ?? 0) - (float) $account->opening_balance, 2);
 
@@ -195,11 +215,30 @@ class AccountController extends Controller
 
     /**
      * Guard against reaching a bank account through the cash screens and vice
-     * versa.
+     * versa — and against reaching another branch's account at all.
      */
     private function scopedAccount(Account $account, string $type): void
     {
         abort_unless($account->type->value === $type, 404);
+
+        $user = auth()->user();
+
+        abort_unless($user === null || BranchScope::canAccess($user, $account->location_id), 403);
+    }
+
+    /**
+     * Locations the acting user may open accounts for: their own branch only
+     * for branch users, every location for the Super Admin.
+     *
+     * @return Collection<int, Location>
+     */
+    private function scopedLocations(): Collection
+    {
+        $user = auth()->user();
+
+        $query = Location::query()->orderBy('name');
+
+        return ($user !== null ? BranchScope::scopeQuery($query, $user, 'id') : $query)->get(['id', 'name']);
     }
 
     /**

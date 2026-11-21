@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\SupplierPayment;
 
-use App\Enums\PaymentMethod;
 use App\Models\PurchaseOrder;
+use App\Models\PurchasePayment;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\ValidationRule;
 
 class StoreSupplierPaymentRequest extends FormRequest
@@ -38,8 +37,15 @@ class StoreSupplierPaymentRequest extends FormRequest
             'amount' => ['required', 'numeric', 'min:0.01', 'max:'.$this->remainingDue()],
             'payment_date' => ['required', 'date'],
             'account_id' => ['required', 'integer', 'exists:accounts,id'],
-            'method' => ['nullable', new Enum(PaymentMethod::class)],
+            'method' => ['nullable', 'string', 'max:20', ...PurchasePayment::methodRules()],
             'note' => ['nullable', 'string', 'max:500'],
+            'payment_request_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('supplier_payment_requests', 'id')->where(fn ($query) => $query
+                    ->where('supplier_id', (int) $this->input('supplier_id'))
+                    ->where('status', 'open')),
+            ],
         ];
     }
 

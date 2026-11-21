@@ -20,6 +20,7 @@ class GenericDatabaseNotification extends Notification
         public string $body = '',
         public ?string $url = null,
         public string $type = 'info',
+        public ?int $locationId = null,
     ) {}
 
     /**
@@ -31,7 +32,7 @@ class GenericDatabaseNotification extends Notification
     }
 
     /**
-     * @return array{title: string, body: string, url: ?string, type: string}
+     * @return array{title: string, body: string, url: ?string, type: string, location_id: ?int}
      */
     public function toDatabase(object $notifiable): array
     {
@@ -40,6 +41,7 @@ class GenericDatabaseNotification extends Notification
             'body' => $this->body,
             'url' => $this->url,
             'type' => $this->type,
+            'location_id' => $this->locationId,
         ];
     }
 }

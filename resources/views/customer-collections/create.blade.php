@@ -123,17 +123,35 @@
                     @enderror
                 </div>
 
+                @php
+                    $isCustCollAdmin = auth()->user()?->hasRole('Super Admin') ?? false;
+                    $userAssignedLocId = (int) (auth()->user()?->branch_id ?? auth()->user()?->location_id ?? $defaultLocationId ?? 0);
+                    if (!$isCustCollAdmin && !$userAssignedLocId) {
+                        $userAssignedLocId = (int) (\App\Models\Location::where('status', 'active')
+                            ->where('type', '!=', \App\Enums\LocationType::Warehouse->value ?? 'warehouse')
+                            ->value('id') ?? \App\Models\Location::where('status', 'active')->value('id') ?? 1);
+                    }
+                @endphp
+
                 <div>
                     <label for="location_id" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
                         Business Location<span class="text-danger">*</span>
                     </label>
-                    <select id="location_id" name="location_id" required
-                            class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('location_id') border-danger @enderror">
-                        <option value="">Please Select</option>
-                        @foreach($locations as $location)
-                            <option value="{{ $location->id }}" @selected((int) old('location_id', $defaultLocationId ?? null) === $location->id)>{{ $location->name }}</option>
-                        @endforeach
-                    </select>
+                    @if (!$isCustCollAdmin && $userAssignedLocId)
+                        <div class="w-full rounded-xl border border-line bg-soft/50 px-3.5 py-2.5 text-sm text-ink shadow-2xs flex items-center gap-2">
+                            <x-icon name="store" class="size-4 text-brand-500" />
+                            <span class="font-semibold">{{ $locations->firstWhere('id', $userAssignedLocId)?->name ?? 'Assigned Outlet' }}</span>
+                        </div>
+                        <input type="hidden" id="location_id" name="location_id" value="{{ $userAssignedLocId }}">
+                    @else
+                        <select id="location_id" name="location_id" required
+                                class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('location_id') border-danger @enderror">
+                            <option value="">Please Select</option>
+                            @foreach($locations as $location)
+                                <option value="{{ $location->id }}" @selected((int) old('location_id', $defaultLocationId ?? null) === $location->id)>{{ $location->name }}</option>
+                            @endforeach
+                        </select>
+                    @endif
                     @error('location_id')
                         <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>
                     @enderror

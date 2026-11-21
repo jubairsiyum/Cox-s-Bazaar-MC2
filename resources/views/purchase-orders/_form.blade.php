@@ -62,19 +62,36 @@
                 @enderror
             </div>
 
+            @php
+                $isPOAdmin = auth()->user()?->hasRole('Super Admin') ?? false;
+                $userAssignedLocId = (int) (auth()->user()?->branch_id ?? auth()->user()?->location_id ?? 0);
+                if (!$isPOAdmin && !$userAssignedLocId) {
+                    $userAssignedLocId = (int) (\App\Models\Location::where('status', 'active')
+                        ->where('type', '!=', \App\Enums\LocationType::Warehouse->value ?? 'warehouse')
+                        ->value('id') ?? 1);
+                }
+            @endphp
             <div>
                 <label for="location_id" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
                     Business Location<span class="text-danger">*</span>
                 </label>
-                <select id="location_id" name="location_id" required
-                        class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('location_id') border-danger @enderror">
-                    <option value="">Please Select</option>
-                    @foreach($locations as $location)
-                        <option value="{{ $location->id }}" @selected(old('location_id', $isEdit ? $order->location_id : null) == $location->id)>
-                            {{ $location->name }}
-                        </option>
-                    @endforeach
-                </select>
+                @if (!$isPOAdmin && $userAssignedLocId && !$isEdit)
+                    <div class="w-full rounded-xl border border-line bg-soft/50 px-3.5 py-2.5 text-sm text-ink shadow-2xs flex items-center gap-2">
+                        <x-icon name="store" class="size-4 text-brand-500" />
+                        <span class="font-semibold">{{ $locations->firstWhere('id', $userAssignedLocId)?->name ?? 'Assigned Outlet' }}</span>
+                    </div>
+                    <input type="hidden" id="location_id" name="location_id" value="{{ $userAssignedLocId }}">
+                @else
+                    <select id="location_id" name="location_id" required
+                            class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('location_id') border-danger @enderror">
+                        <option value="">Please Select</option>
+                        @foreach($locations as $location)
+                            <option value="{{ $location->id }}" @selected(old('location_id', $isEdit ? $order->location_id : null) == $location->id)>
+                                {{ $location->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                @endif
                 @error('location_id')
                     <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>
                 @enderror
@@ -120,7 +137,7 @@
                     @endforeach
                 </select>
                 <p class="mt-1.5 text-xs text-muted">
-                    Stock follows this status: "Received" posts the goods into stock right away, while "Pending" / "Ordered" hold them until the purchase is marked Received. "Cancelled" reverses a receipt.
+                    "Ordered" places the order with the supplier — it displays as "Pending" on the purchase list until the supplier accepts it. "Received" is a direct receipt of goods already taken and posts stock right away. Full payment or the supplier's delivery confirmation flips an ordered purchase to "Received" automatically.
                 </p>
                 @error('purchase_status')
                     <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>

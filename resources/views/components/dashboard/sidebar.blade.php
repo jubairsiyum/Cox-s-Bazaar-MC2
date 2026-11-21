@@ -1,53 +1,115 @@
 @php
 use App\Helpers\MenuHelper;
-$menuGroups = MenuHelper::getMenuGroups();
-$sidebarUnreadCount = auth()->user()?->unreadNotifications()->count() ?? 0;
+$isSupplierPortal = auth()->user()?->isSupplierPortalUser() ?? false;
+$sidebarUnreadCount = auth()->user() === null ? 0 : \App\Services\NotificationService::scopeFor(auth()->user()->unreadNotifications(), auth()->user())->count();
+$sidebarUnreadBadge = $sidebarUnreadCount > 0 ? ($sidebarUnreadCount > 99 ? '99+' : (string) $sidebarUnreadCount) : null;
+$menuGroups = $isSupplierPortal ? MenuHelper::getSupplierPortalGroups($sidebarUnreadBadge) : MenuHelper::getMenuGroups();
 
-// Move top-level "Notifications" inside "Administration" for cleaner navigation hierarchy
+// Realign navigation for intuitive ERP UX:
+// 1. "Inventory" holds operational product & stock items (Products, Stock Levels, Transfers, Adjustments, Warehouses)
+// 2. "Master Data" is a dedicated section for administrative control of core lookups (Brands, Categories, Units)
+// 3. "Notifications" is nested under "Administration"
+// 4. Order sections logically: Operations -> Logistics & Partners -> Finance & Reports -> Master Data & Administration
 foreach ($menuGroups as &$groupRef) {
-  if (($groupRef['title'] ?? '') !== 'Menu' || empty($groupRef['items'])) {
+  if (($groupRef['title'] ?? '') !== 'Menu' || empty($groupRef['items']) || $isSupplierPortal) {
     continue;
   }
 
-  $notificationItem = null;
-  $adminIndex = null;
-  $filteredItems = [];
+  $itemMap = collect($groupRef['items'])->keyBy('name');
 
-  foreach ($groupRef['items'] as $navItem) {
-    if (($navItem['name'] ?? '') === 'Notifications' && ($navItem['path'] ?? '') === '/notifications') {
-      $notificationItem = [
-        'name' => $navItem['name'],
-        'path' => $navItem['path'],
-        'can' => $navItem['can'] ?? 'dashboard.view',
-        'badge' => $sidebarUnreadCount > 0 ? ($sidebarUnreadCount > 99 ? '99+' : (string) $sidebarUnreadCount) : null,
-      ];
-      continue;
-    }
+  // Master Data sub-items
+  $masterSubMap = collect($itemMap->get('Master Data')['subItems'] ?? [])->keyBy('name');
+  // Inventory sub-items
+  $invSubMap = collect($itemMap->get('Inventory')['subItems'] ?? [])->keyBy('name');
 
-    if (($navItem['name'] ?? '') === 'Administration') {
-      $adminIndex = count($filteredItems);
-    }
+  // 1. Inventory: Product catalog + physical stock operations & warehouses
+  $inventorySubItems = array_values(array_filter([
+    $masterSubMap->get('Products'),
+    $invSubMap->get('Stock Levels'),
+    $invSubMap->get('Transfers'),
+    $invSubMap->get('Adjustments'),
+    $invSubMap->get('Warehouses'),
+  ]));
 
-    $filteredItems[] = $navItem;
+  $inventoryCanAny = [
+    'products.view', 'products.manage',
+    'inventory.view',
+    'stock-transfers.manage',
+    'stock-adjustments.manage',
+    'warehouses.manage',
+  ];
+
+  $alignedInventory = [
+    'icon' => 'box',
+    'name' => 'Inventory',
+    'canany' => $inventoryCanAny,
+    'subItems' => $inventorySubItems,
+  ];
+
+  // 2. Master Data: Administrative control of foundational classifications (Brands, Categories, Units)
+  $masterDataSubItems = array_values(array_filter([
+    $masterSubMap->get('Brands'),
+    $masterSubMap->get('Categories'),
+    $masterSubMap->get('Units'),
+  ]));
+
+  $masterDataCanAny = [
+    'brands.view', 'brands.manage',
+    'categories.view', 'categories.manage',
+    'units.view', 'units.manage',
+  ];
+
+  $alignedMasterData = [
+    'icon' => 'tables',
+    'name' => 'Master Data',
+    'canany' => $masterDataCanAny,
+    'subItems' => $masterDataSubItems,
+  ];
+
+  // 3. Administration with nested Notifications
+  $adminItem = $itemMap->get('Administration');
+  $adminSubItems = $adminItem['subItems'] ?? [];
+
+  $notificationSubItem = [
+    'name' => 'Notifications',
+    'path' => '/notifications',
+    'can' => 'dashboard.view',
+    'badge' => $sidebarUnreadCount > 0 ? ($sidebarUnreadCount > 99 ? '99+' : (string) $sidebarUnreadCount) : null,
+  ];
+
+  $hasNotifications = collect($adminSubItems)->contains(fn ($s) => ($s['path'] ?? '') === '/notifications');
+  if (!$hasNotifications) {
+    $adminSubItems[] = $notificationSubItem;
   }
 
-  if ($notificationItem !== null && $adminIndex !== null) {
-    $adminCanAny = (array) ($filteredItems[$adminIndex]['canany'] ?? []);
-    if (!in_array($notificationItem['can'], $adminCanAny, true)) {
-      $adminCanAny[] = $notificationItem['can'];
-    }
-    $filteredItems[$adminIndex]['canany'] = $adminCanAny;
-    $filteredItems[$adminIndex]['subItems'] = $filteredItems[$adminIndex]['subItems'] ?? [];
+  $adminCanAny = array_values(array_unique(array_merge(
+    (array) ($adminItem['canany'] ?? []),
+    ['dashboard.view']
+  )));
 
-    $alreadyPresent = collect($filteredItems[$adminIndex]['subItems'])
-      ->contains(fn ($s) => ($s['path'] ?? '') === '/notifications');
+  $alignedAdmin = [
+    'icon' => $adminItem['icon'] ?? 'authentication',
+    'name' => 'Administration',
+    'canany' => $adminCanAny,
+    'subItems' => $adminSubItems,
+  ];
 
-    if (!$alreadyPresent) {
-      $filteredItems[$adminIndex]['subItems'][] = $notificationItem;
-    }
+  // Ordered items exactly as specified:
+  // Dashboard > Master data > Parties > Inventory > Purchasing > Sales > POS > Finance > Reports > Administration
+  $alignedItems = array_values(array_filter([
+    $itemMap->get('Dashboard'),
+    $alignedMasterData,
+    $itemMap->get('Parties'),
+    $alignedInventory,
+    $itemMap->get('Purchasing'),
+    $itemMap->get('Sales'),
+    $itemMap->get('POS Terminal'),
+    $itemMap->get('Finance'),
+    $itemMap->get('Reports'),
+    $alignedAdmin,
+  ]));
 
-    $groupRef['items'] = $filteredItems;
-  }
+  $groupRef['items'] = $alignedItems;
 }
 unset($groupRef);
 
@@ -178,10 +240,11 @@ $isTailAdminActive = true;
 
   {{-- Brand Logo --}}
   <div class="shrink-0">
-    <a href="{{ route('dashboard') }}" class="flex items-center gap-3 px-2 pt-1">
+    <a href="{{ route($isSupplierPortal ? 'suppliers.my-profile' : 'dashboard') }}" class="flex items-center gap-3 px-2 pt-1">
       <img src="{{ asset('cmc2-logo.jpeg') }}" alt="{{ config('app.name') }}" class="h-9 w-9 shrink-0 rounded-xl object-contain bg-surface p-0.5 shadow-sm">
       <div class="min-w-0">
-        <span class="block text-base font-extrabold tracking-tight text-ink truncate">{{ config('app.name', 'Swift Track') }}</span>
+        <!-- <span class="block text-base font-extrabold tracking-tight text-ink truncate">{{ config('app.name', 'Swift Track') }}</span> -->
+        <span class="block text-base font-extrabold tracking-tight text-ink truncate">Cox's Bazar MC2</span>
         <span class="block text-[11px] font-medium text-muted">Distribution ERP</span>
       </div>
     </a>
@@ -312,13 +375,20 @@ $isTailAdminActive = true;
                 </span>
                 <span class="truncate">{{ __($item['name']) }}</span>
               </span>
-              @if (!empty($item['new']))
+              @if (!empty($item['badge']))
+              <span class="rounded-full bg-danger/15 px-1.5 py-0.5 text-[10px] font-bold text-danger tabular-nums leading-none">{{ $item['badge'] }}</span>
+              @elseif (!empty($item['new']))
               <span class="rounded-full bg-brand-500/10 px-2 py-0.5 text-[10px] font-bold text-brand-500 uppercase">New</span>
               @endif
             </a>
             @endif
           </li>
           @endforeach
+          @if ($menuGroup['title'] === 'Menu' && ! $isSupplierPortal)
+          @hasSection('sidebar_sections')
+          @yield('sidebar_sections')
+          @endif
+          @endif
         </ul>
       </div>
     </div>
@@ -328,18 +398,18 @@ $isTailAdminActive = true;
   {{-- Bottom Utilities --}}
   <div class="mt-auto shrink-0 space-y-1 border-t border-line pt-4">
     @php
-      $sidebarSettingsUrl = Route::has('settings.index') ? route('settings.index') : (Route::has('admin.settings.index') ? route('admin.settings.index') : null);
-      $canManageSettings = auth()->user()?->can('settings.manage') ?? false;
+    $sidebarSettingsUrl = Route::has('settings.index') ? route('settings.index') : (Route::has('admin.settings.index') ? route('admin.settings.index') : null);
+    $canManageSettings = auth()->user()?->can('settings.manage') ?? false;
     @endphp
     @if ($sidebarSettingsUrl && $canManageSettings)
-      <a href="{{ $sidebarSettingsUrl }}"
-         class="flex items-center gap-3 rounded-full px-3 py-2 text-sm font-medium text-muted transition hover:bg-soft/60 hover:text-ink">
-        <x-icon name="settings" class="size-4.5" /> Settings
-      </a>
-      <a href="{{ $sidebarSettingsUrl }}?tab=theme"
-         class="flex items-center gap-3 rounded-full px-3 py-2 text-sm font-medium text-muted transition hover:bg-soft/60 hover:text-ink">
-        <x-icon name="palette" class="size-4.5 text-brand-500" /> Themes
-      </a>
+    <a href="{{ $sidebarSettingsUrl }}"
+      class="flex items-center gap-3 rounded-full px-3 py-2 text-sm font-medium text-muted transition hover:bg-soft/60 hover:text-ink">
+      <x-icon name="settings" class="size-4.5" /> Settings
+    </a>
+    <a href="{{ $sidebarSettingsUrl }}?tab=theme"
+      class="flex items-center gap-3 rounded-full px-3 py-2 text-sm font-medium text-muted transition hover:bg-soft/60 hover:text-ink">
+      <x-icon name="palette" class="size-4.5 text-brand-500" /> Themes
+    </a>
     @endif
 
     <form method="POST" action="{{ Route::has('logout') ? route('logout') : '#' }}">

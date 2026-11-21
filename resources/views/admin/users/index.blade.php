@@ -27,12 +27,14 @@
                     <option value="{{ $role->name }}" @selected(request('role') === $role->name)>{{ $role->name }}</option>
                 @endforeach
             </select>
-            <select name="branch_id" class="form-select" onchange="this.form.submit()" style="min-width:160px;">
-                <option value="">All Branches</option>
-                @foreach($locations as $location)
-                    <option value="{{ $location->id }}" @selected(request('branch_id') == $location->id)>{{ $location->name }}</option>
-                @endforeach
-            </select>
+            @if($canFilterBranch)
+                <select name="branch_id" class="form-select" onchange="this.form.submit()" style="min-width:160px;">
+                    <option value="">All Branches</option>
+                    @foreach($locations as $location)
+                        <option value="{{ $location->id }}" @selected(request('branch_id') == $location->id)>{{ $location->name }}</option>
+                    @endforeach
+                </select>
+            @endif
             <select name="status" class="form-select" onchange="this.form.submit()" style="min-width:130px;">
                 <option value="">All Statuses</option>
                 <option value="active" @selected(request('status') === 'active')>Active</option>

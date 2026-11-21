@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Exports;
 
 use App\Models\Supplier;
+use App\Models\User;
+use App\Services\SupplierScope;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -43,6 +45,7 @@ class SupplierExport implements FromCollection, WithHeadings, WithMapping
         protected ?string $search = null,
         protected ?string $status = null,
         ?string $columns = null,
+        protected ?User $user = null,
     ) {
         if (! empty($columns)) {
             $requested = array_filter(array_map('trim', explode(',', $columns)));
@@ -56,7 +59,13 @@ class SupplierExport implements FromCollection, WithHeadings, WithMapping
 
     public function collection(): Collection
     {
-        return Supplier::query()
+        $query = Supplier::query();
+
+        if ($this->user !== null) {
+            $query = SupplierScope::scopeQuery($query, $this->user, 'id');
+        }
+
+        return $query
             ->when($this->search, fn ($q) => $q->search($this->search))
             ->when($this->status, fn ($q) => $q->where('status', $this->status))
             ->latest('id')

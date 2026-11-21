@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Models\Location;
+use App\Models\PurchaseOrder;
+use App\Models\Supplier;
+use App\Models\Unit;
 use App\Models\User;
 use App\Services\NotificationService;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -125,4 +129,50 @@ it('only exposes the notifications of the logged-in user', function () {
 
 it('requires authentication for the notification center', function () {
     $this->get(route('notifications.index'))->assertRedirect('/login');
+});
+
+it('delivers a supplier payment request as an in-app message on the notification screen', function () {
+    $admin = actingAsSuperAdmin();
+
+    $supplier = Supplier::factory()->create(['name' => 'Bismillah Telecom', 'opening_balance' => 0, 'purchase_due' => 0, 'purchase_return_due' => 0]);
+    $location = Location::factory()->create(['name' => 'Chakaria Outlet']);
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $this->post(route('purchase-orders.store'), [
+        'order_date' => now()->format('Y-m-d\TH:i'),
+        'reference_no' => null,
+        'supplier_id' => $supplier->id,
+        'location_id' => $location->id,
+        'purchase_status' => 'ordered',
+        'tax_rate' => 0,
+        'paid_amount' => 0,
+        'items' => [
+            ['unit_id' => $unit->id, 'quantity' => 5, 'unit_price' => 200],
+        ],
+    ])->assertRedirect(route('purchase-invoices.index'));
+
+    $order = PurchaseOrder::query()->firstOrFail();
+
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
+    $manager->assignRole('Outlet Manager');
+
+    $this->actingAs($admin)->post(route('suppliers.profile.payment-requests.store', $supplier), [
+        'location_id' => $location->id,
+        'purchase_order_id' => $order->id,
+        'message' => 'Please settle the outstanding dues for this month.',
+        'amount' => 1000,
+    ])->assertSessionHas('success');
+
+    // The targeted branch sees the message on the bell + notifications screen.
+    $this->actingAs($manager)
+        ->get(route('notifications.index'))
+        ->assertOk()
+        ->assertSee('Payment request from Bismillah Telecom')
+        ->assertSee('Please settle the outstanding dues')
+        ->assertSee(route('supplier-payments.create'), false);
+
+    // The message carries a direct action link to the pre-filled screen.
+    $notification = $manager->notifications()->first();
+
+    expect($notification->data['url'])->toContain('payment_request_id=');
 });

@@ -45,9 +45,9 @@ class PurchaseOrderService
             }
 
             if ($receivedNow) {
-                StockService::restock($unit, $quantity, $order, self::note($order, 'received'));
+                StockService::restock($unit, $quantity, $order, self::note($order, 'received'), $order->location_id !== null ? (int) $order->location_id : null);
             } else {
-                StockService::purchaseReturn($unit, $quantity, $order, self::note($order, 'receipt reversed'));
+                StockService::purchaseReturn($unit, $quantity, $order, self::note($order, 'receipt reversed'), $order->location_id !== null ? (int) $order->location_id : null);
             }
         }
     }
@@ -60,10 +60,12 @@ class PurchaseOrderService
      * or null when the order is newly created.
      *
      * @param  array{supplier_id?: int|null, grand_total?: float|int|string, paid_amount?: float|int|string, purchase_status?: string, approval_status?: string}|null  $original
+     * @return float Signed change of the due this order contributes (new minus old).
      */
-    public static function applySupplierDue(PurchaseOrder $order, ?array $original = null): void
+    public static function applySupplierDue(PurchaseOrder $order, ?array $original = null): float
     {
         $oldDue = 0.0;
+        $newDue = 0.0;
 
         if ($original !== null
             && self::originalStatusIs($original, 'approval_status', ApprovalStatus::Approved)
@@ -87,19 +89,23 @@ class PurchaseOrderService
                 self::adjustDue($order->supplier, $newDue);
             }
         }
+
+        return round($newDue - $oldDue, 2);
     }
 
     /**
      * Drop the unpaid remainder of an order from its supplier's due balance.
      * Used when the order is deleted.
+     *
+     * @return float Signed change of the due (zero or negative).
      */
-    public static function releaseSupplierDue(PurchaseOrder $order): void
+    public static function releaseSupplierDue(PurchaseOrder $order): float
     {
         if ($order->approval_status !== ApprovalStatus::Approved
             || $order->purchase_status === PurchaseStatus::Cancelled
             || ! $order->supplier_id
         ) {
-            return;
+            return 0.0;
         }
 
         $due = self::contribution($order->grand_total, $order->paid_amount);
@@ -107,6 +113,8 @@ class PurchaseOrderService
         if ($due > 0) {
             self::adjustDue($order->supplier, -$due);
         }
+
+        return round(-$due, 2);
     }
 
     /**

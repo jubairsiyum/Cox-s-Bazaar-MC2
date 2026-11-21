@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\StockMovementType;
+use App\Services\StockService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -36,12 +37,14 @@ class Unit extends Model
 
     protected static function booted(): void
     {
-        // Record the opening stock movement for every new stock row.
+        // Record the opening stock movement for every new stock row, stamped
+        // at the creating user's own branch (strict branch isolation).
         static::created(function (Unit $unit) {
             $quantity = (int) $unit->quantity;
 
             if ($quantity > 0) {
                 $unit->stockMovements()->create([
+                    'location_id' => StockService::actorLocationId(),
                     'type' => StockMovementType::Opening,
                     'quantity' => $quantity,
                     'quantity_after' => $quantity,
@@ -64,6 +67,7 @@ class Unit extends Model
             $new = (int) $unit->quantity;
 
             $unit->stockMovements()->create([
+                'location_id' => StockService::actorLocationId(),
                 'type' => StockMovementType::Adjustment,
                 'quantity' => $new - $old,
                 'quantity_after' => $new,

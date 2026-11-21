@@ -27,7 +27,8 @@ class StoreSalesOrderRequest extends FormRequest
             'expected_date' => ['nullable', 'date', 'after_or_equal:order_date'],
             'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
             'customer_name' => ['required_without:customer_id', 'nullable', 'string', 'max:255'],
-            'customer_phone' => ['required', 'string', 'max:50'],
+            'mobile_no' => ['required', 'string', 'max:50'],
+            'customer_email' => ['nullable', 'email', 'max:255'],
             'location_id' => ['required', 'integer', 'exists:locations,id'],
             'tax_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'note' => ['nullable', 'string', 'max:1000'],
@@ -41,8 +42,9 @@ class StoreSalesOrderRequest extends FormRequest
 
     /**
      * Reject customer details that already belong to another customer —
-     * name and phone are unique identities. Conflicts with the customer the
-     * submission resolves to are fine (that profile is reused/updated).
+     * name, phone and email are unique identities. Conflicts with the
+     * customer the submission resolves to are fine (that profile is
+     * reused/updated).
      *
      * @return array<callable(Validator): void>
      */
@@ -57,7 +59,8 @@ class StoreSalesOrderRequest extends FormRequest
                 foreach (CustomerResolver::identityConflicts(
                     (int) $this->input('customer_id') ?: null,
                     $this->input('customer_name'),
-                    $this->input('customer_phone')
+                    $this->input('mobile_no'),
+                    $this->input('customer_email')
                 ) as $field => $conflict) {
                     $validator->errors()->add(
                         $field,
@@ -78,7 +81,8 @@ class StoreSalesOrderRequest extends FormRequest
             'expected_date' => 'Expected Date',
             'customer_id' => 'Customer',
             'customer_name' => 'Customer Name',
-            'customer_phone' => 'Phone Number',
+            'mobile_no' => 'Mobile No',
+            'customer_email' => 'Email',
             'location_id' => 'Business Location',
             'tax_rate' => 'Tax Rate',
             'items' => 'Products',

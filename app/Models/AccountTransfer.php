@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\AccountEntryStatus;
-use App\Enums\AccountMethod;
 use App\Services\NumberingService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -25,6 +24,7 @@ class AccountTransfer extends Model
     protected $fillable = [
         'from_account_id',
         'to_account_id',
+        'location_id',
         'amount',
         'transfer_date',
         'method',
@@ -41,9 +41,9 @@ class AccountTransfer extends Model
         return [
             'from_account_id' => 'integer',
             'to_account_id' => 'integer',
+            'location_id' => 'integer',
             'amount' => 'decimal:2',
             'transfer_date' => 'date',
-            'method' => AccountMethod::class,
             'status' => AccountEntryStatus::class,
             'approved_at' => 'datetime',
         ];
@@ -54,6 +54,14 @@ class AccountTransfer extends Model
         static::creating(function (AccountTransfer $transfer) {
             if (blank($transfer->reference_no)) {
                 $transfer->reference_no = NumberingService::next('transfer_prefix', 'TRF');
+            }
+
+            // Strict branch isolation: the transfer is stamped with the branch
+            // it happened at — the sending account's location, falling back to
+            // the creator's own branch (see BranchScope).
+            if ($transfer->location_id === null) {
+                $transfer->location_id = $transfer->fromAccount?->location_id
+                    ?? User::query()->whereKey($transfer->created_by)->value('branch_id');
             }
         });
     }
@@ -68,6 +76,15 @@ class AccountTransfer extends Model
     public function toAccount(): BelongsTo
     {
         return $this->belongsTo(Account::class, 'to_account_id');
+    }
+
+    /**
+     * The branch (location) this transfer happened at, when known. NULL marks
+     * shared/head-office activity visible to the Super Admin only.
+     */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(Location::class);
     }
 
     public function creator(): BelongsTo

@@ -132,7 +132,7 @@
 
         {{-- Filter Toolbar --}}
         <div class="px-5 sm:px-6 py-4 border-b border-line bg-canvas/40">
-            <form method="GET" action="{{ route('transactions.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3 items-end">
+            <form method="GET" action="{{ route('transactions.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3 items-end">
                 <div class="relative sm:col-span-2">
                     <label class="block text-[11px] font-semibold text-muted uppercase tracking-wider mb-1.5">Search</label>
                     <div class="relative flex items-center">
@@ -174,6 +174,17 @@
                         <option value="">All accounts</option>
                         @foreach($accounts as $account)
                             <option value="{{ $account->id }}" @selected(request('account_id') == $account->id)>{{ $account->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-semibold text-muted uppercase tracking-wider mb-1.5">Category</label>
+                    <select name="category" onchange="this.form.submit()"
+                            class="w-full rounded-xl border border-line bg-surface py-2 px-2.5 text-xs font-semibold text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 cursor-pointer">
+                        <option value="">All categories</option>
+                        @foreach($categories as $value => $label)
+                            <option value="{{ $value }}" @selected(request('category') === $value)>{{ $label }}</option>
                         @endforeach
                     </select>
                 </div>

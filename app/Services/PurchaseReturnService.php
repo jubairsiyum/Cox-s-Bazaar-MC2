@@ -52,9 +52,9 @@ class PurchaseReturnService
             $unit = Unit::query()->findOrFail($unitId);
 
             if ($delta > 0) {
-                StockService::purchaseReturn($unit, $delta, $return, self::note($return, 'returned to supplier'));
+                StockService::purchaseReturn($unit, $delta, $return, self::note($return, 'returned to supplier'), $return->location_id !== null ? (int) $return->location_id : null);
             } else {
-                StockService::restock($unit, -$delta, $return, self::note($return, 'return reversed'));
+                StockService::restock($unit, -$delta, $return, self::note($return, 'return reversed'), $return->location_id !== null ? (int) $return->location_id : null);
             }
         }
     }
@@ -67,9 +67,13 @@ class PurchaseReturnService
      * on update/delete, or null when the return is newly created.
      *
      * @param  array{supplier_id?: int|null, grand_total?: float|int|string, paid_amount?: float|int|string, approval_status?: string}|null  $original
+     * @return float Signed change of the return credit (new minus old).
      */
-    public static function applySupplierDue(PurchaseReturn $return, ?array $original = null): void
+    public static function applySupplierDue(PurchaseReturn $return, ?array $original = null): float
     {
+        $oldDue = 0.0;
+        $newDue = 0.0;
+
         if ($original !== null && self::originalStatusIs($original, ApprovalStatus::Approved)) {
             $oldDue = self::contribution($original['grand_total'] ?? 0, $original['paid_amount'] ?? 0);
             $oldSupplier = Supplier::query()->find($original['supplier_id'] ?? null);
@@ -86,16 +90,20 @@ class PurchaseReturnService
                 self::adjustDue($return->supplier, $newDue);
             }
         }
+
+        return round($newDue - $oldDue, 2);
     }
 
     /**
      * Drop the unpaid remainder of a return from its supplier's return due
      * balance. Used when the return is deleted.
+     *
+     * @return float Signed change of the return credit (zero or negative).
      */
-    public static function releaseSupplierDue(PurchaseReturn $return): void
+    public static function releaseSupplierDue(PurchaseReturn $return): float
     {
         if ($return->approval_status !== ApprovalStatus::Approved || ! $return->supplier_id) {
-            return;
+            return 0.0;
         }
 
         $due = self::contribution($return->grand_total, $return->paid_amount);
@@ -103,6 +111,8 @@ class PurchaseReturnService
         if ($due > 0) {
             self::adjustDue($return->supplier, -$due);
         }
+
+        return round(-$due, 2);
     }
 
     /**

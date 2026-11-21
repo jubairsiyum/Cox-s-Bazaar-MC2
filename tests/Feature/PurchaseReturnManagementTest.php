@@ -9,6 +9,7 @@ use App\Models\PurchaseReturn;
 use App\Models\Supplier;
 use App\Models\Unit;
 use App\Models\User;
+use App\Notifications\GenericDatabaseNotification;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\SettingsSeeder;
 use Illuminate\Support\Facades\Notification;
@@ -296,7 +297,7 @@ function purchaseReturnTeamUser(string $role, array $attributes = []): User
     return $user;
 }
 
-it('sends no approval notifications anywhere in the return flow', function () {
+it('sends no approval notifications to staff anywhere in the return flow', function () {
     Notification::fake();
 
     actingAsSuperAdmin();
@@ -305,20 +306,23 @@ it('sends no approval notifications anywhere in the return flow', function () {
 
     // The old awaiting-approval audience still exists, but nothing awaits
     // approval anymore: a submitted return is already applied.
-    purchaseReturnTeamUser('Outlet Manager', ['branch_id' => $order->location_id]);
+    $manager = purchaseReturnTeamUser('Outlet Manager', ['branch_id' => $order->location_id]);
     purchaseReturnTeamUser('Outlet Manager', ['branch_id' => Location::factory()->create()->id]);
 
     $this->post(route('purchase-returns.store'), purchaseReturnPayload($order))
         ->assertRedirect(route('purchase-returns.index'));
 
-    // Completing or refusing a legacy pending return is silent as well.
+    // Completing or refusing a legacy pending return is silent for staff as well.
     $legacy = legacyPendingReturn($order);
     $this->patch(route('purchase-returns.approve', $legacy))->assertRedirect(route('purchase-returns.index'));
 
     $otherLegacy = legacyPendingReturn($order);
     $this->patch(route('purchase-returns.reject', $otherLegacy))->assertRedirect(route('purchase-returns.index'));
 
-    Notification::assertNothingSent();
+    // The only alerts are the supplier's credit notices: the submitted return
+    // and the approved legacy return. The rejected one moves no credit.
+    Notification::assertNotSentTo($manager, GenericDatabaseNotification::class);
+    Notification::assertSentTimes(GenericDatabaseNotification::class, 2);
 });
 
 it('completes a legacy pending return through the cleanup action', function () {

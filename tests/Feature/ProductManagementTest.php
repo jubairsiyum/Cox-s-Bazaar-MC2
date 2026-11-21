@@ -1,9 +1,11 @@
 <?php
 
 use App\Enums\StockMovementType;
+use App\Models\Location;
 use App\Models\Product;
 use App\Models\Unit;
 use App\Models\User;
+use App\Services\StockService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\SettingsSeeder;
 use Illuminate\Http\UploadedFile;
@@ -433,4 +435,111 @@ it('merges legacy duplicate product variants into a single row', function () {
         'name' => 'Phone Charger 20W',
         'quantity' => 42,
     ])->assertRedirect(route('products.index'));
+});
+
+/**
+ * A verified user with products.view at the given branch.
+ */
+function productBranchUser(Location $location, string $name = 'Branch Viewer'): User
+{
+    $user = User::factory()->create([
+        'name' => $name,
+        'email_verified_at' => now(),
+        'branch_id' => $location->id,
+    ]);
+    $user->assignRole('Sales Staff');
+
+    return $user;
+}
+
+/**
+ * A product with $quantity units in stock at the given location.
+ */
+function productStockedAt(string $name, Location $location, int $quantity): Product
+{
+    $product = Product::factory()->create(['name' => $name, 'storage' => null, 'color' => null]);
+    $unit = Unit::factory()->for($product)->create(['quantity' => 0]);
+    StockService::restock($unit, $quantity, null, null, $location->id);
+
+    return $product;
+}
+
+it('lists only products in stock at the own branch for branch users', function () {
+    $mine = Location::factory()->create(['name' => 'Branch A Outlet']);
+    $other = Location::factory()->create(['name' => 'Branch B Outlet']);
+
+    productStockedAt('Local Phone', $mine, 5);
+    productStockedAt('Away Phone', $other, 7);
+
+    $this->actingAs(productBranchUser($mine))
+        ->get(route('products.index'))
+        ->assertOk()
+        ->assertSee('Local Phone')
+        ->assertDontSee('Away Phone');
+
+    $this->actingAs(productBranchUser($other))
+        ->get(route('products.index'))
+        ->assertOk()
+        ->assertSee('Away Phone')
+        ->assertDontSee('Local Phone');
+});
+
+it('shows cross-branch availability when a searched product is not in stock at the own branch', function () {
+    $mine = Location::factory()->create(['name' => 'Branch A Outlet']);
+    $other = Location::factory()->create(['name' => 'Branch B Outlet']);
+
+    productStockedAt('Local Phone', $mine, 5);
+    productStockedAt('Away Phone', $other, 7);
+
+    $ghost = Product::factory()->create(['name' => 'Ghost Phone', 'storage' => null, 'color' => null]);
+    Unit::factory()->for($ghost)->create(['quantity' => 0]);
+
+    $viewer = productBranchUser($mine);
+
+    // The unsearched list stays availability-based: own branch only.
+    $this->actingAs($viewer)->get(route('products.index'))
+        ->assertOk()
+        ->assertSee('Local Phone')
+        ->assertDontSee('Away Phone')
+        ->assertDontSee('Not in stock at your branch');
+
+    // Searching a product that is out of stock here shows its details with
+    // the branch that does have it — name and available quantity.
+    $this->actingAs($viewer)->get(route('products.index', ['search' => 'Away']))
+        ->assertOk()
+        ->assertSee('Not in stock at your branch')
+        ->assertSee('Away Phone')
+        ->assertSee('Branch B Outlet')
+        ->assertSee('7 pcs available');
+
+    // A searched product nobody stocks is still identified as unavailable.
+    $this->actingAs($viewer)->get(route('products.index', ['search' => 'Ghost']))
+        ->assertOk()
+        ->assertSee('Ghost Phone')
+        ->assertSee('Not available at any branch');
+});
+
+it('keeps the shared catalog for Super Admin and shows nothing to unassigned users', function () {
+    $mine = Location::factory()->create(['name' => 'Branch A Outlet']);
+    $other = Location::factory()->create(['name' => 'Branch B Outlet']);
+
+    productStockedAt('Away Phone', $other, 7);
+
+    // Super Admin sees the whole shared catalog, availability sections aside.
+    actingAsSuperAdmin();
+
+    $this->get(route('products.index'))
+        ->assertOk()
+        ->assertSee('Away Phone')
+        ->assertDontSee('Not in stock at your branch');
+
+    // A restricted user without a branch sees nothing — not even on search.
+    $unassigned = User::factory()->create(['email_verified_at' => now()]);
+    $unassigned->assignRole('Sales Staff');
+
+    $this->actingAs($unassigned)->get(route('products.index', ['search' => 'Away']))
+        ->assertOk()
+        ->assertDontSee('Away Phone')
+        ->assertDontSee('Branch B Outlet')
+        ->assertDontSee('Not in stock at your branch');
 });

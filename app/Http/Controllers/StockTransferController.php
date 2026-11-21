@@ -19,6 +19,7 @@ use App\Services\AuditService;
 use App\Services\LocationScope;
 use App\Services\NotificationService;
 use App\Services\PurchaseApprovalNotifier;
+use App\Services\StockService;
 use App\Services\StockTransferService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
@@ -401,7 +402,8 @@ class StockTransferController extends Controller
     }
 
     /**
-     * Search stock lines (products) for the transfer form.
+     * Search stock lines (products) for the transfer form. Quantities shown
+     * are scoped to the acting user's own branch (strict branch isolation).
      */
     public function searchUnits(Request $request): JsonResponse
     {
@@ -412,12 +414,16 @@ class StockTransferController extends Controller
             ->search($request->string('q')->toString())
             ->orderBy(Product::query()->select('name')->whereColumn('products.id', 'units.product_id'))
             ->limit(10)
-            ->get()
+            ->get();
+
+        $quantities = StockService::scopedQuantitiesFor($units, $request->user());
+
+        $units = $units
             ->map(fn (Unit $unit) => [
                 'id' => $unit->id,
                 'product_name' => $unit->displayName(),
                 'unit' => $unit->unit,
-                'quantity' => $unit->quantity,
+                'quantity' => $quantities[$unit->id] ?? 0,
                 'purchase_price' => (float) ($unit->product?->purchase_price ?? 0),
             ]);
 
@@ -467,7 +473,7 @@ class StockTransferController extends Controller
         $filename = 'stock_transfers_'.now()->format('Y-m-d_His').'.'.($format === 'csv' ? 'csv' : 'xlsx');
 
         return Excel::download(
-            new StockTransferExport($search ?: null, $columns ?: null),
+            new StockTransferExport($search ?: null, $columns ?: null, $request->user()),
             $filename
         );
     }

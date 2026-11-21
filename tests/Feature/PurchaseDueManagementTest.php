@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Enums\ApprovalStatus;
 use App\Enums\PaymentStatus;
+use App\Enums\PurchaseStatus;
+use App\Enums\SupplierOrderStatus;
 use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\Location;
@@ -115,10 +117,11 @@ it('scopes the purchase dues list to the own location for outlet managers', func
 });
 
 it('submits a pending due payment request capped at the due and alerts the responsible managers', function () {
-    $creator = User::factory()->create(['email_verified_at' => now()]);
+    $location = Location::factory()->create();
+
+    $creator = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
     $creator->assignRole('Accountant');
 
-    $location = Location::factory()->create();
     $order = duePurchase(['grand_total' => 5000, 'paid_amount' => 2000], null, $location);
 
     $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
@@ -137,7 +140,7 @@ it('submits a pending due payment request capped at the due and alerts the respo
         ->and((float) $payment->amount)->toBe(3000.0)
         ->and($payment->status)->toBe(ApprovalStatus::Pending)
         ->and((int) $payment->created_by)->toBe($creator->id)
-        ->and($payment->method->value)->toBe('bkash');
+        ->and($payment->method)->toBe('bkash');
 
     // A pending request has no financial effect yet.
     expect((float) $order->fresh()->paid_amount)->toBe(2000.0);
@@ -276,10 +279,19 @@ it('applies nothing when a due payment request is rejected', function () {
 });
 
 it('lets the creator edit or cancel their own pending request only', function () {
-    $creator = User::factory()->create(['email_verified_at' => now()]);
+    $location = Location::factory()->create();
+
+    $creator = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
     $creator->assignRole('Accountant');
 
-    $order = duePurchase();
+    $order = duePurchase([], null, $location);
+
+    // A second responsible user at the branch: without one, the request would
+    // complete directly (nobody else could ever sign it off) and could not be
+    // edited or cancelled as a pending request.
+    $other = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
+    $other->assignRole('Accountant');
+
     $payment = PurchasePayment::factory()->pending()->create([
         'purchase_order_id' => $order->id,
         'amount' => 500,
@@ -292,10 +304,8 @@ it('lets the creator edit or cancel their own pending request only', function ()
 
     expect((float) $payment->fresh()->amount)->toBe(750.0);
 
-    // Another staff member may not touch somebody else's request.
-    $other = User::factory()->create(['email_verified_at' => now()]);
-    $other->assignRole('Accountant');
-
+    // Another staff member of the same branch may not touch somebody else's
+    // request either — the creator-only rule is what blocks them.
     $this->actingAs($other)
         ->patch(route('purchase-dues.update', $payment), ['amount' => 100])
         ->assertForbidden();
@@ -496,4 +506,46 @@ it('completes a legacy pending request directly when its responsible manager upd
     $audit = AuditLog::query()->where('auditable_id', $payment->id)->latest('id')->first();
 
     expect($audit->description)->toContain('completed directly by the responsible manager');
+});
+
+it('keeps the branch side Ordered when the due payment settles the order in full', function () {
+    $location = Location::factory()->create();
+    $supplier = Supplier::factory()->create(['opening_balance' => 0, 'purchase_due' => 3000, 'purchase_return_due' => 0]);
+    $order = duePurchase([
+        'grand_total' => 5000,
+        'paid_amount' => 2000,
+        'purchase_status' => 'ordered',
+        'supplier_status' => 'accepted',
+    ], $supplier, $location);
+
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $location->id]);
+    $manager->assignRole('Outlet Manager');
+
+    $this->actingAs($manager)->post(route('purchase-dues.store'), [
+        'purchase_order_id' => $order->id,
+        'amount' => 3000,
+        'method' => 'cash',
+    ])->assertRedirect();
+
+    $order->refresh();
+
+    // Settling the invoice does not receive the goods: the branch side stays
+    // Ordered and the supplier side Accepted until the goods are received.
+    expect((float) $order->paid_amount)->toBe(5000.0)
+        ->and($order->purchase_status)->toBe(PurchaseStatus::Ordered)
+        ->and($order->supplier_status)->toBe(SupplierOrderStatus::Accepted)
+        ->and($order->payment_status)->toBe(PaymentStatus::Paid)
+        ->and($order->managerDisplayStatus()[1])->toBe('Ordered')
+        ->and($order->supplierDisplayStatus()[1])->toBe('Accepted');
+
+    // The supplier's profile feed records the payment with full detail and
+    // the branch-wise cleared / still owing summary.
+    $entry = $supplier->notifications()
+        ->get()
+        ->first(fn ($notification) => str_contains($notification->data['body'] ?? '', 'recorded on'));
+
+    expect($entry)->not->toBeNull()
+        ->and($entry->data['body'])->toContain('3,000.00')
+        ->and($entry->data['body'])->toContain('Branches with dues cleared')
+        ->and($entry->data['body'])->toContain('still owing');
 });

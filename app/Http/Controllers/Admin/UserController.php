@@ -8,10 +8,14 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\User\StoreUserRequest;
 use App\Http\Requests\User\UpdateUserRequest;
 use App\Models\Location;
+use App\Models\Supplier;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Services\BranchScope;
+use App\Services\DuplicateCheckService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 use Spatie\Permission\Models\Role;
@@ -20,12 +24,17 @@ class UserController extends Controller
 {
     /**
      * Display a listing of the users.
+     *
+     * Strict branch isolation: branch users see only their own branch's
+     * users and the branch filter is offered to the Super Admin only.
      */
     public function index(Request $request): View
     {
         $this->authorize('viewAny', User::class);
 
-        $users = User::query()
+        $canFilterBranch = BranchScope::isUnrestricted($request->user());
+
+        $users = BranchScope::scopeQuery(User::query()->withTrashed(), $request->user(), 'branch_id')
             ->with('roles', 'branch')
             ->when($request->filled('search'), function ($query) use ($request) {
                 $term = $request->string('search')->toString();
@@ -39,13 +48,12 @@ class UserController extends Controller
             ->when($request->filled('role'), function ($query) use ($request) {
                 $query->whereHas('roles', fn ($q) => $q->where('name', $request->string('role')->toString()));
             })
-            ->when($request->filled('branch_id'), function ($query) use ($request) {
+            ->when($request->filled('branch_id') && $canFilterBranch, function ($query) use ($request) {
                 $query->where('branch_id', (int) $request->input('branch_id'));
             })
             ->when($request->filled('status'), function ($query) use ($request) {
                 $query->where('status', $request->string('status')->toString());
             })
-            ->withTrashed()
             ->latest()
             ->paginate(15)
             ->withQueryString();
@@ -53,20 +61,21 @@ class UserController extends Controller
         return view('admin.users.index', [
             'users' => $users,
             'roles' => Role::orderBy('name')->get(),
-            'locations' => Location::orderBy('name')->get(['id', 'name']),
+            'locations' => $this->scopedLocations($request),
+            'canFilterBranch' => $canFilterBranch,
         ]);
     }
 
     /**
      * Show the form for creating a new user.
      */
-    public function create(): View
+    public function create(Request $request): View
     {
         $this->authorize('create', User::class);
 
         return view('admin.users.create', [
             'roles' => Role::orderBy('name')->get(),
-            'locations' => Location::orderBy('name')->get(['id', 'name']),
+            'locations' => $this->scopedLocations($request),
         ]);
     }
 
@@ -76,6 +85,12 @@ class UserController extends Controller
     public function store(StoreUserRequest $request): RedirectResponse
     {
         $validated = $request->validated();
+
+        // Strict branch isolation: branch users create users for their own
+        // branch only (Super Admin may choose any branch, or none).
+        if (BranchScope::isRestricted($request->user())) {
+            $validated['branch_id'] = BranchScope::locationId($request->user());
+        }
 
         $user = User::create([
             'name' => $validated['name'],
@@ -91,6 +106,10 @@ class UserController extends Controller
             $user->syncRoles($validated['roles']);
         }
 
+        if (in_array('Supplier', $validated['roles'] ?? [], true)) {
+            $this->linkSupplierProfile($user, $validated['supplier_name'], $request->user());
+        }
+
         AuditService::created($user, 'User account created.');
 
         return redirect()->route('users.index')->with('success', 'User created successfully.');
@@ -99,14 +118,14 @@ class UserController extends Controller
     /**
      * Show the form for editing the specified user.
      */
-    public function edit(User $user): View
+    public function edit(Request $request, User $user): View
     {
         $this->authorize('update', $user);
 
         return view('admin.users.edit', [
-            'user' => $user->load('roles'),
+            'user' => $user->load('roles', 'supplier'),
             'roles' => Role::orderBy('name')->get(),
-            'locations' => Location::orderBy('name')->get(['id', 'name']),
+            'locations' => $this->scopedLocations($request),
         ]);
     }
 
@@ -117,6 +136,12 @@ class UserController extends Controller
     {
         $validated = $request->validated();
         $original = $user->getOriginal();
+
+        // Strict branch isolation: branch users keep accounts locked to their
+        // own branch (Super Admin may choose any branch, or none).
+        if (BranchScope::isRestricted($request->user())) {
+            $validated['branch_id'] = BranchScope::locationId($request->user());
+        }
 
         $user->fill([
             'name' => $validated['name'],
@@ -134,6 +159,10 @@ class UserController extends Controller
 
         if (array_key_exists('roles', $validated)) {
             $user->syncRoles($validated['roles'] ?? []);
+        }
+
+        if (in_array('Supplier', $validated['roles'] ?? [], true)) {
+            $this->linkSupplierProfile($user, $validated['supplier_name'], $request->user());
         }
 
         AuditService::updated($user, $original, 'User account updated.');
@@ -176,5 +205,53 @@ class UserController extends Controller
         AuditService::deleted($user, 'User account deleted.');
 
         return redirect()->route('users.index')->with('success', 'User deleted successfully.');
+    }
+
+    /**
+     * Create the supplier profile a Supplier-role login opens, or refresh the
+     * one already linked to the account. Reuses a soft-deleted supplier with
+     * the same identity instead of duplicating it, like the supplier form does.
+     */
+    private function linkSupplierProfile(User $user, string $supplierName, User $actor): void
+    {
+        $attributes = [
+            'user_id' => $user->id,
+            'name' => $supplierName,
+            'mobile' => $user->phone,
+            'email' => $user->email,
+            'status' => 'active',
+            'created_by' => $actor->id,
+        ];
+
+        $supplier = $user->supplier ?? DuplicateCheckService::reusableRecord(Supplier::class, $attributes);
+
+        if ($supplier === null) {
+            $supplier = Supplier::create($attributes);
+
+            AuditService::created($supplier, "Supplier '{$supplier->name}' ({$supplier->supplier_id}) created for {$user->email}.");
+
+            return;
+        }
+
+        DuplicateCheckService::purgeTrashConflicts(Supplier::class, $attributes, $supplier->id);
+
+        $original = $supplier->getOriginal();
+
+        $supplier->fill($attributes)->restore();
+
+        AuditService::updated($supplier, $original, "Supplier '{$supplier->name}' ({$supplier->supplier_id}) linked to {$user->email}.");
+    }
+
+    /**
+     * Branch choices for the user forms: their own branch only for branch
+     * users, every location for the Super Admin (strict branch isolation).
+     *
+     * @return Collection<int, Location>
+     */
+    private function scopedLocations(Request $request): Collection
+    {
+        return BranchScope::scopeQuery(Location::query(), $request->user(), 'id')
+            ->orderBy('name')
+            ->get(['id', 'name']);
     }
 }

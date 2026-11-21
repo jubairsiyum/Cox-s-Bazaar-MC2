@@ -7,6 +7,7 @@ namespace App\Policies;
 use App\Enums\AccountEntryStatus;
 use App\Models\AccountTransfer;
 use App\Models\User;
+use App\Services\BranchScope;
 use App\Services\FinanceApprovals;
 
 class AccountTransferPolicy
@@ -38,21 +39,25 @@ class AccountTransferPolicy
         // Cancelled transfers are frozen; completed ones are editable but their
         // balance effect is reversed and re-applied by the service layer.
         return $accountTransfer->status !== AccountEntryStatus::Cancelled
-            && $this->create($user);
+            && $this->create($user)
+            && BranchScope::canAccess($user, $accountTransfer->location_id);
     }
 
     public function delete(User $user, AccountTransfer $accountTransfer): bool
     {
-        return $this->create($user);
+        return $this->create($user)
+            && BranchScope::canAccess($user, $accountTransfer->location_id);
     }
 
     public function approve(User $user, AccountTransfer $accountTransfer): bool
     {
-        return FinanceApprovals::canDecide(
-            $user,
-            self::approverPermissions(),
-            $accountTransfer->created_by
-        );
+        return BranchScope::canAccess($user, $accountTransfer->location_id)
+            && FinanceApprovals::canDecide(
+                $user,
+                self::approverPermissions(),
+                $accountTransfer->created_by,
+                $accountTransfer->location_id
+            );
     }
 
     public function reject(User $user, AccountTransfer $accountTransfer): bool

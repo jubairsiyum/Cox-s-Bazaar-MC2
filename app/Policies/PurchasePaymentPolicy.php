@@ -7,6 +7,7 @@ namespace App\Policies;
 use App\Enums\ApprovalStatus;
 use App\Models\PurchasePayment;
 use App\Models\User;
+use App\Services\BranchScope;
 use App\Services\SalesScope;
 
 class PurchasePaymentPolicy
@@ -21,6 +22,18 @@ class PurchasePaymentPolicy
         'supplier-payments.manage',
     ];
 
+    /**
+     * Supplier logins may not record, change or decide any supplier payment.
+     */
+    public function before(User $user, string $ability): ?bool
+    {
+        if ($user->isSupplierPortalUser() && ! in_array($ability, ['viewAny'], true)) {
+            return false;
+        }
+
+        return null;
+    }
+
     public function viewAny(User $user): bool
     {
         return $user->hasAnyPermission(self::PERMISSIONS);
@@ -32,12 +45,14 @@ class PurchasePaymentPolicy
     }
 
     /**
-     * Pending requests may be edited or cancelled by their creator only.
+     * Pending requests may be edited or cancelled by their creator only — and
+     * only within their own branch (strict branch isolation).
      */
     public function update(User $user, PurchasePayment $purchasePayment): bool
     {
         return (int) $purchasePayment->created_by === (int) $user->id
-            && $purchasePayment->status === ApprovalStatus::Pending;
+            && $purchasePayment->status === ApprovalStatus::Pending
+            && BranchScope::canAccess($user, $purchasePayment->locationId());
     }
 
     public function delete(User $user, PurchasePayment $purchasePayment): bool

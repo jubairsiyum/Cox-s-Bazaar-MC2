@@ -9,6 +9,7 @@ import registerUi from "./ui";
 import { initThemedSelects } from "./ui/themed-select";
 import { registerMotion, startMotion, themeSwitch } from "./motion";
 import errorScene from "./error-scene";
+import { loginForm, authStage } from "./auth";
 
 Alpine.plugin(persist);
 
@@ -192,6 +193,8 @@ registerMotion(Alpine);
 startMotion();
 
 Alpine.data("errorScene", errorScene);
+Alpine.data("loginForm", loginForm);
+Alpine.data("authStage", authStage);
 
 // Start Alpine
 Alpine.start();

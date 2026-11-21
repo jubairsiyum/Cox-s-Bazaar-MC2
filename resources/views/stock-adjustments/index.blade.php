@@ -287,7 +287,7 @@
                                 <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>
                             @endforeach
                         </select>
-                        @unless(\App\Services\LocationScope::isRestricted(auth()->user()))
+                        @if(auth()->user()?->hasRole('Super Admin'))
                             <select name="location_id" onchange="this.form.submit()"
                                     class="rounded-xl border border-line bg-surface py-2 px-2.5 text-xs font-semibold text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 cursor-pointer">
                                 <option value="">All locations</option>
@@ -302,7 +302,7 @@
                                     <option value="{{ $branch->id }}" @selected(request('branch') == $branch->id)>{{ $branch->name }}</option>
                                 @endforeach
                             </select>
-                        @endunless
+                        @endif
                         @if(request('status') || request('location_id') || request('branch'))
                             <a href="{{ route('stock-adjustments.index', array_filter(['per_page' => request('per_page'), 'search' => request('search'), 'sort' => request('sort'), 'direction' => request('direction')])) }}"
                                class="inline-flex items-center rounded-xl border border-line bg-surface px-2.5 py-2 text-xs font-semibold text-muted hover:text-ink hover:bg-soft transition-colors"

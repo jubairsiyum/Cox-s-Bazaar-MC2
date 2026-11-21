@@ -135,7 +135,7 @@
                     @enderror
                 </div>
 
-                {{-- Method --}}
+                {{-- Method (populated from the Method reference data) --}}
                 <div>
                     <label for="method" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
                         Method
@@ -143,7 +143,7 @@
                     <select id="method" name="method"
                             class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all cursor-pointer @error('method') border-danger @enderror">
                         <option value="">Please Select</option>
-                        @foreach(\App\Enums\AccountMethod::options() as $value => $label)
+                        @foreach($methods as $value => $label)
                             <option value="{{ $value }}" @selected(old('method') === $value)>{{ $label }}</option>
                         @endforeach
                     </select>

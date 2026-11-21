@@ -40,7 +40,7 @@
                     @endforeach
                 </select>
             </div>
-            @if($canFilterBranch)
+            @if($canFilterBranch && auth()->user()?->hasRole('Super Admin'))
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">Branch</label>
                     <select name="branch_id" class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20">
@@ -112,7 +112,7 @@
                                     <x-status-badge status="awaiting-approval" label="Awaiting Approval" />
                                     <span class="block text-[11px] text-muted mt-1 tabular-nums">
                                         {{ \App\Helpers\Money::format($latestRequest->amount) }}
-                                        @if($latestRequest->method) · {{ $latestRequest->method->label() }}@endif
+                                        @if($latestRequest->method) · {{ $latestRequest->methodLabel() }}@endif
                                     </span>
                                 @elseif($latestRequest->status === \App\Enums\ApprovalStatus::Approved)
                                     @if((int) $latestRequest->approved_by === (int) $latestRequest->created_by && $latestRequest->approved_by !== null)
@@ -122,7 +122,7 @@
                                     @endif
                                     <span class="block text-[11px] text-muted mt-1 tabular-nums">
                                         {{ \App\Helpers\Money::format($latestRequest->amount) }}
-                                        @if($latestRequest->method) · {{ $latestRequest->method->label() }}@endif
+                                        @if($latestRequest->method) · {{ $latestRequest->methodLabel() }}@endif
                                     </span>
                                 @else
                                     <x-status-badge status="rejected" label="Rejected" />
@@ -139,7 +139,7 @@
                                     @if($latestRequest !== null)
                                         @can('update', $latestRequest)
                                             <button type="button"
-                                                    @click="openEditModal(@js(route('purchase-dues.update', $latestRequest)), @js($order->reference_no), @js($order->supplier?->name ?? 'Unknown supplier'), @js($remainingDue + (float) $latestRequest->amount), @js((float) $latestRequest->amount), @js($latestRequest->method?->value ?? 'other'), @js($latestRequest->note ?? ''))"
+                                                    @click="openEditModal(@js(route('purchase-dues.update', $latestRequest)), @js($order->reference_no), @js($order->supplier?->name ?? 'Unknown supplier'), @js($remainingDue + (float) $latestRequest->amount), @js((float) $latestRequest->amount), @js($latestRequest->method ?? 'other'), @js($latestRequest->note ?? ''))"
                                                     class="rounded-lg border border-line bg-soft px-2.5 py-1 text-[11px] font-semibold text-ink hover:border-brand-500 hover:text-brand-500 transition-colors cursor-pointer">
                                                 Edit
                                             </button>
@@ -246,6 +246,9 @@
                         <label class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">Method</label>
                         <select name="method" x-model="requestModal.method"
                                 class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20">
+                            <option x-show="requestModal.method && ! @js(array_keys($methodOptions)).includes(requestModal.method)"
+                                    :value="requestModal.method"
+                                    x-text="(requestModal.method || '') + ' (stored)'"></option>
                             @foreach($methodOptions as $value => $label)
                                 <option value="{{ $value }}">{{ $label }}</option>
                             @endforeach
@@ -293,7 +296,7 @@ function purchaseDuesPage() {
             due: 0,
             orderId: '',
             amount: '',
-            method: @js(\App\Enums\PaymentMethod::Cash->value),
+            method: @js(array_key_first($methodOptions) ?? 'cash'),
             note: ''
         },
         openCreateModal(orderId, ref, supplier, due) {
@@ -306,7 +309,7 @@ function purchaseDuesPage() {
                 due: Number(due),
                 orderId: orderId,
                 amount: '',
-                method: @js(\App\Enums\PaymentMethod::Cash->value),
+                method: @js(array_key_first($methodOptions) ?? 'cash'),
                 note: ''
             });
         },

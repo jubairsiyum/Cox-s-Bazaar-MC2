@@ -4,6 +4,7 @@
   $user = $user ?? auth()->user();
   $currentPath = request()->path();
   $isDashboard = request()->routeIs('dashboard') || request()->is('dashboard') || $currentPath === 'dashboard' || $currentPath === '';
+  $isSupplierPortal = $user?->isSupplierPortalUser() ?? false;
 @endphp
 
 <header {{ $attributes->merge(['class' => ($isDashboard ? 'enter mv-down ' : '') . 'flex items-center gap-3']) }} @if($isDashboard) style="--i:2" @endif>
@@ -15,6 +16,7 @@
   </button>
 
   {{-- Search pill --}}
+  @unless ($isSupplierPortal)
   <form method="GET" action="{{ route('products.index') }}" class="w-full max-w-xs">
     <label class="flex h-11 w-full items-center gap-3 rounded-full bg-surface px-4 text-muted shadow-card transition-shadow focus-within:ring-2 focus-within:ring-brand-500/20 cursor-text">
       <x-icon name="search" class="size-4.5 shrink-0 text-muted" />
@@ -25,6 +27,7 @@
              class="w-full bg-transparent text-sm text-ink outline-none placeholder:text-muted">
     </label>
   </form>
+  @endunless
 
   <div class="ml-auto flex items-center gap-2.5 sm:gap-3">
     {{-- Dark mode toggle --}}
@@ -75,7 +78,7 @@
           $settingsRoute = Route::has('settings.index') ? route('settings.index') : (Route::has('admin.settings.index') ? route('admin.settings.index') : null);
         @endphp
 
-        @if ($settingsRoute)
+        @if ($settingsRoute && ! $isSupplierPortal)
           <a href="{{ $settingsRoute }}"
              class="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-muted transition-colors hover:bg-soft hover:text-ink">
             <x-icon name="settings" class="size-4" /> Settings

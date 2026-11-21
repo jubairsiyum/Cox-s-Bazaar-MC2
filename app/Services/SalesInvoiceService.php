@@ -117,7 +117,8 @@ class SalesInvoiceService
                     $unit,
                     (int) $item->quantity,
                     $invoice,
-                    "Sales invoice {$invoice->invoice_no} posted."
+                    "Sales invoice {$invoice->invoice_no} posted.",
+                    $invoice->location_id !== null ? (int) $invoice->location_id : null
                 );
             }
 
@@ -148,7 +149,8 @@ class SalesInvoiceService
                         $unit,
                         (int) $item->quantity,
                         $invoice,
-                        "Sales invoice {$invoice->invoice_no} voided — stock restored."
+                        "Sales invoice {$invoice->invoice_no} voided — stock restored.",
+                        $invoice->location_id !== null ? (int) $invoice->location_id : null
                     );
                 }
             }

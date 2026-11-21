@@ -1,4 +1,5 @@
-@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap") layer(base);
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap")
+layer(base);
 @import "prismjs/themes/prism.min.css";
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -10,6 +11,7 @@
 @import "./themes/graphite.css";
 @import "./motion.css";
 @import "./error-scene.css";
+@import "./auth.css";
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
@@ -20,114 +22,118 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  /* Motion Bridge Tokens */
-  --m-accent: var(--brand-500);
-  --m-shadow-rgb: var(--shadow-rgb);
+    /* Motion Bridge Tokens */
+    --m-accent: var(--brand-500);
+    --m-shadow-rgb: var(--shadow-rgb);
 
-  /* Dashboard Layout, Radius & Spacing Tokens */
-  --dash-radius-shell: 40px;
-  --dash-radius-card: 24px;
-  --dash-radius-subcard: 16px;
-  --dash-radius-pill: 9999px;
+    /* Dashboard Layout, Radius & Spacing Tokens */
+    --dash-radius-shell: 40px;
+    --dash-radius-card: 24px;
+    --dash-radius-subcard: 16px;
+    --dash-radius-pill: 9999px;
 
-  --dash-spacing-shell: 2rem;        /* 32px (lg:p-8) */
-  --dash-spacing-shell-mobile: 1rem; /* 16px (p-4) */
-  --dash-spacing-card: 1.5rem;       /* 24px (p-6) */
-  --dash-spacing-gap: 1.25rem;       /* 20px (gap-5) */
+    --dash-spacing-shell: 2rem; /* 32px (lg:p-8) */
+    --dash-spacing-shell-mobile: 1rem; /* 16px (p-4) */
+    --dash-spacing-card: 1.5rem; /* 24px (p-6) */
+    --dash-spacing-gap: 1.25rem; /* 20px (gap-5) */
 }
 
 /* CSS variable based semantic theme tokens */
 @theme inline {
-  --color-canvas:   var(--canvas);
-  --color-shell:    var(--shell);
-  --color-surface:  var(--surface);
-  --color-soft:     var(--soft);
-  --color-line:     var(--line);
+    --color-canvas: var(--canvas);
+    --color-shell: var(--shell);
+    --color-surface: var(--surface);
+    --color-soft: var(--soft);
+    --color-line: var(--line);
 
-  --color-ink:      var(--ink);
-  --color-muted:    var(--muted);
-  --color-on-brand: var(--on-brand);
+    --color-ink: var(--ink);
+    --color-muted: var(--muted);
+    --color-on-brand: var(--on-brand);
 
-  --color-brand-50:  var(--brand-50);
-  --color-brand-100: var(--brand-100);
-  --color-brand-400: var(--brand-400);
-  --color-brand-500: var(--brand-500);
-  --color-brand-600: var(--brand-600);
+    --color-brand-50: var(--brand-50);
+    --color-brand-100: var(--brand-100);
+    --color-brand-400: var(--brand-400);
+    --color-brand-500: var(--brand-500);
+    --color-brand-600: var(--brand-600);
 
-  --color-danger:  var(--danger);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-overlay: var(--overlay);
+    --color-danger: var(--danger);
+    --color-success: var(--success);
+    --color-warning: var(--warning);
+    --color-overlay: var(--overlay);
 
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
 
-  --radius-dash-shell: var(--dash-radius-shell);
-  --radius-dash-card: var(--dash-radius-card);
-  --radius-dash-subcard: var(--dash-radius-subcard);
-  --radius-dash-pill: var(--dash-radius-pill);
+    --radius-dash-shell: var(--dash-radius-shell);
+    --radius-dash-card: var(--dash-radius-card);
+    --radius-dash-subcard: var(--dash-radius-subcard);
+    --radius-dash-pill: var(--dash-radius-pill);
 
-  --spacing-dash-shell: var(--dash-spacing-shell);
-  --spacing-dash-shell-mobile: var(--dash-spacing-shell-mobile);
-  --spacing-dash-card: var(--dash-spacing-card);
-  --spacing-dash-gap: var(--dash-spacing-gap);
+    --spacing-dash-shell: var(--dash-spacing-shell);
+    --spacing-dash-shell-mobile: var(--dash-spacing-shell-mobile);
+    --spacing-dash-card: var(--dash-spacing-card);
+    --spacing-dash-gap: var(--dash-spacing-gap);
 
-  --shadow-card: 0 1px 2px rgb(var(--shadow-rgb) / 0.04), 0 8px 24px rgb(var(--shadow-rgb) / 0.05);
+    --shadow-card:
+        0 1px 2px rgb(var(--shadow-rgb) / 0.04),
+        0 8px 24px rgb(var(--shadow-rgb) / 0.05);
 }
 
 @theme {
-  /* non-color tokens (same for all themes) */
-  --font-sans: "Plus Jakarta Sans", "Hind Siliguri", ui-sans-serif, system-ui, sans-serif;
-  --font-outfit: Outfit, sans-serif;
+    /* non-color tokens (same for all themes) */
+    --font-sans:
+        "Plus Jakarta Sans", "Hind Siliguri", ui-sans-serif, system-ui,
+        sans-serif;
+    --font-outfit: Outfit, sans-serif;
 
-  --breakpoint-*: initial;
-  --breakpoint-2xsm: 375px;
-  --breakpoint-xsm: 425px;
-  --breakpoint-3xl: 2000px;
-  --breakpoint-sm: 640px;
-  --breakpoint-md: 768px;
-  --breakpoint-lg: 1024px;
-  --breakpoint-xl: 1280px;
-  --breakpoint-2xl: 1536px;
+    --breakpoint-*: initial;
+    --breakpoint-2xsm: 375px;
+    --breakpoint-xsm: 425px;
+    --breakpoint-3xl: 2000px;
+    --breakpoint-sm: 640px;
+    --breakpoint-md: 768px;
+    --breakpoint-lg: 1024px;
+    --breakpoint-xl: 1280px;
+    --breakpoint-2xl: 1536px;
 
-  --text-title-2xl: 72px;
-  --text-title-2xl--line-height: 90px;
-  --text-title-xl: 60px;
-  --text-title-xl--line-height: 72px;
-  --text-title-lg: 20px;
-  --text-title-lg--line-height: 30px;
-  --text-title-md: 36px;
-  --text-title-md--line-height: 44px;
-  --text-heading-one: 64px;
-  --text-heading-one--line-height: 80px;
-  --text-heading-two: 56px;
-  --text-heading-two--line-height: 72px;
-  --text-heading-three: 48px;
-  --text-heading-three--line-height: 60px;
-  --text-heading-four: 40px;
-  --text-heading-four--line-height: 48px;
-  --text-heading-five: 32px;
-  --text-heading-five--line-height: 40px;
-  --text-heading-six: 24px;
-  --text-heading-six--line-height: 32px;
-  --text-title-sm: 18px;
-  --text-title-sm--line-height: 28px;
-  --text-theme-xl: 20px;
-  --text-theme-xl--line-height: 30px;
-  --text-sm: 14px;
-  --text-sm--line-height: 20px;
-  --text-theme-xs: 12px;
-  --text-theme-xs--line-height: 18px;
+    --text-title-2xl: 72px;
+    --text-title-2xl--line-height: 90px;
+    --text-title-xl: 60px;
+    --text-title-xl--line-height: 72px;
+    --text-title-lg: 20px;
+    --text-title-lg--line-height: 30px;
+    --text-title-md: 36px;
+    --text-title-md--line-height: 44px;
+    --text-heading-one: 64px;
+    --text-heading-one--line-height: 80px;
+    --text-heading-two: 56px;
+    --text-heading-two--line-height: 72px;
+    --text-heading-three: 48px;
+    --text-heading-three--line-height: 60px;
+    --text-heading-four: 40px;
+    --text-heading-four--line-height: 48px;
+    --text-heading-five: 32px;
+    --text-heading-five--line-height: 40px;
+    --text-heading-six: 24px;
+    --text-heading-six--line-height: 32px;
+    --text-title-sm: 18px;
+    --text-title-sm--line-height: 28px;
+    --text-theme-xl: 20px;
+    --text-theme-xl--line-height: 30px;
+    --text-sm: 14px;
+    --text-sm--line-height: 20px;
+    --text-theme-xs: 12px;
+    --text-theme-xs--line-height: 18px;
 
-  --z-index-1: 1;
-  --z-index-9: 9;
-  --z-index-99: 99;
-  --z-index-999: 999;
-  --z-index-9999: 9999;
-  --z-index-99999: 99999;
-  --z-index-999999: 999999;
+    --z-index-1: 1;
+    --z-index-9: 9;
+    --z-index-99: 99;
+    --z-index-999: 999;
+    --z-index-9999: 9999;
+    --z-index-99999: 99999;
+    --z-index-999999: 999999;
 }
 
 @layer base {
@@ -244,7 +250,9 @@
         @apply bg-line rounded-full;
     }
 }
-.dark .custom-scrollbar::-webkit-scrollbar-thumb { background-color: var(--line); }
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: var(--line);
+}
 @layer utilities {
     /* For Remove Date Icon */
     input[type="date"]::-webkit-inner-spin-button,
@@ -403,7 +411,7 @@
     @apply w-full;
 }
 .flatpickr-calendar {
-    @apply mt-2 !rounded-xl bg-surface !p-5 !border !border-transparent !text-muted dark:!text-muted dark:!shadow-card 2xsm:!w-auto;
+    @apply mt-2 !rounded-xl bg-surface !p-5 !border !border-line shadow-card !text-muted dark:!text-muted dark:!shadow-card 2xsm:!w-auto;
 }
 .flatpickr-time input {
     background-color: var(--canvas) !important;
@@ -458,8 +466,9 @@ span.flatpickr-weekday,
     @apply dark:!text-on-brand;
 }
 .flatpickr-day.inRange {
-    box-shadow: -5px 0 0 var(--canvas), 5px 0 0 var(--canvas) !important;
-    
+    box-shadow:
+        -5px 0 0 var(--canvas),
+        5px 0 0 var(--canvas) !important;
 }
 .flatpickr-day.inRange,
 .flatpickr-day.prevMonthDay.inRange,
@@ -972,8 +981,7 @@ html.dark #calendar,
 
 .task.is-dragging {
     border-radius: 0.75rem;
-    box-shadow:
-        var(--shadow-card);
+    box-shadow: var(--shadow-card);
     opacity: 0.8;
     cursor: grabbing; /* Changes the cursor to indicate dragging */
 }
@@ -1210,7 +1218,9 @@ pre[class*="language-"] {
     }
 }
 
-.dark .custom-scrollbar::-webkit-scrollbar-thumb { background-color: var(--line); }
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: var(--line);
+}
 
 .api-token-chart .apexcharts-tooltip {
     border: 0 !important;
@@ -1609,22 +1619,28 @@ table.data-table tfoot td {
     white-space: nowrap;
 }
 .badge-success {
-    background: var(--soft); color: var(--success);
+    background: var(--soft);
+    color: var(--success);
 }
 .badge-warning {
-    background: var(--soft); color: var(--warning);
+    background: var(--soft);
+    color: var(--warning);
 }
 .badge-danger {
-    background: var(--soft); color: var(--danger);
+    background: var(--soft);
+    color: var(--danger);
 }
 .badge-info {
-    background: var(--soft); color: var(--brand-500);
+    background: var(--soft);
+    color: var(--brand-500);
 }
 .badge-neutral {
-    background: var(--soft); color: var(--muted);
+    background: var(--soft);
+    color: var(--muted);
 }
 .badge-primary {
-    background: var(--soft); color: var(--brand-500);
+    background: var(--soft);
+    color: var(--brand-500);
 }
 
 /* Alerts / Flash Messages */
@@ -2170,7 +2186,11 @@ select option:checked {
     box-shadow: 0 1px 2px rgb(var(--shadow-rgb) / 0.04);
     cursor: pointer;
     user-select: none;
-    transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+    transition:
+        border-color 0.18s ease,
+        background-color 0.18s ease,
+        box-shadow 0.18s ease,
+        color 0.18s ease;
 }
 .ts-trigger:hover:not(:disabled) {
     border-color: color-mix(in srgb, var(--brand-500) 45%, var(--line));
@@ -2223,7 +2243,9 @@ select option:checked {
     height: 15px;
     flex-shrink: 0;
     color: var(--muted);
-    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.18s ease;
+    transition:
+        transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+        color 0.18s ease;
 }
 .ts-trigger-compact .ts-chevron {
     width: 13px;
@@ -2251,7 +2273,9 @@ select option:checked {
     opacity: 0;
     transform: translateY(-4px) scale(0.97);
     transform-origin: top center;
-    transition: opacity 0.15s cubic-bezier(0.16, 1, 0.3, 1), transform 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+    transition:
+        opacity 0.15s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .ts-menu[data-side="top"] {
     transform: translateY(4px) scale(0.97);
@@ -2289,7 +2313,9 @@ select option:checked {
     font-family: inherit;
     font-size: 0.78rem;
     outline: none;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    transition:
+        border-color 0.15s ease,
+        box-shadow 0.15s ease;
 }
 .ts-search-input::placeholder {
     color: var(--muted);
@@ -2327,7 +2353,9 @@ select option:checked {
     line-height: 1.35;
     text-align: left;
     cursor: pointer;
-    transition: background-color 0.12s ease, color 0.12s ease;
+    transition:
+        background-color 0.12s ease,
+        color 0.12s ease;
 }
 .ts-menu-compact .ts-option {
     padding: 6px 10px;

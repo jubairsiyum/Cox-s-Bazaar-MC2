@@ -10,8 +10,11 @@ use App\Http\Requests\AccountTransaction\StoreAccountTransactionRequest;
 use App\Http\Requests\AccountTransaction\UpdateAccountTransactionRequest;
 use App\Models\Account;
 use App\Models\AccountTransaction;
+use App\Models\PaymentMethod;
+use App\Models\TransactionCategory;
 use App\Services\AccountBalanceService;
 use App\Services\AuditService;
+use App\Services\BranchScope;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,17 +29,20 @@ class AccountTransactionController extends Controller
 {
     /**
      * List income/expense entries with KPI summary cards.
+     * Strict branch isolation: only the user's own branch's entries (and KPIs).
      */
     public function index(Request $request): View
     {
         $this->authorize('viewAny', AccountTransaction::class);
+
+        $user = $request->user();
 
         $perPage = (int) $request->input('per_page', 10);
         if (! in_array($perPage, [10, 25, 50, 100], true)) {
             $perPage = 10;
         }
 
-        $transactions = AccountTransaction::query()
+        $transactions = BranchScope::scopeQuery(AccountTransaction::query(), $user)
             ->with(['account', 'creator', 'approver'])
             ->search($request->string('search')->toString())
             ->when($request->filled('type'), fn ($q) => $q->where('type', $request->string('type')->toString()))
@@ -50,7 +56,7 @@ class AccountTransactionController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
-        $monthTotals = AccountTransaction::query()
+        $monthTotals = BranchScope::scopeQuery(AccountTransaction::query(), $user)
             ->selectRaw("
                 COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as income_total,
                 COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as expense_total
@@ -59,13 +65,13 @@ class AccountTransactionController extends Controller
             ->whereBetween('transaction_date', [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()])
             ->first();
 
-        $pendingCount = AccountTransaction::query()->where('status', 'pending')->count();
+        $pendingCount = BranchScope::scopeQuery(AccountTransaction::query(), $user)->where('status', 'pending')->count();
 
         return view('transactions.index', [
             'transactions' => $transactions,
             'perPage' => $perPage,
-            'accounts' => Account::query()->active()->orderBy('name')->get(['id', 'name', 'type']),
-            'categories' => AccountTransaction::CATEGORIES,
+            'accounts' => BranchScope::scopeQuery(Account::query(), $user)->active()->orderBy('name')->get(['id', 'name', 'type']),
+            'categories' => TransactionCategory::options(),
             'monthIncome' => (float) ($monthTotals->income_total ?? 0),
             'monthExpense' => (float) ($monthTotals->expense_total ?? 0),
             'pendingCount' => $pendingCount,
@@ -80,8 +86,9 @@ class AccountTransactionController extends Controller
         $this->authorize('create', [AccountTransaction::class, $request->string('type')->toString() ?: null]);
 
         return view('transactions.create', [
-            'accounts' => Account::query()->active()->orderBy('name')->get(['id', 'name', 'type', 'current_balance']),
-            'categories' => AccountTransaction::CATEGORIES,
+            'accounts' => BranchScope::scopeQuery(Account::query(), $request->user())->active()->orderBy('name')->get(['id', 'name', 'type', 'current_balance']),
+            'categories' => TransactionCategory::query()->active()->orderBy('name')->get(['id', 'name', 'type']),
+            'methods' => PaymentMethod::options(),
             'defaultType' => $request->string('type')->toString(),
         ]);
     }
@@ -95,6 +102,14 @@ class AccountTransactionController extends Controller
         $validated['amount'] = round((float) $validated['amount'], 2);
         $validated['status'] = AccountEntryStatus::Pending->value;
         $validated['created_by'] = $request->user()?->id;
+
+        // Strict branch isolation: entries are recorded on the user's own
+        // branch's accounts only (shared/head-office accounts are Super Admin).
+        $account = Account::query()->find((int) $validated['account_id']);
+
+        if (! BranchScope::canAccess($request->user(), $account?->location_id)) {
+            return back()->withInput()->with('error', 'You can only record entries on accounts of your own branch.');
+        }
 
         $transaction = AccountTransaction::create($validated);
 
@@ -113,14 +128,15 @@ class AccountTransactionController extends Controller
     /**
      * Show the form for editing an entry.
      */
-    public function edit(AccountTransaction $accountTransaction): View
+    public function edit(Request $request, AccountTransaction $accountTransaction): View
     {
         $this->authorize('update', $accountTransaction);
 
         return view('transactions.edit', [
             'transaction' => $accountTransaction,
-            'accounts' => Account::query()->active()->orderBy('name')->get(['id', 'name', 'type', 'current_balance']),
-            'categories' => AccountTransaction::CATEGORIES,
+            'accounts' => BranchScope::scopeQuery(Account::query(), $request->user())->active()->orderBy('name')->get(['id', 'name', 'type', 'current_balance']),
+            'categories' => TransactionCategory::query()->active()->orderBy('name')->get(['id', 'name', 'type']),
+            'methods' => PaymentMethod::options(),
         ]);
     }
 
@@ -140,6 +156,14 @@ class AccountTransactionController extends Controller
         }
 
         $wasCompleted = $accountTransaction->status === AccountEntryStatus::Completed;
+
+        // Strict branch isolation: entries stay on the user's own branch's
+        // accounts (crafted requests may not re-point them elsewhere).
+        $account = Account::query()->find((int) ($validated['account_id'] ?? $accountTransaction->account_id));
+
+        if (! BranchScope::canAccess($request->user(), $account?->location_id)) {
+            return back()->withInput()->with('error', 'You can only record entries on accounts of your own branch.');
+        }
 
         try {
             DB::transaction(function () use ($accountTransaction, $validated, $balances, $wasCompleted): void {

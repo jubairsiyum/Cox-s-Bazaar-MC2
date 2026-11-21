@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Exports;
 
 use App\Models\StockTransfer;
+use App\Models\User;
+use App\Services\BranchScope;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -34,6 +36,7 @@ class StockTransferExport implements FromCollection, WithHeadings, WithMapping
     public function __construct(
         protected ?string $search = null,
         ?string $columns = null,
+        protected ?User $user = null,
     ) {
         if (! empty($columns)) {
             $requested = array_filter(array_map('trim', explode(',', $columns)));
@@ -47,9 +50,16 @@ class StockTransferExport implements FromCollection, WithHeadings, WithMapping
 
     public function collection(): Collection
     {
-        return StockTransfer::query()
+        $query = StockTransfer::query()
             ->with(['fromLocation', 'toLocation'])
-            ->when($this->search, fn ($q) => $q->search($this->search))
+            ->when($this->search, fn ($q) => $q->search($this->search));
+
+        // Strict branch isolation: exports honour the user's scope too.
+        if ($this->user !== null) {
+            $query = BranchScope::scopeQueryAny($query, $this->user, 'from_location_id', 'to_location_id');
+        }
+
+        return $query
             ->orderBy('transfer_date', 'desc')
             ->get();
     }

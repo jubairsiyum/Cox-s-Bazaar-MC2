@@ -4,105 +4,245 @@
 @section('page_title', 'Distribution Dashboard')
 
 @php
-  // Safe Dynamic Data Resolution with Fallbacks
+  // ── 1. Role & Outlet Scope Resolution (Strict BranchScope) ──────────────────
+  $viewer = auth()->user();
+  $roles = $viewer ? $viewer->roles->pluck('name')->all() : [];
+  $primaryRole = !empty($roles) ? ucfirst(str_replace(['_', '-'], ' ', $roles[0])) : 'Staff';
+
+  // STRICT ACCESS RULE: ONLY Super Admin can view all branches and network overview.
+  // All other roles (Manager, Outlet Manager, Sales Staff, Storekeeper, etc.) are strictly locked to their assigned outlet.
+  $isSuperAdmin = $viewer?->hasRole('Super Admin') ?? false;
+  $isRestricted = $viewer !== null && \App\Services\BranchScope::isRestricted($viewer);
+
+  // All active business locations for Super Admin switcher
+  $allLocations = $isSuperAdmin
+      ? \App\Models\Location::where('status', 'active')->orderBy('name')->get(['id', 'name', 'type'])
+      : collect();
+
+  // Resolve target location and active scope
+  if ($isRestricted) {
+      $assignedLocationId = $viewer !== null ? \App\Services\BranchScope::locationId($viewer) : null;
+      $assignedLocation = $assignedLocationId ? \App\Models\Location::find($assignedLocationId) : null;
+      $targetLocationId = $assignedLocationId;
+      $scopedLocationId = $assignedLocationId ? (int) $assignedLocationId : null;
+      $activeScopeLocation = $assignedLocation;
+  } else {
+      $requestedLocationId = request()->filled('location_id') ? (int) request('location_id') : null;
+      if ($requestedLocationId && $allLocations->contains('id', $requestedLocationId)) {
+          $targetLocationId = $requestedLocationId;
+          $scopedLocationId = $requestedLocationId;
+          $activeScopeLocation = $allLocations->firstWhere('id', $requestedLocationId);
+      } else {
+          $targetLocationId = null;
+          $scopedLocationId = null;
+          $activeScopeLocation = null;
+      }
+  }
+
+  $branchScoped = $isRestricted || ($targetLocationId !== null);
+  $scopeTitle = $activeScopeLocation ? $activeScopeLocation->name : ($isSuperAdmin ? 'All Outlets & Warehouses' : 'No branch assigned');
+  $branchQuantities = ($targetLocationId !== null && $targetLocationId > 0)
+      ? \App\Services\StockService::quantitiesByUnitAt($targetLocationId)
+      : [];
+
+  // Scoped query helper
+  $scoped = function ($query) use ($viewer, $isRestricted, $targetLocationId) {
+      if ($isRestricted) {
+          return $viewer !== null ? \App\Services\BranchScope::scopeQuery($query, $viewer) : $query->whereRaw('1 = 0');
+      }
+      if ($targetLocationId !== null) {
+          return $query->where('location_id', $targetLocationId);
+      }
+      return $query;
+  };
+
+  // ── 2. Safe Dynamic Data Resolution ────────────────────────────────────────
   try {
-      // 1. Live Sales Metrics from SalesInvoices
-      $todaySales = (float) \App\Models\SalesInvoice::whereDate('invoice_date', today())
-          ->where('status', \App\Enums\SalesInvoiceStatus::Posted)
+      // 2.1 Live Sales Metrics
+      $todaySales = (float) $scoped(\App\Models\SalesInvoice::query()->whereDate('invoice_date', today())
+          ->where('status', \App\Enums\SalesInvoiceStatus::Posted))
           ->sum('grand_total');
 
-      $yesterdaySales = (float) \App\Models\SalesInvoice::whereDate('invoice_date', today()->subDay())
-          ->where('status', \App\Enums\SalesInvoiceStatus::Posted)
+      $yesterdaySales = (float) $scoped(\App\Models\SalesInvoice::query()->whereDate('invoice_date', today()->subDay())
+          ->where('status', \App\Enums\SalesInvoiceStatus::Posted))
           ->sum('grand_total');
 
       $salesChangePct = $yesterdaySales > 0
           ? (int) round((($todaySales - $yesterdaySales) / $yesterdaySales) * 100)
           : ($todaySales > 0 ? 100 : 0);
 
-      $todayInvoicesCount = (int) \App\Models\SalesInvoice::whereDate('invoice_date', today())
-          ->where('status', \App\Enums\SalesInvoiceStatus::Posted)
+      $todayInvoicesCount = (int) $scoped(\App\Models\SalesInvoice::query()->whereDate('invoice_date', today())
+          ->where('status', \App\Enums\SalesInvoiceStatus::Posted))
           ->count();
 
-      // 2. Collections (Recorded payments on sales invoices)
-      $todayCollection = (float) \App\Models\SalesInvoice::whereDate('invoice_date', today())
+      // 2.2 Collections (Payments recorded on sales invoices)
+      $todayCollection = (float) $scoped(\App\Models\SalesInvoice::query()->whereDate('invoice_date', today()))
           ->sum('paid_amount');
 
-      $yesterdayCollection = (float) \App\Models\SalesInvoice::whereDate('invoice_date', today()->subDay())
+      $yesterdayCollection = (float) $scoped(\App\Models\SalesInvoice::query()->whereDate('invoice_date', today()->subDay()))
           ->sum('paid_amount');
 
       $collectionChangePct = $yesterdayCollection > 0
           ? (int) round((($todayCollection - $yesterdayCollection) / $yesterdayCollection) * 100)
           : ($todayCollection > 0 ? 100 : 0);
 
-      // 3. Retailer Dues (Total Outstanding Receivables on posted invoices)
-      $totalReceivableDue = (float) \App\Models\SalesInvoice::where('status', \App\Enums\SalesInvoiceStatus::Posted)
+      // 2.3 Retailer Dues (Total Outstanding Receivables on posted invoices)
+      $totalReceivableDue = (float) $scoped(\App\Models\SalesInvoice::query()->where('status', \App\Enums\SalesInvoiceStatus::Posted))
           ->sum('due_amount');
 
-      $overdueReceivable = (float) \App\Models\SalesInvoice::where('status', \App\Enums\SalesInvoiceStatus::Posted)
+      $overdueReceivable = (float) $scoped(\App\Models\SalesInvoice::query()->where('status', \App\Enums\SalesInvoiceStatus::Posted)
           ->whereDate('invoice_date', '<', today()->subDays(30))
-          ->where('due_amount', '>', 0)
+          ->where('due_amount', '>', 0))
           ->sum('due_amount');
 
-      $activeRetailersCount = (int) \App\Models\Customer::where('status', 'active')->count();
+      // Scoped active retailers count
+      $activeRetailersCount = $targetLocationId !== null
+          ? (int) $scoped(\App\Models\SalesInvoice::query())->whereNotNull('customer_id')->distinct('customer_id')->count('customer_id')
+          : (int) \App\Models\Customer::where('status', 'active')->count();
 
-      // 4. Stock Valuation & Inventory Units
-      $totalStockUnits = (int) \App\Models\Unit::sum('quantity');
+      // 2.4 Stock Valuation & Inventory Units
+      if ($branchScoped) {
+          $totalStockUnits = (int) array_sum($branchQuantities);
 
-      $rawStockValue = \Illuminate\Support\Facades\DB::table('units')
+          $unitCosts = $branchQuantities === []
+              ? collect()
+              : \Illuminate\Support\Facades\DB::table('units')
+                  ->join('products', 'products.id', '=', 'units.product_id')
+                  ->whereNull('products.deleted_at')
+                  ->whereNull('units.deleted_at')
+                  ->whereIn('units.id', array_keys($branchQuantities))
+                  ->selectRaw('units.id as unit_id, COALESCE(products.purchase_price, products.sale_price, 0) as cost')
+                  ->get();
+
+          $totalStockValue = (float) $unitCosts->sum(fn ($row) => ($branchQuantities[(int) $row->unit_id] ?? 0) * (float) $row->cost);
+          $primaryWarehouse = $targetLocationId !== null
+              ? ($activeScopeLocation?->name ?? 'My Branch')
+              : 'No branch assigned';
+          $stockScopeCaption = $primaryWarehouse;
+      } else {
+          $totalStockUnits = (int) \App\Models\Unit::sum('quantity');
+
+          $rawStockValue = \Illuminate\Support\Facades\DB::table('units')
+              ->join('products', 'units.product_id', '=', 'products.id')
+              ->whereNull('products.deleted_at')
+              ->whereNull('units.deleted_at')
+              ->selectRaw('SUM(units.quantity * COALESCE(products.purchase_price, products.sale_price, 0)) as total_val')
+              ->value('total_val');
+
+          $totalStockValue = $rawStockValue ? (float) $rawStockValue : 0;
+          $primaryWarehouse = \App\Models\Location::where('status', 'active')
+              ->where('type', \App\Enums\LocationType::Warehouse->value ?? 'warehouse')
+              ->value('name')
+              ?? \App\Models\Location::where('status', 'active')->value('name')
+              ?? 'Central Warehouse';
+          $stockScopeCaption = 'All branches included';
+      }
+
+      // 2.4.1 Day-over-Day (DoD) Stock Value % Change
+      $todayMovementsQuery = \Illuminate\Support\Facades\DB::table('stock_movements')
+          ->join('units', 'stock_movements.unit_id', '=', 'units.id')
           ->join('products', 'units.product_id', '=', 'products.id')
+          ->whereDate('stock_movements.created_at', today())
           ->whereNull('products.deleted_at')
-          ->whereNull('units.deleted_at')
-          ->selectRaw('SUM(units.quantity * COALESCE(products.purchase_price, products.sale_price, 0)) as total_val')
-          ->value('total_val');
-      $totalStockValue = $rawStockValue ? (float) $rawStockValue : 0;
+          ->whereNull('units.deleted_at');
 
-      // Primary active warehouse / central location
-      $primaryWarehouse = \App\Models\Location::where('status', 'active')
-          ->where('type', \App\Enums\LocationType::Warehouse->value ?? 'warehouse')
-          ->value('name')
-          ?? \App\Models\Location::where('status', 'active')->value('name')
-          ?? 'Central Warehouse';
+      if ($branchScoped && $targetLocationId !== null) {
+          $todayMovementsQuery->where('stock_movements.location_id', $targetLocationId);
+      }
 
-      // 5. Stock Transfers & Field Placement
-      $todayDispatched = (int) \App\Models\StockTransfer::whereDate('transfer_date', today())
+      $todayStockDelta = (float) ($todayMovementsQuery->selectRaw(
+          'SUM(stock_movements.quantity * COALESCE(products.purchase_price, products.sale_price, 0)) as val_delta'
+      )->value('val_delta') ?? 0);
+
+      $stockValueChangePct = 0;
+      if ($todayStockDelta != 0) {
+          $yesterdayStockValue = $totalStockValue - $todayStockDelta;
+          if ($yesterdayStockValue > 0) {
+              $stockValueChangePct = (int) round(($todayStockDelta / $yesterdayStockValue) * 100);
+          } else {
+              $stockValueChangePct = $todayStockDelta > 0 ? 100 : -100;
+          }
+      }
+
+      // 2.5 Stock Transfers & Field Placement
+      $scopedTransfers = function ($query) use ($viewer, $isRestricted, $targetLocationId) {
+          if ($isRestricted) {
+              return $viewer !== null
+                  ? \App\Services\BranchScope::scopeQueryAny($query, $viewer, 'from_location_id', 'to_location_id')
+                  : $query->whereRaw('1 = 0');
+          }
+          if ($targetLocationId !== null) {
+              return $query->where(function ($q) use ($targetLocationId) {
+                  $q->where('from_location_id', $targetLocationId)
+                    ->orWhere('to_location_id', $targetLocationId);
+              });
+          }
+          return $query;
+      };
+
+      $todayDispatched = (int) $scopedTransfers(\App\Models\StockTransfer::query()->whereDate('transfer_date', today()))
           ->join('stock_transfer_items', 'stock_transfers.id', '=', 'stock_transfer_items.stock_transfer_id')
           ->sum('stock_transfer_items.quantity');
 
-      $todayPlaced = (int) \App\Models\StockTransfer::whereDate('transfer_date', today())
-          ->where('status', \App\Enums\StockTransferStatus::Received ?? 'received')
+      $todayPlaced = (int) $scopedTransfers(\App\Models\StockTransfer::query()->whereDate('transfer_date', today())
+          ->where('stock_transfers.status', \App\Enums\StockTransferStatus::Received->value ?? 'received'))
           ->join('stock_transfer_items', 'stock_transfers.id', '=', 'stock_transfer_items.stock_transfer_id')
           ->sum('stock_transfer_items.quantity');
 
       $todayInTransit = max(0, $todayDispatched - $todayPlaced);
-      $activeRoutes = (int) \App\Models\Location::where('status', 'active')->count();
+      $activeRoutes = $branchScoped
+          ? ($targetLocationId !== null ? 1 : 0)
+          : (int) \App\Models\Location::where('status', 'active')->count();
 
-      // Fallback captions
+      // Dynamic captions
       $todaySalesCaption = $todayInvoicesCount > 0
           ? $todayInvoicesCount . ' ' . \Illuminate\Support\Str::plural('Invoice', $todayInvoicesCount) . ' Posted Today'
-          : ($todayDispatched > 0 ? $todayDispatched . ' Handsets Dispatched' : 'No invoices posted yet today');
+          : ($todayDispatched > 0 ? $todayDispatched . ' Handsets Dispatched' : 'No sales posted today');
 
       $todayCollectionCaption = $todayCollection > 0
-          ? 'Collected today against invoices'
-          : 'No invoice collections today';
+          ? 'Collected today at ' . ($activeScopeLocation ? $activeScopeLocation->name : 'outlets')
+          : 'No collections today';
 
       $retailerDuesCaption = $overdueReceivable > 0
           ? 'Overdue ৳' . number_format($overdueReceivable) . ' · ' . $activeRetailersCount . ' Retailers'
           : ($activeRetailersCount . ' Active ' . \Illuminate\Support\Str::plural('Retailer', $activeRetailersCount));
 
       $stockValueCaption = $totalStockUnits > 0
-          ? number_format($totalStockUnits) . ' Units in ' . $primaryWarehouse
-          : '0 units registered in inventory';
+          ? number_format($totalStockUnits) . ' Units · ' . $stockScopeCaption
+          : '0 units registered';
 
-      // 6. Dynamic Low Stock & Reorder Alerts
+      // 2.6 Dynamic Low Stock & Reorder Alerts
       $lowStockThreshold = (int) \App\Models\Setting::get('low_stock_threshold', 10);
-      $lowStockProducts = \App\Models\Product::with(['brand', 'stockRow'])
-          ->where('status', 'active')
-          ->whereHas('stockRow', fn ($q) => $q->where('quantity', '<=', $lowStockThreshold))
-          ->take(5)
-          ->get();
 
-      $dynamicAlertItems = $lowStockProducts->map(function ($p) use ($lowStockThreshold) {
-          $stock = (int) ($p->stockRow?->quantity ?? 0);
+      if ($branchScoped) {
+          $lowStockUnitIds = array_keys(array_filter(
+              $branchQuantities,
+              fn (int $quantity): bool => $quantity <= $lowStockThreshold
+          ));
+
+          $lowStockProducts = \App\Models\Product::with(['brand', 'stockRow'])
+              ->where('status', 'active')
+              ->whereHas('stockRow', fn ($q) => $q->whereIn('units.id', $lowStockUnitIds))
+              ->take(5)
+              ->get();
+
+          $alertQuantities = collect($lowStockProducts)
+              ->mapWithKeys(fn ($p): array => [$p->id => (int) ($branchQuantities[$p->stockRow?->id] ?? 0)])
+              ->all();
+      } else {
+          $lowStockProducts = \App\Models\Product::with(['brand', 'stockRow'])
+              ->where('status', 'active')
+              ->whereHas('stockRow', fn ($q) => $q->where('quantity', '<=', $lowStockThreshold))
+              ->take(5)
+              ->get();
+
+          $alertQuantities = collect($lowStockProducts)
+              ->mapWithKeys(fn ($p): array => [$p->id => (int) ($p->stockRow?->quantity ?? 0)])
+              ->all();
+      }
+
+      $dynamicAlertItems = $lowStockProducts->map(function ($p) use ($lowStockThreshold, $alertQuantities) {
+          $stock = (int) ($alertQuantities[$p->id] ?? 0);
           $brandName = $p->brand?->name ?? 'Brand';
           $modelName = $p->model
               ? "{$p->name} ({$p->model})"
@@ -119,13 +259,13 @@
           ];
       })->all();
 
-      // 7. Dynamic Sales & Collection Trend Chart Data
+      // 2.7 Dynamic Sales & Collection Trend Chart Data
       $start7d = today()->subDays(6);
-      $invoices7d = \App\Models\SalesInvoice::whereDate('invoice_date', '>=', $start7d)
+      $invoices7d = $scoped(\App\Models\SalesInvoice::query()->whereDate('invoice_date', '>=', $start7d)
           ->selectRaw("DATE(invoice_date) as d, 
                        SUM(CASE WHEN status = 'posted' THEN grand_total ELSE 0 END) as s_total, 
                        SUM(paid_amount) as c_total")
-          ->groupBy('d')
+          ->groupBy('d'))
           ->get()
           ->keyBy('d');
 
@@ -145,11 +285,11 @@
       $weeksSales = [0, 0, 0, 0];
       $weeksCollections = [0, 0, 0, 0];
       $start30d = today()->subDays(27);
-      $invoices30d = \App\Models\SalesInvoice::whereDate('invoice_date', '>=', $start30d)
+      $invoices30d = $scoped(\App\Models\SalesInvoice::query()->whereDate('invoice_date', '>=', $start30d)
           ->selectRaw("DATE(invoice_date) as d, 
                        SUM(CASE WHEN status = 'posted' THEN grand_total ELSE 0 END) as s_total, 
                        SUM(paid_amount) as c_total")
-          ->groupBy('d')
+          ->groupBy('d'))
           ->get()
           ->keyBy('d');
 
@@ -170,11 +310,14 @@
       $yearMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       $yearSales = array_fill(0, 12, 0);
       $yearCollections = array_fill(0, 12, 0);
-      $invoicesYear = \App\Models\SalesInvoice::whereYear('invoice_date', now()->year)
-          ->selectRaw("MONTH(invoice_date) as m, 
+      $monthExpr = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'sqlite'
+          ? "CAST(strftime('%m', invoice_date) AS INTEGER)"
+          : 'MONTH(invoice_date)';
+      $invoicesYear = $scoped(\App\Models\SalesInvoice::query()->whereYear('invoice_date', now()->year)
+          ->selectRaw("{$monthExpr} as m, 
                        SUM(CASE WHEN status = 'posted' THEN grand_total ELSE 0 END) as s_total, 
                        SUM(paid_amount) as c_total")
-          ->groupBy('m')
+          ->groupBy('m'))
           ->get()
           ->keyBy('m');
 
@@ -206,9 +349,9 @@
           ],
       ];
 
-      // 8. Dynamic Recent Invoices
-      $recentInvoicesList = \App\Models\SalesInvoice::with(['customer', 'items.unit', 'creator', 'location'])
-          ->latest('invoice_date')
+      // 2.8 Dynamic Recent Invoices
+      $recentInvoicesList = $scoped(\App\Models\SalesInvoice::query()->with(['customer', 'items.unit', 'creator', 'location'])
+          ->latest('invoice_date'))
           ->take(5)
           ->get();
 
@@ -223,9 +366,9 @@
           return [
               'invoice_no' => $inv->invoice_no,
               'retailer' => $customer?->name ?? 'Walk-in Customer',
-              'location' => filled($customer?->city) ? $customer->city : ($inv->location?->name ?? 'Main Outlet'),
+              'location' => filled($customer?->city) ? $customer->city : ($inv->location?->name ?? 'Outlet'),
               'items' => $itemsSummary,
-              'sr' => $inv->creator?->name ?? 'Sales Staff',
+              'sr' => $inv->creator?->name ?? 'Staff',
               'amount' => (float) $inv->grand_total,
               'status' => $inv->payment_status?->value ?? 'due',
               'date' => $inv->invoice_date ? $inv->invoice_date->format('d M, h:i A') : 'Today',
@@ -233,24 +376,54 @@
           ];
       })->all();
 
-      // 9. Stocked Brands Share
+      // 2.9 Stocked Brands Share
       $totalRegisteredBrands = (int) \App\Models\Brand::query()->count();
-      $stockedBrandRows = \Illuminate\Support\Facades\DB::table('brands')
-          ->join('products', function ($join) {
-              $join->on('products.brand_id', '=', 'brands.id')
-                  ->whereNull('products.deleted_at');
-          })
-          ->join('units', function ($join) {
-              $join->on('units.product_id', '=', 'products.id')
-                  ->whereNull('units.deleted_at');
-          })
-          ->whereNull('brands.deleted_at')
-          ->groupBy('brands.id', 'brands.name')
-          ->havingRaw('SUM(units.quantity) > 0')
-          ->selectRaw('brands.id, brands.name, SUM(units.quantity) as stock_units, COUNT(DISTINCT products.id) as sku_count, SUM(units.quantity * COALESCE(products.sale_price, products.purchase_price, 0)) as stock_value')
-          ->orderByDesc('stock_value')
-          ->orderByDesc('stock_units')
-          ->get();
+
+      if ($branchScoped) {
+          $stockedBrandRows = ($targetLocationId === null || $targetLocationId < 1)
+              ? collect()
+              : \Illuminate\Support\Facades\DB::table('brands')
+                  ->join('products', function ($join) {
+                      $join->on('products.brand_id', '=', 'brands.id')
+                          ->whereNull('products.deleted_at');
+                  })
+                  ->join('units', function ($join) {
+                      $join->on('units.product_id', '=', 'products.id')
+                          ->whereNull('units.deleted_at');
+                  })
+                  ->joinSub(
+                      \App\Models\StockMovement::query()
+                          ->selectRaw('unit_id, COALESCE(SUM(quantity), 0) as quantity')
+                          ->where('location_id', $targetLocationId)
+                          ->groupBy('unit_id'),
+                      'branch_stock',
+                      fn ($join) => $join->on('branch_stock.unit_id', '=', 'units.id')
+                  )
+                  ->whereNull('brands.deleted_at')
+                  ->groupBy('brands.id', 'brands.name')
+                  ->havingRaw('SUM(branch_stock.quantity) > 0')
+                  ->selectRaw('brands.id, brands.name, SUM(branch_stock.quantity) as stock_units, COUNT(DISTINCT products.id) as sku_count, SUM(branch_stock.quantity * COALESCE(products.sale_price, products.purchase_price, 0)) as stock_value')
+                  ->orderByDesc('stock_value')
+                  ->orderByDesc('stock_units')
+                  ->get();
+      } else {
+          $stockedBrandRows = \Illuminate\Support\Facades\DB::table('brands')
+              ->join('products', function ($join) {
+                  $join->on('products.brand_id', '=', 'brands.id')
+                      ->whereNull('products.deleted_at');
+              })
+              ->join('units', function ($join) {
+                  $join->on('units.product_id', '=', 'products.id')
+                      ->whereNull('units.deleted_at');
+              })
+              ->whereNull('brands.deleted_at')
+              ->groupBy('brands.id', 'brands.name')
+              ->havingRaw('SUM(units.quantity) > 0')
+              ->selectRaw('brands.id, brands.name, SUM(units.quantity) as stock_units, COUNT(DISTINCT products.id) as sku_count, SUM(units.quantity * COALESCE(products.sale_price, products.purchase_price, 0)) as stock_value')
+              ->orderByDesc('stock_value')
+              ->orderByDesc('stock_units')
+              ->get();
+      }
 
       $brandPalette = [
           '#465fff', '#f59e0b', '#10b981', '#8b5cf6',
@@ -290,7 +463,6 @@
 
               $color = $brandPalette[$idx % count($brandPalette)];
 
-              // 12-month share distribution initialized with current baseline
               $shareSeries = array_fill(0, 12, $share);
               $volumeSeries = array_fill(0, 12, round($val, 2));
 
@@ -321,13 +493,14 @@
       $activeRetailersCount = 0;
       $totalStockUnits = 0;
       $totalStockValue = 0;
+      $stockValueChangePct = 0;
       $primaryWarehouse = 'Central Warehouse';
       $todayDispatched = 0;
       $todayPlaced = 0;
       $todayInTransit = 0;
       $activeRoutes = 1;
-      $todaySalesCaption = 'No sales recorded yet';
-      $todayCollectionCaption = 'No collections today';
+      $todaySalesCaption = 'No sales recorded';
+      $todayCollectionCaption = 'No collections';
       $retailerDuesCaption = '0 Retailers';
       $stockValueCaption = '0 Units registered';
       $dynamicAlertItems = [];
@@ -345,41 +518,132 @@
 @section('content')
   <div class="space-y-6">
 
-    {{-- Greeting & Quick Add Shortcuts --}}
-    <div class="enter mv-down flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-1" style="--i:0">
+    {{-- ── Header: Greeting, Role & Outlet Scope Switcher ── --}}
+    <div class="enter mv-down flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-1" style="--i:0">
       <div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2.5 flex-wrap">
           <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-ink">
             {{ $greeting }}, {{ $userName }}!
           </h1>
           <span class="text-xl sm:text-2xl select-none">👋</span>
+
+          {{-- Role Badge --}}
+          <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-xs font-semibold text-brand-500 ring-1 ring-brand-500/20">
+            <span class="size-1.5 rounded-full bg-brand-500"></span>
+            {{ $primaryRole }}
+          </span>
+
+          {{-- Outlet Scope Indicator / Switcher --}}
+          @if ($isSuperAdmin && $allLocations->isNotEmpty())
+            {{-- ONLY Super Admin gets the interactive switcher dropdown --}}
+            <div class="relative inline-block" x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="open = false">
+              <button type="button"
+                      @click="open = !open"
+                      class="btn-scale inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3.5 py-1 text-xs font-semibold text-ink shadow-2xs hover:bg-soft hover:text-brand-500 transition-colors cursor-pointer">
+                <x-icon name="store" class="size-3.5 text-brand-500" />
+                <span class="max-w-[180px] sm:max-w-xs truncate">{{ $activeScopeLocation ? $activeScopeLocation->name : 'All Outlets (Network)' }}</span>
+                <x-icon name="chevron" class="size-3 text-muted transition-transform duration-200" ::class="open && 'rotate-180'" />
+              </button>
+
+              <div x-show="open" x-cloak
+                   x-transition:enter="transition duration-200 ease-out"
+                   x-transition:enter-start="opacity-0 scale-95 -translate-y-1"
+                   x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                   x-transition:leave="transition duration-150 ease-in"
+                   x-transition:leave-start="opacity-100 scale-100"
+                   x-transition:leave-end="opacity-0 scale-95"
+                   class="absolute left-0 z-50 mt-2 w-64 origin-top-left rounded-2xl border border-line bg-surface p-1.5 shadow-card text-xs">
+                <div class="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted border-b border-line mb-1">
+                  Select Scope View
+                </div>
+
+                {{-- All Outlets --}}
+                <a href="{{ route('dashboard') }}"
+                   class="flex items-center justify-between rounded-xl px-3 py-2 font-medium transition-colors {{ !$scopedLocationId ? 'bg-soft text-brand-500 font-bold' : 'text-ink hover:bg-soft' }}">
+                  <span class="flex items-center gap-2">
+                    <x-icon name="dashboard" class="size-3.5 text-muted" />
+                    <span>All Outlets & Warehouses</span>
+                  </span>
+                  @if(!$scopedLocationId)
+                    <span class="size-1.5 rounded-full bg-brand-500"></span>
+                  @endif
+                </a>
+
+                <div class="my-1 border-t border-line"></div>
+
+                {{-- Individual Outlets --}}
+                @foreach($allLocations as $loc)
+                  <a href="{{ route('dashboard', ['location_id' => $loc->id]) }}"
+                     class="flex items-center justify-between rounded-xl px-3 py-2 font-medium transition-colors {{ $scopedLocationId === $loc->id ? 'bg-soft text-brand-500 font-bold' : 'text-ink hover:bg-soft' }}">
+                    <span class="flex items-center gap-2 truncate">
+                      <x-icon name="store" class="size-3.5 text-muted" />
+                      <span class="truncate">{{ $loc->name }}</span>
+                    </span>
+                    @if($scopedLocationId === $loc->id)
+                      <span class="size-1.5 rounded-full bg-brand-500"></span>
+                    @endif
+                  </a>
+                @endforeach
+              </div>
+            </div>
+          @elseif ($activeScopeLocation)
+            {{-- All non-Super Admin roles (Outlet Manager, Manager, Sales Staff, etc.): strictly locked to their outlet --}}
+            <span class="inline-flex items-center gap-1.5 rounded-full border border-brand-500/25 bg-surface px-3 py-1 text-xs font-semibold text-brand-600 shadow-2xs">
+              <x-icon name="store" class="size-3.5 text-brand-500" />
+              <span>Outlet Scope: <strong>{{ $activeScopeLocation->name }}</strong></span>
+            </span>
+          @endif
         </div>
+
         <p class="mt-1 text-xs sm:text-sm text-muted">
-          Here is what is happening across your distribution network today, <span class="font-medium text-ink">{{ now()->format('l, d M Y') }}</span>.
+          @if ($activeScopeLocation)
+            Showing live metrics for <strong class="text-ink">{{ $activeScopeLocation->name }}</strong> on {{ now()->format('l, d M Y') }}.
+          @else
+            Consolidated network overview across all distribution outlets and warehouses on {{ now()->format('l, d M Y') }}.
+          @endif
         </p>
       </div>
 
-      {{-- Right Side: Quick Add Shortcut Buttons --}}
+      {{-- ── Quick Add Shortcuts (Gated by Permissions) ── --}}
       <div class="flex items-center gap-2.5 sm:gap-3 flex-wrap sm:flex-nowrap shrink-0">
-        {{-- Add Product Shortcut --}}
-        <a href="{{ route('products.create') }}"
-           class="btn-scale inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-ink shadow-2xs hover:bg-soft hover:text-brand-500">
-          <x-icon name="plus" class="size-3.5 text-muted" />
-          <span>Add Product</span>
-        </a>
+        {{-- POS Quick Terminal Shortcut (For Outlet Managers & Sales Staff) --}}
+        @can('pos.access')
+          <a href="{{ route('pos.index') }}"
+             class="btn-scale inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-ink shadow-2xs hover:bg-soft hover:text-brand-500 transition-colors">
+            <x-icon name="cart" class="size-3.5 text-brand-500" />
+            <span>POS Terminal</span>
+          </a>
+        @endcan
 
-        {{-- Primary Action: Transfer / Dispatch --}}
-        <a href="{{ route('stock-transfers.create') }}"
-           class="btn-scale inline-flex items-center gap-2 rounded-full bg-brand-500 px-4 py-2 text-xs font-semibold text-on-brand shadow-sm hover:bg-brand-600">
-          <x-icon name="plus" class="size-3.5" />
-          <span>New Transfer</span>
-        </a>
+        {{-- Add Product Shortcut (Only if permitted) --}}
+        @can('products.manage')
+          <a href="{{ route('products.create') }}"
+             class="btn-scale inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-ink shadow-2xs hover:bg-soft hover:text-brand-500 transition-colors">
+            <x-icon name="plus" class="size-3.5 text-muted" />
+            <span>Add Product</span>
+          </a>
+        @endcan
 
-        {{-- More Quick Actions Dropdown --}}
+        {{-- Primary Action: Transfer or Sales Order --}}
+        @can('stock-transfers.manage')
+          <a href="{{ route('stock-transfers.create') }}"
+             class="btn-scale inline-flex items-center gap-2 rounded-full bg-brand-500 px-4 py-2 text-xs font-semibold text-on-brand shadow-sm hover:bg-brand-600 transition-colors">
+            <x-icon name="plus" class="size-3.5" />
+            <span>New Transfer</span>
+          </a>
+        @elsecan('sales-orders.manage')
+          <a href="{{ route('sales-orders.create') }}"
+             class="btn-scale inline-flex items-center gap-2 rounded-full bg-brand-500 px-4 py-2 text-xs font-semibold text-on-brand shadow-sm hover:bg-brand-600 transition-colors">
+            <x-icon name="plus" class="size-3.5" />
+            <span>New Order</span>
+          </a>
+        @endcan
+
+        {{-- More Quick Actions Dropdown (Only shows options user can execute) --}}
         <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="open = false">
           <button type="button"
                   @click="open = !open"
-                  class="btn-scale grid size-9 place-items-center rounded-full border border-line bg-surface text-muted shadow-2xs hover:bg-soft hover:text-ink"
+                  class="btn-scale grid size-9 place-items-center rounded-full border border-line bg-surface text-muted shadow-2xs hover:bg-soft hover:text-ink transition-colors cursor-pointer"
                   title="More actions">
             <x-icon name="dots" class="size-4" />
           </button>
@@ -392,32 +656,61 @@
                x-transition:leave-start="opacity-100 scale-100"
                x-transition:leave-end="opacity-0 scale-95"
                class="absolute right-0 z-50 mt-2 w-48 origin-top-right rounded-2xl border border-line bg-surface p-1.5 shadow-card text-xs">
-            <a href="{{ route('customers.create') }}"
-               class="flex items-center gap-2 rounded-xl px-3 py-2 font-medium text-ink transition-colors hover:bg-soft hover:text-brand-500">
-              <x-icon name="store" class="size-4 text-muted" />
-              <span>Add Retailer</span>
-            </a>
-            <a href="{{ route('stock-adjustments.create') }}"
-               class="flex items-center gap-2 rounded-xl px-3 py-2 font-medium text-ink transition-colors hover:bg-soft hover:text-brand-500">
-              <x-icon name="box" class="size-4 text-muted" />
-              <span>Stock Adjustment</span>
-            </a>
-            <a href="{{ route('suppliers.create') }}"
-               class="flex items-center gap-2 rounded-xl px-3 py-2 font-medium text-ink transition-colors hover:bg-soft hover:text-brand-500">
-              <x-icon name="truck" class="size-4 text-muted" />
-              <span>Add Supplier</span>
-            </a>
-            <a href="{{ route('pos.index') }}"
-               class="flex items-center gap-2 rounded-xl px-3 py-2 font-medium text-ink transition-colors hover:bg-soft hover:text-brand-500">
-              <x-icon name="cart" class="size-4 text-muted" />
-              <span>POS Terminal</span>
-            </a>
+            @can('sales-orders.manage')
+              <a href="{{ route('sales-orders.create') }}"
+                 class="flex items-center gap-2 rounded-xl px-3 py-2 font-medium text-ink transition-colors hover:bg-soft hover:text-brand-500">
+                <x-icon name="cart" class="size-4 text-muted" />
+                <span>New Sales Order</span>
+              </a>
+            @endcan
+
+            @can('customers.manage')
+              <a href="{{ route('customers.create') }}"
+                 class="flex items-center gap-2 rounded-xl px-3 py-2 font-medium text-ink transition-colors hover:bg-soft hover:text-brand-500">
+                <x-icon name="store" class="size-4 text-muted" />
+                <span>Add Retailer</span>
+              </a>
+            @endcan
+
+            @can('stock-adjustments.manage')
+              <a href="{{ route('stock-adjustments.create') }}"
+                 class="flex items-center gap-2 rounded-xl px-3 py-2 font-medium text-ink transition-colors hover:bg-soft hover:text-brand-500">
+                <x-icon name="box" class="size-4 text-muted" />
+                <span>Stock Adjustment</span>
+              </a>
+            @endcan
+
+            @can('suppliers.manage')
+              <a href="{{ route('suppliers.create') }}"
+                 class="flex items-center gap-2 rounded-xl px-3 py-2 font-medium text-ink transition-colors hover:bg-soft hover:text-brand-500">
+                <x-icon name="truck" class="size-4 text-muted" />
+                <span>Add Supplier</span>
+              </a>
+            @endcan
+
+            @can('sales-returns.manage')
+              <a href="{{ route('sales-returns.create') }}"
+                 class="flex items-center gap-2 rounded-xl px-3 py-2 font-medium text-ink transition-colors hover:bg-soft hover:text-brand-500">
+                <x-icon name="arrow-up-right" class="size-4 text-muted" />
+                <span>Sales Return</span>
+              </a>
+            @endcan
           </div>
         </div>
       </div>
     </div>
 
-    {{-- 1. Top 4 Metric KPI Stat Cards --}}
+    @if ($isRestricted && !$assignedLocation)
+      <div class="rounded-2xl border border-warning/30 bg-warning/10 p-4 text-xs sm:text-sm text-warning flex items-start gap-3">
+        <x-icon name="warning" class="size-5 shrink-0 mt-0.5 text-warning" />
+        <div>
+          <h4 class="font-bold text-ink">No Outlet Assigned to Your Account</h4>
+          <p class="mt-0.5 text-muted">You are logged in with role <strong>{{ $primaryRole }}</strong>, but no specific outlet/branch is currently assigned to your account. For security, cross-outlet metrics are withheld. An administrator can assign your outlet under User Management.</p>
+        </div>
+      </div>
+    @endif
+
+    {{-- ── 1. Top 4 Metric KPI Stat Cards (Scoped) ── --}}
     <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-4 items-stretch">
       <div class="flex flex-col">
         <x-dashboard.stat-card 
@@ -456,7 +749,7 @@
         <x-dashboard.stat-card 
           title="Total Stock Value" 
           :amount="$totalStockValue" 
-          :change="0" 
+          :change="$stockValueChangePct" 
           :caption="$stockValueCaption" 
           icon="box"
           class="rv mv-blur lift"
@@ -465,11 +758,16 @@
       </div>
     </div>
 
-    {{-- 2. Middle Row: Sales vs. Collection Trend (2 Cols) + SR Field Distribution (1 Col) --}}
+    {{-- ── 2. Middle Row: Sales vs. Collection Trend (2 Cols) + Field Distribution (1 Col) ── --}}
     <div class="grid gap-5 xl:grid-cols-3 items-stretch">
       <div class="xl:col-span-2 flex flex-col">
         @if ($dynamicChartPeriods)
-          <x-dashboard.sales-chart class="rv" style="--i:5; --stagger:130ms; --d:100ms" :periods="$dynamicChartPeriods" />
+          <x-dashboard.sales-chart 
+            class="rv" 
+            style="--i:5; --stagger:130ms; --d:100ms" 
+            :title="$activeScopeLocation ? 'Sales & Collections (' . $activeScopeLocation->name . ')' : 'Sales & Collection Trend'"
+            :periods="$dynamicChartPeriods" 
+          />
         @else
           <x-dashboard.sales-chart class="rv" style="--i:5; --stagger:130ms; --d:100ms" />
         @endif
@@ -486,16 +784,23 @@
       </div>
     </div>
 
-    {{-- 3. Third Row: Low Stock & Reorder Alerts (50%) + Brand Sales Share (50%) --}}
+    {{-- ── 3. Third Row: Low Stock Alerts (50%) + Brand Sales Share (50%) ── --}}
     <div class="grid gap-5 lg:grid-cols-2 items-stretch">
       <div class="flex flex-col">
-        <x-dashboard.stock-alerts class="rv" style="--i:2; --d:40ms" :items="$dynamicAlertItems" />
+        <x-dashboard.stock-alerts 
+          class="rv" 
+          style="--i:2; --d:40ms" 
+          :title="$activeScopeLocation ? 'Low Stock Alerts (' . $activeScopeLocation->name . ')' : 'Low Stock & Reorder Alerts'"
+          :items="$dynamicAlertItems" 
+        />
       </div>
       <div class="flex flex-col">
         @if ($dynamicBrandShares !== null)
           <x-dashboard.brand-share-chart
             class="rv"
             style="--i:2; --d:40ms"
+            :title="$activeScopeLocation ? 'Brand Stock Share (' . $activeScopeLocation->name . ')' : 'Brand Sales Share'"
+            :subtitle="$activeScopeLocation ? 'Distribution stock across brands at ' . $activeScopeLocation->name : null"
             :brands="$dynamicBrandShares"
             :totalRegisteredBrands="$totalRegisteredBrands"
             :warehouseName="$primaryWarehouse"
@@ -505,15 +810,22 @@
           <x-dashboard.brand-share-chart
             class="rv"
             style="--i:2; --d:40ms"
+            :title="$activeScopeLocation ? 'Brand Stock Share (' . $activeScopeLocation->name . ')' : 'Brand Sales Share'"
+            :subtitle="$activeScopeLocation ? 'Distribution stock across brands at ' . $activeScopeLocation->name : null"
             :warehouseName="$primaryWarehouse"
           />
         @endif
       </div>
     </div>
 
-    {{-- 4. Bottom Row: Recent Retailer Invoices & Orders --}}
+    {{-- ── 4. Bottom Row: Recent Invoices & Orders (Scoped) ── --}}
     <div>
-      <x-dashboard.recent-invoices class="rv" style="--i:1; --d:40ms" :invoices="$dynamicRecentInvoices" />
+      <x-dashboard.recent-invoices 
+        class="rv" 
+        style="--i:1; --d:40ms" 
+        :title="$activeScopeLocation ? 'Recent Invoices — ' . $activeScopeLocation->name : 'Recent Distribution Invoices'"
+        :invoices="$dynamicRecentInvoices" 
+      />
     </div>
 
   </div>

@@ -226,16 +226,18 @@
                     </select>
                 </div>
 
-                <div>
-                    <label for="return_filter_location" class="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">Business Location</label>
-                    <select id="return_filter_location" name="location_id"
-                            class="w-full rounded-xl border border-line bg-surface px-3 py-2 text-xs sm:text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20">
-                        <option value="">All Locations</option>
-                        @foreach($locations as $location)
-                            <option value="{{ $location->id }}" @selected(request('location_id') == $location->id)>{{ $location->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                @if(auth()->user()?->hasRole('Super Admin'))
+                    <div>
+                        <label for="return_filter_location" class="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">Business Location</label>
+                        <select id="return_filter_location" name="location_id"
+                                class="w-full rounded-xl border border-line bg-surface px-3 py-2 text-xs sm:text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20">
+                            <option value="">All Locations</option>
+                            @foreach($locations as $location)
+                                <option value="{{ $location->id }}" @selected(request('location_id') == $location->id)>{{ $location->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
 
                 <div>
                     <label for="return_filter_payment" class="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">Payment Status</label>
