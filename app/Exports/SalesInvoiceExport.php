@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exports;
 
+use App\Helpers\Money;
 use App\Models\SalesInvoice;
 use App\Models\User;
 use App\Services\SalesScope;
@@ -82,12 +83,12 @@ class SalesInvoiceExport implements FromCollection, WithHeadings, WithMapping
                 'customer' => $invoice->customer?->name ?? 'Walk-in',
                 'location' => collect([$invoice->branch?->name, $invoice->location?->name])->filter()->implode(' / ') ?: '—',
                 'items_count' => (int) ($invoice->items_count ?? 0),
-                'subtotal' => number_format((float) $invoice->subtotal, 2),
-                'discount' => number_format((float) $invoice->discount_amount, 2),
-                'tax' => number_format((float) $invoice->tax_amount, 2),
-                'grand_total' => number_format((float) $invoice->grand_total, 2),
-                'paid' => number_format((float) $invoice->paid_amount, 2),
-                'due' => number_format((float) $invoice->payment_due, 2),
+                'subtotal' => Money::format($invoice->subtotal),
+                'discount' => Money::format($invoice->discount_amount),
+                'tax' => Money::format($invoice->tax_amount),
+                'grand_total' => Money::format($invoice->grand_total),
+                'paid' => Money::format($invoice->paid_amount),
+                'due' => Money::format($invoice->payment_due),
                 'payment_status' => $invoice->payment_status->label(),
                 'status' => $invoice->status->label(),
                 default => $invoice->{$col} ?? '',

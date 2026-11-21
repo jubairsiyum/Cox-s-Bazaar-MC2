@@ -340,7 +340,7 @@ class CustomerController extends Controller
         fclose($handle);
 
         return response($csv, 200, [
-            'Content-Type' => 'text/csv',
+            'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="customer_import_template.csv"',
         ]);
     }

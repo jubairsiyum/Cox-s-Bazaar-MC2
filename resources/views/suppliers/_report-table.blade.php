@@ -27,11 +27,11 @@
                             {{ $supplier->tel_no ?: '—' }}
                         @elseif($key === 'purchase_due')
                             <span class="{{ (float) $supplier->purchase_due > 0 ? 'due-alert' : '' }}">
-                                {{ $currencySymbol }}{{ number_format((float) $supplier->purchase_due, 2) }}
+                                {{ \App\Helpers\Money::format($supplier->purchase_due) }}
                             </span>
                         @elseif($key === 'purchase_return_due')
                             <span class="{{ (float) $supplier->purchase_return_due > 0 ? 'return-alert' : '' }}">
-                                {{ $currencySymbol }}{{ number_format((float) $supplier->purchase_return_due, 2) }}
+                                {{ \App\Helpers\Money::format($supplier->purchase_return_due) }}
                             </span>
                         @elseif($key === 'status')
                             <span class="status-pill {{ $supplier->status === 'active' ? 'status-active' : 'status-inactive' }}">
@@ -55,9 +55,9 @@
                 <td class="center"></td>
                 @foreach($columns as $key => $label)
                     @if($key === 'purchase_due')
-                        <td class="num due-alert">{{ $currencySymbol }}{{ number_format($totalDueInReport, 2) }}</td>
+                        <td class="num due-alert">{{ \App\Helpers\Money::format($totalDueInReport) }}</td>
                     @elseif($key === 'purchase_return_due')
-                        <td class="num return-alert">{{ $currencySymbol }}{{ number_format($totalReturnDueInReport, 2) }}</td>
+                        <td class="num return-alert">{{ \App\Helpers\Money::format($totalReturnDueInReport) }}</td>
                     @elseif($loop->first)
                         <td style="text-transform: uppercase; letter-spacing: 0.04em; font-size: 10.5px;">Total</td>
                     @else

@@ -14,6 +14,7 @@ return [
     */
 
     'name' => env('APP_NAME', 'Laravel'),
+    'charset' => 'UTF-8',
     // 'name' => env('APP_NAME', "Cox's Bazar MC2"),
 
     /*

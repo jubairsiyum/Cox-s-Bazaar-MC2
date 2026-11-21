@@ -6,6 +6,7 @@ namespace App\Http\Requests\CustomerCollection;
 
 use App\Enums\PaymentMethod;
 use App\Enums\SalesInvoiceStatus;
+use App\Helpers\Money;
 use App\Models\CustomerCollection;
 use App\Models\SalesInvoice;
 use Illuminate\Foundation\Http\FormRequest;
@@ -77,7 +78,7 @@ class StoreCustomerCollectionRequest extends FormRequest
                     $invoice = SalesInvoice::query()->find($invoiceId);
 
                     if ($invoice !== null && (float) $value > (float) $invoice->due_amount + 0.01) {
-                        $fail('The allocation cannot exceed the invoice due of '.number_format((float) $invoice->due_amount, 2).'.');
+                        $fail('The allocation cannot exceed the invoice due of '.Money::format($invoice->due_amount).'.');
                     }
                 },
             ],

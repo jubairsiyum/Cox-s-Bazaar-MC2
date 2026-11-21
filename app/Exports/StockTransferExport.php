@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exports;
 
+use App\Helpers\Money;
 use App\Models\StockTransfer;
 use App\Models\User;
 use App\Services\BranchScope;
@@ -81,8 +82,8 @@ class StockTransferExport implements FromCollection, WithHeadings, WithMapping
                 'from_location' => $transfer->fromLocation?->name ?? '—',
                 'to_location' => $transfer->toLocation?->name ?? '—',
                 'status' => $transfer->status->label(),
-                'shipping_charges' => number_format((float) $transfer->shipping_charges, 2),
-                'total_amount' => number_format((float) $transfer->total_amount, 2),
+                'shipping_charges' => Money::format($transfer->shipping_charges),
+                'total_amount' => Money::format($transfer->total_amount),
                 'additional_notes' => $transfer->additional_notes ?: '—',
                 default => $transfer->{$col} ?? '',
             };

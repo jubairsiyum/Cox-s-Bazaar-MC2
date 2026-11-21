@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exports;
 
+use App\Helpers\Money;
 use App\Models\PurchaseOrder;
 use App\Models\User;
 use App\Services\LocationScope;
@@ -84,8 +85,8 @@ class PurchaseOrderExport implements FromCollection, WithHeadings, WithMapping
                 'supplier' => $order->supplier?->name ?? '—',
                 'purchase_status' => $order->purchase_status->label(),
                 'payment_status' => $order->payment_status->label(),
-                'grand_total' => number_format((float) $order->grand_total, 2),
-                'payment_due' => number_format((float) $order->payment_due, 2),
+                'grand_total' => Money::format($order->grand_total),
+                'payment_due' => Money::format($order->payment_due),
                 'added_by' => $order->creator?->name ?? '—',
                 default => $order->{$col} ?? '',
             };

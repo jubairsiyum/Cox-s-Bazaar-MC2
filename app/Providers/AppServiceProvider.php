@@ -30,12 +30,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        ini_set('default_charset', 'UTF-8');
         $this->ensureStorageLinkExists();
         $this->registerSuperAdminGateBypass();
         $this->registerPasswordDefaults();
         $this->registerPolicies();
         $this->registerTailAdminComponents();
         $this->enforceHttpsInProduction();
+        Blade::directive('bdt', fn (string $expression): string => "<?php echo \App\Helpers\Money::format({$expression}); ?>");
     }
 
     /**

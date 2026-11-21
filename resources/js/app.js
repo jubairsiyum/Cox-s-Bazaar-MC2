@@ -19,11 +19,14 @@ window.flatpickr = flatpickr;
 
 // ── Global helpers available in Alpine expressions ──────────
 window.formatBDT = (amount) => {
-    const num = parseFloat(amount) || 0;
-    return '৳' + num.toLocaleString('en-BD', {
+    const raw = String(amount ?? "0").replace(/[৳,\s]/g, "");
+    const num = Number.isFinite(Number(raw)) ? Number(raw) : 0;
+    const formatted = Math.abs(num).toLocaleString('en-US', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
+        useGrouping: true,
     });
+    return `${num < 0 ? '-' : ''}৳${formatted}`;
 };
 
 // Register Alpine.js components before initializing
