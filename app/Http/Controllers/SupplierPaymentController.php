@@ -127,7 +127,7 @@ class SupplierPaymentController extends Controller
         return (float) SupplierScope::scopeQuery(BranchScope::scopeQuery(PurchaseOrder::query(), $user), $user)
             ->where('purchase_status', '!=', 'cancelled')
             ->toBase()
-            ->selectRaw('COALESCE(SUM(MAX(grand_total - paid_amount, 0)), 0) as outstanding')
+            ->selectRaw('COALESCE(SUM(CASE WHEN grand_total > paid_amount THEN grand_total - paid_amount ELSE 0 END), 0) as outstanding')
             ->value('outstanding') ?? 0.0;
     }
 

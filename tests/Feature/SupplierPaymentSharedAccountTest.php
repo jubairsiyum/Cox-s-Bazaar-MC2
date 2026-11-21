@@ -40,6 +40,21 @@ it('lists company-wide accounts in the supplier payment form for a branch user',
         ->assertSee($shared->name);
 });
 
+it('loads the supplier payments list for a branch user with an unpaid order', function () {
+    $branch = Location::factory()->create();
+    $supplier = Supplier::factory()->create();
+    PurchaseOrder::factory()->create([
+        'supplier_id' => $supplier->id,
+        'location_id' => $branch->id,
+        'grand_total' => 1000,
+        'paid_amount' => 250,
+    ]);
+
+    $this->actingAs(branchManagerAt($branch))
+        ->get(route('supplier-payments.index'))
+        ->assertOk();
+});
+
 it('does not list another branch account in the supplier payment form', function () {
     $branch = Location::factory()->create();
     $otherBranch = Location::factory()->create();
