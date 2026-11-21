@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\SalesOrder;
 
+use App\Http\Controllers\SalesOrderController;
 use App\Models\SalesOrder;
+use App\Models\Setting;
+use App\Models\Unit;
 use App\Services\CustomerResolver;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
@@ -66,6 +69,30 @@ class UpdateSalesOrderRequest extends FormRequest
                         $field,
                         __('validation.unique', ['attribute' => $validator->getDisplayableAttribute($field)])
                     );
+                }
+
+                // Verify stock availability at the selected location unless negative stock is allowed in settings
+                $allowsNegative = (bool) Setting::get('allow_negative_stock', '0');
+                if (! $allowsNegative) {
+                    $locationId = (int) $this->input('location_id');
+
+                    foreach ($this->input('items', []) as $index => $item) {
+                        $unitId = (int) ($item['unit_id'] ?? 0);
+                        $quantity = (int) ($item['quantity'] ?? 0);
+
+                        if ($unitId > 0 && $quantity > 0) {
+                            $unit = Unit::query()->find($unitId);
+                            if ($unit) {
+                                $available = SalesOrderController::resolveLocationStock($unit, $locationId);
+                                if ($quantity > $available) {
+                                    $validator->errors()->add(
+                                        "items.{$index}.quantity",
+                                        "Quantity ({$quantity}) exceeds available stock ({$available}) of '{$unit->displayName()}' at the selected location."
+                                    );
+                                }
+                            }
+                        }
+                    }
                 }
             },
         ];

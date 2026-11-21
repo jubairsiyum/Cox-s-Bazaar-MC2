@@ -3,51 +3,111 @@ use App\Helpers\MenuHelper;
 $menuGroups = MenuHelper::getMenuGroups();
 $sidebarUnreadCount = auth()->user()?->unreadNotifications()->count() ?? 0;
 
-// Move top-level "Notifications" inside "Administration" for cleaner navigation hierarchy
+// Realign navigation for intuitive ERP UX:
+// 1. "Inventory" holds operational product & stock items (Products, Stock Levels, Transfers, Adjustments, Warehouses)
+// 2. "Master Data" is a dedicated section for administrative control of core lookups (Brands, Categories, Units)
+// 3. "Notifications" is nested under "Administration"
+// 4. Order sections logically: Operations -> Logistics & Partners -> Finance & Reports -> Master Data & Administration
 foreach ($menuGroups as &$groupRef) {
-if (($groupRef['title'] ?? '') !== 'Menu' || empty($groupRef['items'])) {
-continue;
-}
+  if (($groupRef['title'] ?? '') !== 'Menu' || empty($groupRef['items'])) {
+    continue;
+  }
 
-$notificationItem = null;
-$adminIndex = null;
-$filteredItems = [];
+  $itemMap = collect($groupRef['items'])->keyBy('name');
 
-foreach ($groupRef['items'] as $navItem) {
-if (($navItem['name'] ?? '') === 'Notifications' && ($navItem['path'] ?? '') === '/notifications') {
-$notificationItem = [
-'name' => $navItem['name'],
-'path' => $navItem['path'],
-'can' => $navItem['can'] ?? 'dashboard.view',
-'badge' => $sidebarUnreadCount > 0 ? ($sidebarUnreadCount > 99 ? '99+' : (string) $sidebarUnreadCount) : null,
-];
-continue;
-}
+  // Master Data sub-items
+  $masterSubMap = collect($itemMap->get('Master Data')['subItems'] ?? [])->keyBy('name');
+  // Inventory sub-items
+  $invSubMap = collect($itemMap->get('Inventory')['subItems'] ?? [])->keyBy('name');
 
-if (($navItem['name'] ?? '') === 'Administration') {
-$adminIndex = count($filteredItems);
-}
+  // 1. Inventory: Product catalog + physical stock operations & warehouses
+  $inventorySubItems = array_values(array_filter([
+    $masterSubMap->get('Products'),
+    $invSubMap->get('Stock Levels'),
+    $invSubMap->get('Transfers'),
+    $invSubMap->get('Adjustments'),
+    $invSubMap->get('Warehouses'),
+  ]));
 
-$filteredItems[] = $navItem;
-}
+  $inventoryCanAny = [
+    'products.view', 'products.manage',
+    'inventory.view',
+    'stock-transfers.manage',
+    'stock-adjustments.manage',
+    'warehouses.manage',
+  ];
 
-if ($notificationItem !== null && $adminIndex !== null) {
-$adminCanAny = (array) ($filteredItems[$adminIndex]['canany'] ?? []);
-if (!in_array($notificationItem['can'], $adminCanAny, true)) {
-$adminCanAny[] = $notificationItem['can'];
-}
-$filteredItems[$adminIndex]['canany'] = $adminCanAny;
-$filteredItems[$adminIndex]['subItems'] = $filteredItems[$adminIndex]['subItems'] ?? [];
+  $alignedInventory = [
+    'icon' => 'box',
+    'name' => 'Inventory',
+    'canany' => $inventoryCanAny,
+    'subItems' => $inventorySubItems,
+  ];
 
-$alreadyPresent = collect($filteredItems[$adminIndex]['subItems'])
-->contains(fn ($s) => ($s['path'] ?? '') === '/notifications');
+  // 2. Master Data: Administrative control of foundational classifications (Brands, Categories, Units)
+  $masterDataSubItems = array_values(array_filter([
+    $masterSubMap->get('Brands'),
+    $masterSubMap->get('Categories'),
+    $masterSubMap->get('Units'),
+  ]));
 
-if (!$alreadyPresent) {
-$filteredItems[$adminIndex]['subItems'][] = $notificationItem;
-}
+  $masterDataCanAny = [
+    'brands.view', 'brands.manage',
+    'categories.view', 'categories.manage',
+    'units.view', 'units.manage',
+  ];
 
-$groupRef['items'] = $filteredItems;
-}
+  $alignedMasterData = [
+    'icon' => 'tables',
+    'name' => 'Master Data',
+    'canany' => $masterDataCanAny,
+    'subItems' => $masterDataSubItems,
+  ];
+
+  // 3. Administration with nested Notifications
+  $adminItem = $itemMap->get('Administration');
+  $adminSubItems = $adminItem['subItems'] ?? [];
+
+  $notificationSubItem = [
+    'name' => 'Notifications',
+    'path' => '/notifications',
+    'can' => 'dashboard.view',
+    'badge' => $sidebarUnreadCount > 0 ? ($sidebarUnreadCount > 99 ? '99+' : (string) $sidebarUnreadCount) : null,
+  ];
+
+  $hasNotifications = collect($adminSubItems)->contains(fn ($s) => ($s['path'] ?? '') === '/notifications');
+  if (!$hasNotifications) {
+    $adminSubItems[] = $notificationSubItem;
+  }
+
+  $adminCanAny = array_values(array_unique(array_merge(
+    (array) ($adminItem['canany'] ?? []),
+    ['dashboard.view']
+  )));
+
+  $alignedAdmin = [
+    'icon' => $adminItem['icon'] ?? 'authentication',
+    'name' => 'Administration',
+    'canany' => $adminCanAny,
+    'subItems' => $adminSubItems,
+  ];
+
+  // Ordered items exactly as specified:
+  // Dashboard > Master data > Parties > Inventory > Purchasing > Sales > POS > Finance > Reports > Administration
+  $alignedItems = array_values(array_filter([
+    $itemMap->get('Dashboard'),
+    $alignedMasterData,
+    $itemMap->get('Parties'),
+    $alignedInventory,
+    $itemMap->get('Purchasing'),
+    $itemMap->get('Sales'),
+    $itemMap->get('POS Terminal'),
+    $itemMap->get('Finance'),
+    $itemMap->get('Reports'),
+    $alignedAdmin,
+  ]));
+
+  $groupRef['items'] = $alignedItems;
 }
 unset($groupRef);
 

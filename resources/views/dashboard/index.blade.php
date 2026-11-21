@@ -110,7 +110,31 @@
           : (int) \App\Models\Customer::where('status', 'active')->count();
 
       // 2.4 Stock Valuation & Inventory Units
-      if ($scopedLocationId) {
+      // Main Super Admin / Network view includes all branches; individual branch scope shows branch-only stock.
+      $isAllBranchesStock = ! $scopedLocationId 
+          || ($activeScopeLocation && (
+              $activeScopeLocation->name === 'Main Warehouse' 
+              || ($activeScopeLocation->type?->value ?? $activeScopeLocation->type) === 'warehouse'
+          ));
+
+      if ($isAllBranchesStock) {
+          $totalStockUnits = (int) \App\Models\Unit::sum('quantity');
+
+          $rawStockValue = \Illuminate\Support\Facades\DB::table('units')
+              ->join('products', 'units.product_id', '=', 'products.id')
+              ->whereNull('products.deleted_at')
+              ->whereNull('units.deleted_at')
+              ->selectRaw('SUM(units.quantity * COALESCE(products.purchase_price, products.sale_price, 0)) as total_val')
+              ->value('total_val');
+          $totalStockValue = (float) ($rawStockValue ?? 0);
+
+          $primaryWarehouse = $activeScopeLocation?->name ?? (
+              \App\Models\Location::where('status', 'active')
+                  ->where('type', \App\Enums\LocationType::Warehouse->value ?? 'warehouse')
+                  ->value('name') ?? 'Main Warehouse'
+          );
+          $stockScopeCaption = 'All branches included';
+      } else {
           $locationStockMovements = \App\Models\StockMovement::where('location_id', $scopedLocationId)->sum('quantity');
           $totalStockUnits = max(0, (int) $locationStockMovements);
 
@@ -124,21 +148,34 @@
               ->value('total_val');
           $totalStockValue = max(0, (float) ($rawStockValue ?? 0));
           $primaryWarehouse = $activeScopeLocation->name;
-      } else {
-          $totalStockUnits = (int) \App\Models\Unit::sum('quantity');
+          $stockScopeCaption = $primaryWarehouse;
+      }
 
-          $rawStockValue = \Illuminate\Support\Facades\DB::table('units')
-              ->join('products', 'units.product_id', '=', 'products.id')
-              ->whereNull('products.deleted_at')
-              ->whereNull('units.deleted_at')
-              ->selectRaw('SUM(units.quantity * COALESCE(products.purchase_price, products.sale_price, 0)) as total_val')
-              ->value('total_val');
-          $totalStockValue = (float) ($rawStockValue ?? 0);
+      // 2.4.1 Day-over-Day (DoD) Stock Value % Change
+      // Compares current stock value against yesterday's closing value based on today's net inventory movements.
+      $todayMovementsQuery = \Illuminate\Support\Facades\DB::table('stock_movements')
+          ->join('units', 'stock_movements.unit_id', '=', 'units.id')
+          ->join('products', 'units.product_id', '=', 'products.id')
+          ->whereDate('stock_movements.created_at', today())
+          ->whereNull('products.deleted_at')
+          ->whereNull('units.deleted_at');
 
-          $primaryWarehouse = \App\Models\Location::where('status', 'active')
-              ->where('type', \App\Enums\LocationType::Warehouse->value ?? 'warehouse')
-              ->value('name')
-              ?? 'Central Warehouse';
+      if (! $isAllBranchesStock && $scopedLocationId) {
+          $todayMovementsQuery->where('stock_movements.location_id', $scopedLocationId);
+      }
+
+      $todayStockDelta = (float) ($todayMovementsQuery->selectRaw(
+          'SUM(stock_movements.quantity * COALESCE(products.purchase_price, products.sale_price, 0)) as val_delta'
+      )->value('val_delta') ?? 0);
+
+      $stockValueChangePct = 0;
+      if ($todayStockDelta != 0) {
+          $yesterdayStockValue = $totalStockValue - $todayStockDelta;
+          if ($yesterdayStockValue > 0) {
+              $stockValueChangePct = (int) round(($todayStockDelta / $yesterdayStockValue) * 100);
+          } else {
+              $stockValueChangePct = $todayStockDelta > 0 ? 100 : -100;
+          }
       }
 
       // 2.5 Stock Transfers & Field Placement
@@ -150,16 +187,17 @@
           });
       }
 
-      $todayDispatched = (int) (clone $transferQuery)
-          ->join('stock_transfer_items', 'stock_transfers.id', '=', 'stock_transfer_items.stock_transfer_id')
-          ->sum('stock_transfer_items.quantity');
-
       $todayPlaced = (int) (clone $transferQuery)
           ->where('stock_transfers.status', \App\Enums\StockTransferStatus::Received->value)
           ->join('stock_transfer_items', 'stock_transfers.id', '=', 'stock_transfer_items.stock_transfer_id')
           ->sum('stock_transfer_items.quantity');
 
-      $todayInTransit = max(0, $todayDispatched - $todayPlaced);
+      $todayInTransit = (int) (clone $transferQuery)
+          ->where('stock_transfers.status', \App\Enums\StockTransferStatus::InTransit->value)
+          ->join('stock_transfer_items', 'stock_transfers.id', '=', 'stock_transfer_items.stock_transfer_id')
+          ->sum('stock_transfer_items.quantity');
+
+      $todayDispatched = $todayPlaced + $todayInTransit;
       $activeRoutes = $scopedLocationId ? 1 : (int) \App\Models\Location::where('status', 'active')->count();
 
       // Dynamic captions
@@ -176,7 +214,7 @@
           : ($activeRetailersCount . ' Active ' . \Illuminate\Support\Str::plural('Retailer', $activeRetailersCount));
 
       $stockValueCaption = $totalStockUnits > 0
-          ? number_format($totalStockUnits) . ' Units in ' . $primaryWarehouse
+          ? number_format($totalStockUnits) . ' Units · ' . $stockScopeCaption
           : '0 units registered';
 
       // 2.6 Dynamic Low Stock & Reorder Alerts
@@ -470,6 +508,7 @@
       $activeRetailersCount = 0;
       $totalStockUnits = 0;
       $totalStockValue = 0;
+      $stockValueChangePct = 0;
       $primaryWarehouse = 'Central Warehouse';
       $todayDispatched = 0;
       $todayPlaced = 0;
@@ -725,7 +764,7 @@
         <x-dashboard.stat-card 
           title="Total Stock Value" 
           :amount="$totalStockValue" 
-          :change="0" 
+          :change="$stockValueChangePct" 
           :caption="$stockValueCaption" 
           icon="box"
           class="rv mv-blur lift"
