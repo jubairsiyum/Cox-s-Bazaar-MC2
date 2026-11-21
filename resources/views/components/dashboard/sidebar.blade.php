@@ -5,49 +5,49 @@ $sidebarUnreadCount = auth()->user()?->unreadNotifications()->count() ?? 0;
 
 // Move top-level "Notifications" inside "Administration" for cleaner navigation hierarchy
 foreach ($menuGroups as &$groupRef) {
-  if (($groupRef['title'] ?? '') !== 'Menu' || empty($groupRef['items'])) {
-    continue;
-  }
+if (($groupRef['title'] ?? '') !== 'Menu' || empty($groupRef['items'])) {
+continue;
+}
 
-  $notificationItem = null;
-  $adminIndex = null;
-  $filteredItems = [];
+$notificationItem = null;
+$adminIndex = null;
+$filteredItems = [];
 
-  foreach ($groupRef['items'] as $navItem) {
-    if (($navItem['name'] ?? '') === 'Notifications' && ($navItem['path'] ?? '') === '/notifications') {
-      $notificationItem = [
-        'name' => $navItem['name'],
-        'path' => $navItem['path'],
-        'can' => $navItem['can'] ?? 'dashboard.view',
-        'badge' => $sidebarUnreadCount > 0 ? ($sidebarUnreadCount > 99 ? '99+' : (string) $sidebarUnreadCount) : null,
-      ];
-      continue;
-    }
+foreach ($groupRef['items'] as $navItem) {
+if (($navItem['name'] ?? '') === 'Notifications' && ($navItem['path'] ?? '') === '/notifications') {
+$notificationItem = [
+'name' => $navItem['name'],
+'path' => $navItem['path'],
+'can' => $navItem['can'] ?? 'dashboard.view',
+'badge' => $sidebarUnreadCount > 0 ? ($sidebarUnreadCount > 99 ? '99+' : (string) $sidebarUnreadCount) : null,
+];
+continue;
+}
 
-    if (($navItem['name'] ?? '') === 'Administration') {
-      $adminIndex = count($filteredItems);
-    }
+if (($navItem['name'] ?? '') === 'Administration') {
+$adminIndex = count($filteredItems);
+}
 
-    $filteredItems[] = $navItem;
-  }
+$filteredItems[] = $navItem;
+}
 
-  if ($notificationItem !== null && $adminIndex !== null) {
-    $adminCanAny = (array) ($filteredItems[$adminIndex]['canany'] ?? []);
-    if (!in_array($notificationItem['can'], $adminCanAny, true)) {
-      $adminCanAny[] = $notificationItem['can'];
-    }
-    $filteredItems[$adminIndex]['canany'] = $adminCanAny;
-    $filteredItems[$adminIndex]['subItems'] = $filteredItems[$adminIndex]['subItems'] ?? [];
+if ($notificationItem !== null && $adminIndex !== null) {
+$adminCanAny = (array) ($filteredItems[$adminIndex]['canany'] ?? []);
+if (!in_array($notificationItem['can'], $adminCanAny, true)) {
+$adminCanAny[] = $notificationItem['can'];
+}
+$filteredItems[$adminIndex]['canany'] = $adminCanAny;
+$filteredItems[$adminIndex]['subItems'] = $filteredItems[$adminIndex]['subItems'] ?? [];
 
-    $alreadyPresent = collect($filteredItems[$adminIndex]['subItems'])
-      ->contains(fn ($s) => ($s['path'] ?? '') === '/notifications');
+$alreadyPresent = collect($filteredItems[$adminIndex]['subItems'])
+->contains(fn ($s) => ($s['path'] ?? '') === '/notifications');
 
-    if (!$alreadyPresent) {
-      $filteredItems[$adminIndex]['subItems'][] = $notificationItem;
-    }
+if (!$alreadyPresent) {
+$filteredItems[$adminIndex]['subItems'][] = $notificationItem;
+}
 
-    $groupRef['items'] = $filteredItems;
-  }
+$groupRef['items'] = $filteredItems;
+}
 }
 unset($groupRef);
 
@@ -181,7 +181,8 @@ $isTailAdminActive = true;
     <a href="{{ route('dashboard') }}" class="flex items-center gap-3 px-2 pt-1">
       <img src="{{ asset('cmc2-logo.jpeg') }}" alt="{{ config('app.name') }}" class="h-9 w-9 shrink-0 rounded-xl object-contain bg-surface p-0.5 shadow-sm">
       <div class="min-w-0">
-        <span class="block text-base font-extrabold tracking-tight text-ink truncate">{{ config('app.name', 'Swift Track') }}</span>
+        <!-- <span class="block text-base font-extrabold tracking-tight text-ink truncate">{{ config('app.name', 'Swift Track') }}</span> -->
+        <span class="block text-base font-extrabold tracking-tight text-ink truncate">Cox's Bazar MC2</span>
         <span class="block text-[11px] font-medium text-muted">Distribution ERP</span>
       </div>
     </a>
@@ -328,18 +329,18 @@ $isTailAdminActive = true;
   {{-- Bottom Utilities --}}
   <div class="mt-auto shrink-0 space-y-1 border-t border-line pt-4">
     @php
-      $sidebarSettingsUrl = Route::has('settings.index') ? route('settings.index') : (Route::has('admin.settings.index') ? route('admin.settings.index') : null);
-      $canManageSettings = auth()->user()?->can('settings.manage') ?? false;
+    $sidebarSettingsUrl = Route::has('settings.index') ? route('settings.index') : (Route::has('admin.settings.index') ? route('admin.settings.index') : null);
+    $canManageSettings = auth()->user()?->can('settings.manage') ?? false;
     @endphp
     @if ($sidebarSettingsUrl && $canManageSettings)
-      <a href="{{ $sidebarSettingsUrl }}"
-         class="flex items-center gap-3 rounded-full px-3 py-2 text-sm font-medium text-muted transition hover:bg-soft/60 hover:text-ink">
-        <x-icon name="settings" class="size-4.5" /> Settings
-      </a>
-      <a href="{{ $sidebarSettingsUrl }}?tab=theme"
-         class="flex items-center gap-3 rounded-full px-3 py-2 text-sm font-medium text-muted transition hover:bg-soft/60 hover:text-ink">
-        <x-icon name="palette" class="size-4.5 text-brand-500" /> Themes
-      </a>
+    <a href="{{ $sidebarSettingsUrl }}"
+      class="flex items-center gap-3 rounded-full px-3 py-2 text-sm font-medium text-muted transition hover:bg-soft/60 hover:text-ink">
+      <x-icon name="settings" class="size-4.5" /> Settings
+    </a>
+    <a href="{{ $sidebarSettingsUrl }}?tab=theme"
+      class="flex items-center gap-3 rounded-full px-3 py-2 text-sm font-medium text-muted transition hover:bg-soft/60 hover:text-ink">
+      <x-icon name="palette" class="size-4.5 text-brand-500" /> Themes
+    </a>
     @endif
 
     <form method="POST" action="{{ Route::has('logout') ? route('logout') : '#' }}">

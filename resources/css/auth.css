@@ -1,0 +1,182 @@
+/*
+ |--------------------------------------------------------------------------
+ | Auth (login) page
+ |--------------------------------------------------------------------------
+ | - Theme tokens only. NO color literals (#hex / rgb() / hsl()) in this file.
+ | - Nothing here is a background IMAGE: every decoration is a real element
+ |   (<div>/<svg>) so it recolors with the active theme + dark mode.
+ | - All classes are prefixed `au-` so nothing leaks into the dashboard.
+ | - Animate only transform / opacity / stroke-dashoffset. Entrances use fill-mode
+ |   `backwards` only, so reduced-motion simply shows the final static page.
+ */
+
+/* ---------- Token map (edit ONLY here if your token names differ) ---------- */
+.au-body {
+  --au-bg:      var(--brand-500);                 /* page backdrop            */
+  --au-bg-deep: var(--brand-600);                 /* big sweeps / depth       */
+  --au-bg-lite: var(--brand-400);                 /* lighter shapes           */
+  --au-accent:  var(--accent, var(--chart-3));    /* pop color (triangles)    */
+  --au-card:    var(--shell);                     /* login card               */
+  --au-field:   var(--surface);                   /* inputs                   */
+  --au-ink:     var(--ink);
+  --au-muted:   var(--muted);
+  --au-on:      var(--on-brand);
+
+  /* isometric faces (illustration) */
+  --au-top:   var(--surface);
+  --au-left:  var(--soft);
+  --au-right: color-mix(in srgb, var(--soft) 78%, var(--ink));
+  --au-deep:  color-mix(in srgb, var(--brand-600) 80%, var(--ink));
+}
+.dark .au-body {
+  --au-bg:      color-mix(in srgb, var(--brand-600) 52%, var(--canvas));
+  --au-bg-deep: color-mix(in srgb, var(--brand-600) 34%, var(--canvas));
+  --au-bg-lite: color-mix(in srgb, var(--brand-500) 60%, var(--canvas));
+  --au-on:      var(--ink);                       /* light dots/balls on the dark backdrop */
+  --au-top:   var(--soft);
+  --au-left:  var(--surface);
+  --au-right: color-mix(in srgb, var(--surface) 68%, var(--canvas));
+  --au-deep:  color-mix(in srgb, var(--brand-500) 70%, var(--canvas));
+}
+
+.au-body, .au-body *, .au-body *::before, .au-body *::after { box-sizing: border-box; }
+.au-body { margin: 0; background: var(--au-bg); color: var(--au-ink); font-family: var(--font-sans, system-ui, sans-serif); -webkit-font-smoothing: antialiased; min-height: 100dvh; overflow-x: hidden; }
+
+/* ---------- Stage ---------- */
+.au-stage { position: relative; z-index: 1; min-height: 100dvh; display: grid; place-items: center; padding: clamp(14px, 4vw, 56px); }
+
+/* ---------- Decorations (real elements, not a background image) ---------- */
+.au-decor { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.au-par { position: absolute; translate: calc(var(--px, 0) * var(--dx, 10) * 1px) calc(var(--py, 0) * var(--dy, 10) * 1px); transition: translate .7s cubic-bezier(.2, .7, .2, 1); }
+.au-sweep { border-radius: 9999px; background: var(--au-bg-lite); opacity: .38; }
+.au-sweep-b { background: var(--au-bg-deep); opacity: .5; }
+.au-ball { border-radius: 9999px; background: var(--au-on); }
+.au-dots circle { fill: var(--au-on); }
+.au-dotgrid { opacity: .32; }
+.au-tri { fill: var(--au-accent); }
+.au-dash { fill: none; stroke: var(--au-on); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: .7; }
+.au-bar { fill: var(--au-accent); }
+.au-fl { animation: au-drift 9s ease-in-out infinite; animation-delay: var(--d, 0s); }
+.au-fl-b { animation-duration: 12s; }
+.au-spin { animation: au-spin 26s linear infinite; }
+@keyframes au-drift { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-14px) rotate(3deg); } }
+@keyframes au-spin  { to { transform: rotate(360deg); } }
+
+/* ---------- Card ---------- */
+.au-card {
+  position: relative; width: min(1120px, 100%); background: var(--au-card); border-radius: clamp(22px, 3vw, 36px);
+  padding: clamp(20px, 3.4vw, 44px) clamp(20px, 4.2vw, 64px) clamp(16px, 2vw, 24px);
+  box-shadow: 0 30px 80px rgb(var(--shadow-rgb) / .28), 0 2px 0 rgb(var(--shadow-rgb) / .04);
+  display: grid; gap: clamp(20px, 4vw, 40px);
+}
+.au-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.au-grid2 { display: grid; gap: clamp(24px, 4vw, 56px); align-items: center; }
+@media (min-width: 1024px) { .au-grid2 { grid-template-columns: minmax(0, 420px) minmax(0, 1fr); min-height: 420px; } .au-formcol { justify-self: center; width: 100%; } }
+.au-illus { display: none; }
+.au-illus.au-par { position: relative; margin-inline: 0; } /* parallax wrapper stays in flow */
+@media (min-width: 1024px) { .au-illus { display: block; } }
+.au-scene { width: 100%; height: auto; max-width: 440px; max-height: 440px; margin-inline: auto; display: block; overflow: visible; }
+
+.au-title { margin: 0; font-size: clamp(1.25rem, 1.6vw + .8rem, 1.7rem); font-weight: 800; letter-spacing: -.01em; color: var(--au-ink); line-height: 1.25; }
+.au-sub { margin: 8px 0 0; font-size: .875rem; color: var(--au-muted); line-height: 1.6; }
+
+/* ---------- Form ---------- */
+.au-form { display: grid; gap: 14px; margin-top: 26px; }
+.au-field { position: relative; }
+.au-input {
+  width: 100%; height: 52px; border: 1.5px solid transparent; border-radius: 12px; background: var(--au-field); color: var(--au-ink);
+  padding: 0 16px; font: inherit; font-size: .9rem; font-weight: 600; outline: none;
+  box-shadow: 0 1px 2px rgb(var(--shadow-rgb) / .05);
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.au-input::placeholder { color: var(--au-muted); font-weight: 500; opacity: .85; }
+.au-input:hover { border-color: var(--line); }
+.au-input:focus-visible { border-color: var(--brand-500); box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-500) 18%, transparent); }
+.au-input[aria-invalid="true"] { border-color: var(--danger); }
+.au-input.au-has-btn { padding-inline-end: 50px; }
+.au-eye { position: absolute; inset-inline-end: 6px; top: 6px; width: 40px; height: 40px; display: grid; place-items: center; border: 0; background: transparent; color: var(--au-muted); border-radius: 10px; cursor: pointer; transition: color .2s ease, background-color .2s ease; }
+.au-eye:hover { color: var(--brand-500); background: var(--soft); }
+.au-eye:focus-visible { outline: 2px solid var(--brand-500); outline-offset: 1px; }
+.au-err { margin: 6px 4px 0; font-size: .78rem; font-weight: 600; color: color-mix(in srgb, var(--danger) 68%, var(--ink)); } /* darkened for AA text contrast */
+.au-caps { margin: 6px 4px 0; font-size: .78rem; font-weight: 600; color: color-mix(in srgb, var(--warning) 48%, var(--ink)); }
+.au-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 2px; }
+.au-check { display: inline-flex; align-items: center; gap: 8px; font-size: .8rem; color: var(--au-muted); cursor: pointer; user-select: none; }
+.au-check input { width: 16px; height: 16px; accent-color: var(--brand-500); }
+.au-link { font-size: .8rem; font-weight: 600; color: var(--au-muted); text-decoration: none; transition: color .2s ease; }
+.au-link:hover { color: var(--brand-500); }
+.au-link:focus-visible, .au-iconbtn:focus-visible, .au-btn:focus-visible { outline: 2px solid var(--brand-500); outline-offset: 3px; border-radius: 9999px; }
+.au-btn {
+  position: relative; justify-self: end; min-width: 132px; height: 48px; padding: 0 28px; border: 0; border-radius: 9999px; cursor: pointer;
+  background: var(--brand-500); color: var(--on-brand); font: inherit; font-size: .9rem; font-weight: 700; margin-top: 8px;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--brand-500) 38%, transparent);
+  transition: transform .2s ease, box-shadow .2s ease, background-color .2s ease;
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px; overflow: hidden;
+}
+.au-btn:hover:not(:disabled) { background: var(--brand-600); transform: translateY(-2px); box-shadow: 0 14px 28px color-mix(in srgb, var(--brand-500) 44%, transparent); }
+.au-btn:active:not(:disabled) { transform: translateY(0) scale(.98); }
+.au-btn:disabled { cursor: progress; opacity: .85; }
+.au-spinner { width: 16px; height: 16px; border-radius: 9999px; border: 2px solid color-mix(in srgb, var(--on-brand) 35%, transparent); border-top-color: var(--on-brand); animation: au-spin .7s linear infinite; }
+@media (max-width: 480px) { .au-btn { justify-self: stretch; } }
+.au-alert { margin-top: 18px; padding: 10px 14px; border-radius: 12px; font-size: .82rem; font-weight: 600; background: color-mix(in srgb, var(--success) 12%, var(--surface)); color: var(--ink); border: 1px solid color-mix(in srgb, var(--success) 40%, transparent); }
+
+.au-iconbtn { width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 9999px; background: var(--au-field); color: var(--au-muted); cursor: pointer; box-shadow: 0 1px 2px rgb(var(--shadow-rgb) / .08); transition: color .2s ease, transform .2s ease; }
+.au-iconbtn:hover { color: var(--brand-500); transform: rotate(12deg); }
+.au-foot { display: flex; flex-wrap: wrap; gap: 8px 20px; justify-content: space-between; font-size: .75rem; color: var(--au-muted); padding-top: 4px; }
+.au-foot a { color: inherit; text-decoration: none; } .au-foot a:hover { color: var(--brand-500); }
+.au-logo { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--au-ink); font-weight: 800; font-size: 1.15rem; letter-spacing: -.01em; }
+.au-logo-mark { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: var(--brand-500); color: var(--on-brand); box-shadow: 0 8px 18px color-mix(in srgb, var(--brand-500) 35%, transparent); }
+.au-logo b { color: var(--brand-500); font-weight: 800; }
+
+/* ---------- Illustration colors ---------- */
+.au-top, .au-slab-top, .au-base-top, .au-box-top, .au-bezel-top { stroke-width: 2; stroke-linejoin: round; }
+.au-left, .au-right, .au-slab-l, .au-slab-r, .au-base-l, .au-base-r, .au-box-l, .au-box-r, .au-bezel, .au-bezel-r { stroke-width: 2; stroke-linejoin: round; }
+.au-slab-top { fill: var(--au-top); stroke: var(--au-top); } .au-slab-l { fill: var(--au-left); stroke: var(--au-left); } .au-slab-r { fill: var(--au-right); stroke: var(--au-right); }
+.au-base-top { fill: var(--au-left); stroke: var(--au-left); } .au-base-l { fill: var(--au-right); stroke: var(--au-right); } .au-base-r { fill: color-mix(in srgb, var(--au-right) 78%, var(--ink)); stroke: color-mix(in srgb, var(--au-right) 78%, var(--ink)); }
+.au-bezel-top, .au-bezel-r { fill: var(--au-deep); stroke: var(--au-deep); } .au-bezel { fill: color-mix(in srgb, var(--au-deep) 88%, var(--ink)); stroke: color-mix(in srgb, var(--au-deep) 88%, var(--ink)); }
+.au-box-top { fill: color-mix(in srgb, var(--brand-400) 30%, var(--au-top)); stroke: color-mix(in srgb, var(--brand-400) 30%, var(--au-top)); }
+.au-box-l { fill: color-mix(in srgb, var(--brand-400) 48%, var(--au-left)); stroke: color-mix(in srgb, var(--brand-400) 48%, var(--au-left)); }
+.au-box-r { fill: color-mix(in srgb, var(--brand-500) 55%, var(--au-right)); stroke: color-mix(in srgb, var(--brand-500) 55%, var(--au-right)); }
+.au-halo { fill: var(--brand-500); opacity: .07; }
+.au-grid { fill: none; stroke: var(--line); stroke-width: 1.2; opacity: .9; }
+.au-route { fill: none; stroke: var(--brand-400); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: .25; }
+.au-route-flow, .au-droute-flow { fill: none; stroke: var(--brand-500); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 3 11; animation: au-flow 1.4s linear infinite; }
+.au-key { fill: var(--au-deep); opacity: .85; } .au-pad { fill: var(--au-top); }
+.au-display { fill: var(--surface); } .au-dbar { fill: var(--soft); } .au-dot1 { fill: var(--danger); } .au-dot2 { fill: var(--warning); } .au-dot3 { fill: var(--success); }
+.au-dmap { fill: color-mix(in srgb, var(--brand-500) 8%, var(--surface)); }
+.au-dgrid { fill: none; stroke: var(--line); stroke-width: 1; }
+.au-droute { fill: none; stroke: var(--brand-400); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; opacity: .35; }
+.au-droute-flow { stroke-width: 2.6; stroke-dasharray: 2 8; }
+.au-dstart { fill: var(--brand-500); } .au-dend { fill: var(--au-accent); } .au-dendi { fill: var(--surface); }
+.au-dcard { fill: var(--surface); stroke: var(--line); stroke-width: 1; } .au-dl1 { fill: var(--brand-500); } .au-dl2 { fill: var(--line); }
+.au-tape { fill: color-mix(in srgb, var(--brand-500) 70%, var(--au-top)); opacity: .9; } .au-label { fill: var(--au-top); }
+.au-ripple { fill: none; stroke: var(--au-accent); stroke-width: 2; transform-box: fill-box; transform-origin: center; animation: au-ripple 2.8s ease-out infinite; }
+.au-ripple-b { animation-delay: 1.4s; }
+.au-ring { fill: var(--au-accent); opacity: .9; }
+.au-shadow { fill: var(--ink); opacity: .1; }
+.au-coin-d { fill: var(--au-deep); } .au-coin { fill: var(--surface); } .au-coin-ring { fill: var(--soft); }
+.au-shackle { fill: none; stroke: var(--brand-500); stroke-width: 3.4; stroke-linecap: round; } .au-lock { fill: var(--brand-500); } .au-keyhole { fill: var(--on-brand); }
+.au-pin { fill: var(--au-accent); } .au-pin-i { fill: var(--surface); }
+.au-chip-d { fill: var(--au-right); } .au-chip { fill: var(--surface); } .au-chip-ok { fill: var(--success); } .au-chip-tick { fill: none; stroke: var(--on-brand); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.au-chip-l1 { fill: var(--ink); opacity: .75; } .au-chip-l2 { fill: var(--line); }
+.au-msg-d { fill: var(--au-deep); } .au-msg { fill: var(--brand-500); } .au-msg-dot { fill: var(--on-brand); }
+.au-dm-a { fill: var(--au-accent); } .au-dm-b { fill: var(--brand-500); } .au-dm-c { fill: var(--au-left); }
+.dark .au-dm-c { fill: var(--brand-400); }
+.au-float { animation: au-float 5.4s ease-in-out infinite; animation-delay: var(--d, 0s); }
+.au-dm { transform-box: fill-box; transform-origin: center; animation: au-twinkle 3.6s ease-in-out infinite; animation-delay: var(--d, 0s); }
+@keyframes au-float   { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+@keyframes au-twinkle { 0%, 100% { opacity: .95; transform: scale(1); } 50% { opacity: .45; transform: scale(.78); } }
+@keyframes au-flow    { to { stroke-dashoffset: -28; } }
+@keyframes au-ripple  { 0% { transform: scale(.3); opacity: .9; } 100% { transform: scale(1.25); opacity: 0; } }
+
+/* ---------- Entrance (fill-mode backwards only) ---------- */
+.au-enter { animation: au-in .75s cubic-bezier(.2, .8, .2, 1) backwards; animation-delay: calc(var(--i, 0) * 70ms + 80ms); }
+.au-pop   { transform-box: fill-box; transform-origin: 50% 100%; animation: au-pop .8s cubic-bezier(.2, .9, .25, 1.1) backwards; animation-delay: calc(var(--i, 0) * 90ms + 250ms); }
+@keyframes au-in  { from { opacity: 0; transform: translateY(22px); } }
+@keyframes au-pop { from { opacity: 0; transform: translateY(24px) scale(.94); } }
+.au-form[data-error="true"] { animation: au-shake .45s cubic-bezier(.36, .07, .19, .97) .3s; }
+@keyframes au-shake { 15%, 55% { transform: translateX(-7px); } 35%, 75% { transform: translateX(7px); } 95% { transform: translateX(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .au-body *, .au-body *::before, .au-body *::after { animation: none !important; transition: none !important; }
+  .au-par { translate: none; }
+}
