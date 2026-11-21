@@ -66,17 +66,17 @@ class ErrorPage
 
     private const UI = [
         'bn' => ['home' => 'হোমে ফিরুন', 'back' => 'পিছনে যান', 'retry' => 'আবার চেষ্টা করুন',
-                 'retrying' => '{s} সেকেন্ডে আবার চেষ্টা হবে', 'error' => 'এরর', 'reference' => 'রেফারেন্স', 'stalled' => 'স্বয়ংক্রিয় চেষ্টা থেমে গেছে'],
+            'retrying' => '{s} সেকেন্ডে আবার চেষ্টা হবে', 'error' => 'এরর', 'reference' => 'রেফারেন্স', 'stalled' => 'স্বয়ংক্রিয় চেষ্টা থেমে গেছে'],
         'en' => ['home' => 'Go home', 'back' => 'Go back', 'retry' => 'Try again',
-                 'retrying' => 'Retrying in {s}s', 'error' => 'Error', 'reference' => 'Reference', 'stalled' => 'Automatic retry stopped'],
+            'retrying' => 'Retrying in {s}s', 'error' => 'Error', 'reference' => 'Reference', 'stalled' => 'Automatic retry stopped'],
     ];
 
     /**
-     * @param  int         $code       HTTP status
-     * @param  object|null $exception  Symfony/Laravel HttpException (only Retry-After is read from it)
-     * @param  string|null $locale     'bn' => Bangla, anything else => English
-     * @param  string|null $detail     optional extra line you chose to show (never pass 5xx exception messages)
-     * @param  int|null    $retryAfter explicit seconds (e.g. `php artisan down --render=... --retry=60` passes $retryAfter to the view)
+     * @param  int  $code  HTTP status
+     * @param  object|null  $exception  Symfony/Laravel HttpException (only Retry-After is read from it)
+     * @param  string|null  $locale  'bn' => Bangla, anything else => English
+     * @param  string|null  $detail  optional extra line you chose to show (never pass 5xx exception messages)
+     * @param  int|null  $retryAfter  explicit seconds (e.g. `php artisan down --render=... --retry=60` passes $retryAfter to the view)
      * @return array<string,mixed>
      */
     public static function resolve(int $code, $exception = null, ?string $locale = 'bn', ?string $detail = null, ?int $retryAfter = null): array
@@ -102,20 +102,20 @@ class ErrorPage
         $reference = is_string($reference) ? substr(preg_replace('/[^A-Za-z0-9\-_=:.]/', '', $reference), 0, 40) : null;
 
         return [
-            'code'      => $code,
-            'tone'      => $meta['tone'],
-            'emblem'    => $meta['emblem'],
-            'title'     => $meta[$lang]['title'],
-            'message'   => $meta[$lang]['message'],
-            'detail'    => $detail !== null && $detail !== '' ? $detail : null,
-            'retry'     => $retry,
-            'auto'      => $retry !== null && $meta['auto'],
-            'button'    => $meta['button'],
+            'code' => $code,
+            'tone' => $meta['tone'],
+            'emblem' => $meta['emblem'],
+            'title' => $meta[$lang]['title'],
+            'message' => $meta[$lang]['message'],
+            'detail' => $detail !== null && $detail !== '' ? $detail : null,
+            'retry' => $retry,
+            'auto' => $retry !== null && $meta['auto'],
+            'button' => $meta['button'],
             'retryText' => $retry !== null ? str_replace('{s}', self::digits((string) $retry, $lang), self::UI[$lang]['retrying']) : null,
-            'ui'        => self::UI[$lang],
-            'locale'    => $lang,
+            'ui' => self::UI[$lang],
+            'locale' => $lang,
             'reference' => $reference ?: null,
-            'time'      => date('d M Y, h:i A'),
+            'time' => date('d M Y, h:i A'),
         ];
     }
 

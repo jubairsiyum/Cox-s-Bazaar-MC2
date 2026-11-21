@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\LocationType;
 use App\Enums\SalesInvoiceStatus;
 use App\Enums\SalesOrderStatus;
 use App\Exceptions\InsufficientStockException;
@@ -15,6 +16,7 @@ use App\Models\Customer;
 use App\Models\Location;
 use App\Models\Product;
 use App\Models\SalesOrder;
+use App\Models\StockMovement;
 use App\Models\Unit;
 use App\Services\AuditService;
 use App\Services\CustomerResolver;
@@ -325,11 +327,14 @@ class SalesOrderController extends Controller
 
     /**
      * Product search for the order item picker: matches product name,
-     * product code, model and barcode (same search as the purchase form).
+     * product code, model and barcode (same search as the purchase form),
+     * scoped to the stock available at the selected business location.
      */
     public function searchUnits(Request $request): JsonResponse
     {
         $this->authorize('viewAny', SalesOrder::class);
+
+        $locationId = $request->filled('location_id') ? (int) $request->input('location_id') : null;
 
         $units = Unit::query()
             ->with('product')
@@ -346,11 +351,71 @@ class SalesOrderController extends Controller
                 'id' => (int) $unit->id,
                 'display_name' => $unit->displayName(),
                 'unit' => $unit->unit,
-                'quantity' => (float) ($quantities[$unit->id] ?? 0),
+                'quantity' => $locationId !== null
+                    ? self::resolveLocationStock($unit, $locationId)
+                    : (float) ($quantities[$unit->id] ?? 0),
                 'sale_price' => (float) ($unit->product?->sale_price ?? 0),
                 'barcode' => $unit->product?->barcode,
             ])->values()->all(),
         ]);
+    }
+
+    /**
+     * Resolve the available quantity of a unit at a given business location.
+     */
+    public static function resolveLocationStock(Unit $unit, ?int $locationId): int
+    {
+        if ($locationId === null) {
+            return (int) $unit->quantity;
+        }
+
+        $location = Location::query()->find($locationId);
+        $isWarehouse = $location?->type === LocationType::Warehouse;
+
+        // Check whether any location-specific movements exist for this unit across the system
+        $hasAnyLocationMovements = StockMovement::query()
+            ->where('unit_id', $unit->id)
+            ->whereNotNull('location_id')
+            ->exists();
+
+        // If no location-specific transfers/movements have been posted yet across the system,
+        // fallback to the global opening stock on the unit.
+        if (! $hasAnyLocationMovements) {
+            return (int) $unit->quantity;
+        }
+
+        // Location-specific movements exist:
+        // For a warehouse, sum warehouse movements plus unassigned opening movements.
+        // For non-warehouse locations, sum movements for this specific location.
+        $hasLocationMovements = StockMovement::query()
+            ->where('unit_id', $unit->id)
+            ->when($isWarehouse, function ($query) use ($locationId) {
+                $query->where(function ($q) use ($locationId) {
+                    $q->where('location_id', $locationId)
+                        ->orWhereNull('location_id');
+                });
+            }, function ($query) use ($locationId) {
+                $query->where('location_id', $locationId);
+            })
+            ->exists();
+
+        if (! $hasLocationMovements) {
+            return $isWarehouse ? (int) $unit->quantity : 0;
+        }
+
+        $stock = (int) StockMovement::query()
+            ->where('unit_id', $unit->id)
+            ->when($isWarehouse, function ($query) use ($locationId) {
+                $query->where(function ($q) use ($locationId) {
+                    $q->where('location_id', $locationId)
+                        ->orWhereNull('location_id');
+                });
+            }, function ($query) use ($locationId) {
+                $query->where('location_id', $locationId);
+            })
+            ->sum('quantity');
+
+        return max(0, $stock);
     }
 
     /**
@@ -495,19 +560,29 @@ class SalesOrderController extends Controller
         $items = old('items');
 
         if (is_array($items) && $items !== []) {
-            return array_values(array_map(fn (array $row) => [
-                'unit_id' => (int) ($row['unit_id'] ?? 0),
-                'product_name' => Unit::query()->find((int) ($row['unit_id'] ?? 0))?->displayName() ?? 'Unknown product',
-                'quantity' => (int) ($row['quantity'] ?? 1),
-                'unit_price' => (float) ($row['unit_price'] ?? 0),
-                'discount' => (float) ($row['discount'] ?? 0),
-            ], $items));
+            $locationId = old('location_id') ? (int) old('location_id') : null;
+
+            return array_values(array_map(function (array $row) use ($locationId) {
+                $unit = Unit::query()->find((int) ($row['unit_id'] ?? 0));
+
+                return [
+                    'unit_id' => (int) ($row['unit_id'] ?? 0),
+                    'product_name' => $unit?->displayName() ?? 'Unknown product',
+                    'unit' => $unit?->unit ?? 'Pcs',
+                    'stock' => $unit ? self::resolveLocationStock($unit, $locationId) : 0,
+                    'quantity' => (int) ($row['quantity'] ?? 1),
+                    'unit_price' => (float) ($row['unit_price'] ?? 0),
+                    'discount' => (float) ($row['discount'] ?? 0),
+                ];
+            }, $items));
         }
 
         if ($order !== null) {
             return $order->items->map(fn ($item) => [
                 'unit_id' => (int) $item->unit_id,
                 'product_name' => $item->unit?->displayName() ?? 'Unknown product',
+                'unit' => $item->unit?->unit ?? 'Pcs',
+                'stock' => $item->unit ? self::resolveLocationStock($item->unit, (int) $order->location_id) : 0,
                 'quantity' => (int) $item->quantity,
                 'unit_price' => (float) $item->unit_price,
                 'discount' => (float) $item->discount,

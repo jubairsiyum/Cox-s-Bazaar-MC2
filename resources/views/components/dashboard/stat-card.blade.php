@@ -14,13 +14,27 @@
 ])
 
 @php
-$up = $change >= 0;
-$pct = min(abs($change), 100);
+$changeNum = (float) $change;
+$isNegative = $changeNum < 0;
+$isZero = $changeNum == 0.0;
+$up = $changeNum > 0;
+$pct = min(abs($changeNum), 100);
+
 $fmt = number_format((float) $amount);
 if ($bn) {
 $fmt = strtr($fmt, ['0'=>'০','1'=>'১','2'=>'২','3'=>'৩','4'=>'৪','5'=>'৫','6'=>'৬','7'=>'৭','8'=>'৮','9'=>'৯']);
 }
-$color = $up ? 'text-brand-500' : 'text-danger';
+
+// When % is minus value: vibrant red bar & label (text-danger / text-red-500)
+// When % is positive: brand color (text-brand-500)
+// When % is zero: neutral muted color (text-muted)
+if ($isNegative) {
+    $color = 'text-danger text-red-500';
+} elseif ($up) {
+    $color = 'text-brand-500';
+} else {
+    $color = 'text-muted';
+}
 @endphp
 
 <div {{ $attributes->merge(['class' => 'relative overflow-hidden rounded-3xl bg-surface p-6 shadow-card h-full flex flex-col justify-between']) }} x-data>
@@ -59,7 +73,13 @@ $color = $up ? 'text-brand-500' : 'text-danger';
           stroke-dasharray="{{ $pct }} 100" />
       </svg>
       <span class="gauge-label absolute inset-x-0 bottom-0 text-center text-[11px] font-semibold {{ $color }}">
-        {{ $change > 0 ? '+' : '' }}{{ $change }}% {{ $up ? '↑' : '↓' }}
+        @if ($isNegative)
+          {{ $change }}% ↓
+        @elseif ($up)
+          +{{ $change }}% ↑
+        @else
+          0%
+        @endif
       </span>
     </div>
   </div>
