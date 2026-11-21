@@ -10,8 +10,10 @@ use App\Http\Requests\AccountTransfer\StoreAccountTransferRequest;
 use App\Http\Requests\AccountTransfer\UpdateAccountTransferRequest;
 use App\Models\Account;
 use App\Models\AccountTransfer;
+use App\Models\PaymentMethod;
 use App\Services\AccountBalanceService;
 use App\Services\AuditService;
+use App\Services\BranchScope;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -25,17 +27,20 @@ class AccountTransferController extends Controller
 {
     /**
      * List account transfers with KPI summary cards.
+     * Strict branch isolation: only the user's own branch's transfers (and KPIs).
      */
     public function index(Request $request): View
     {
         $this->authorize('viewAny', AccountTransfer::class);
+
+        $user = $request->user();
 
         $perPage = (int) $request->input('per_page', 10);
         if (! in_array($perPage, [10, 25, 50, 100], true)) {
             $perPage = 10;
         }
 
-        $transfers = AccountTransfer::query()
+        $transfers = BranchScope::scopeQuery(AccountTransfer::query(), $user)
             ->with(['fromAccount', 'toAccount', 'creator', 'approver'])
             ->search($request->string('search')->toString())
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')->toString()))
@@ -50,7 +55,7 @@ class AccountTransferController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
-        $monthTotals = AccountTransfer::query()
+        $monthTotals = BranchScope::scopeQuery(AccountTransfer::query(), $user)
             ->selectRaw("
                 COUNT(*) as transfer_count,
                 COALESCE(SUM(CASE WHEN status = 'completed' THEN amount ELSE 0 END), 0) as completed_total,
@@ -62,7 +67,7 @@ class AccountTransferController extends Controller
         return view('account-transfers.index', [
             'transfers' => $transfers,
             'perPage' => $perPage,
-            'accounts' => Account::query()->active()->orderBy('name')->get(['id', 'name', 'type']),
+            'accounts' => BranchScope::scopeQuery(Account::query(), $user)->active()->orderBy('name')->get(['id', 'name', 'type']),
             'monthCount' => (int) ($monthTotals->transfer_count ?? 0),
             'monthCompleted' => (float) ($monthTotals->completed_total ?? 0),
             'pendingCount' => (int) ($monthTotals->pending_count ?? 0),
@@ -72,12 +77,13 @@ class AccountTransferController extends Controller
     /**
      * Show the form for creating a transfer request.
      */
-    public function create(): View
+    public function create(Request $request): View
     {
         $this->authorize('create', AccountTransfer::class);
 
         return view('account-transfers.create', [
-            'accounts' => Account::query()->active()->orderBy('name')->get(['id', 'name', 'type', 'current_balance']),
+            'accounts' => BranchScope::scopeQuery(Account::query(), $request->user())->active()->orderBy('name')->get(['id', 'name', 'type', 'current_balance']),
+            'methods' => PaymentMethod::options(),
         ]);
     }
 
@@ -90,6 +96,16 @@ class AccountTransferController extends Controller
         $validated['amount'] = round((float) $validated['amount'], 2);
         $validated['status'] = AccountEntryStatus::Pending->value;
         $validated['created_by'] = $request->user()?->id;
+
+        // Strict branch isolation: transfers move money between the user's own
+        // branch's accounts only (shared/head-office accounts are Super Admin).
+        foreach (['from_account_id', 'to_account_id'] as $accountKey) {
+            $account = Account::query()->find((int) $validated[$accountKey]);
+
+            if (! BranchScope::canAccess($request->user(), $account?->location_id)) {
+                return back()->withInput()->with('error', 'You can only transfer between accounts of your own branch.');
+            }
+        }
 
         $transfer = AccountTransfer::create($validated);
 
@@ -107,13 +123,14 @@ class AccountTransferController extends Controller
     /**
      * Show the form for editing a transfer.
      */
-    public function edit(AccountTransfer $accountTransfer): View
+    public function edit(Request $request, AccountTransfer $accountTransfer): View
     {
         $this->authorize('update', $accountTransfer);
 
         return view('account-transfers.edit', [
             'transfer' => $accountTransfer,
-            'accounts' => Account::query()->active()->orderBy('name')->get(['id', 'name', 'type', 'current_balance']),
+            'accounts' => BranchScope::scopeQuery(Account::query(), $request->user())->active()->orderBy('name')->get(['id', 'name', 'type', 'current_balance']),
+            'methods' => PaymentMethod::options(),
         ]);
     }
 
@@ -133,6 +150,16 @@ class AccountTransferController extends Controller
         }
 
         $wasCompleted = $accountTransfer->status === AccountEntryStatus::Completed;
+
+        // Strict branch isolation: transfers stay between the user's own
+        // branch's accounts (crafted requests may not re-point them elsewhere).
+        foreach (['from_account_id', 'to_account_id'] as $accountKey) {
+            $account = Account::query()->find((int) ($validated[$accountKey] ?? $accountTransfer->{$accountKey}));
+
+            if (! BranchScope::canAccess($request->user(), $account?->location_id)) {
+                return back()->withInput()->with('error', 'You can only transfer between accounts of your own branch.');
+            }
+        }
 
         try {
             DB::transaction(function () use ($accountTransfer, $validated, $balances, $wasCompleted): void {

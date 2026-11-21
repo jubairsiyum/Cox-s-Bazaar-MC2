@@ -143,16 +143,20 @@
                     @enderror
                 </div>
 
-                {{-- Method --}}
+                {{-- Method (populated from the Method reference data) --}}
                 <div>
                     <label for="method" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
                         Method
                     </label>
+                    @php $selectedMethod = old('method', $transfer->method); @endphp
                     <select id="method" name="method"
                             class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all cursor-pointer @error('method') border-danger @enderror">
                         <option value="">Please Select</option>
-                        @foreach(\App\Enums\AccountMethod::options() as $value => $label)
-                            <option value="{{ $value }}" @selected(old('method', $transfer->method?->value) === $value)>{{ $label }}</option>
+                        @if(filled($selectedMethod) && ! array_key_exists($selectedMethod, $methods))
+                            <option value="{{ $selectedMethod }}" selected>{{ $selectedMethod }} (stored)</option>
+                        @endif
+                        @foreach($methods as $value => $label)
+                            <option value="{{ $value }}" @selected($selectedMethod === $value)>{{ $label }}</option>
                         @endforeach
                     </select>
                     @error('method')

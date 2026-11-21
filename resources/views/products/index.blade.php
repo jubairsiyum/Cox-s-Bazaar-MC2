@@ -5,8 +5,11 @@
 
 @section('content')
 @php
-    // Single lightweight aggregate query for catalog KPIs (zero N+1)
+    // Single lightweight aggregate query for catalog KPIs (zero N+1).
+    // Branch users get availability-scoped KPIs: only products in stock at
+    // their own branch (strict branch isolation — see BranchScope).
     $productTotals = \App\Models\Product::query()
+        ->when($catalogScopeIds !== null, fn ($q) => $q->whereIn('id', $catalogScopeIds))
         ->selectRaw("COUNT(*) as total_count, SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_count, COALESCE(AVG(NULLIF(sale_price, 0)), 0) as avg_sale_price, COUNT(DISTINCT brand_id) as brand_count, COUNT(DISTINCT category_id) as category_count")
         ->first();
 
@@ -396,7 +399,9 @@
                     @forelse($products as $product)
                         @php
                             $stockRow = $stockByProduct->get($product->id);
-                            $stockQty = $stockRow ? (int) $stockRow->quantity : 0;
+                            $stockQty = $catalogScopeIds !== null
+                                ? (int) ($branchQtyByProduct[$product->id] ?? 0)
+                                : ($stockRow ? (int) $stockRow->quantity : 0);
                             $stockUnit = $stockRow?->unit ?? 'Pcs';
                             $isLowStock = $stockQty <= $lowStockThreshold;
                         @endphp
@@ -569,7 +574,9 @@
                     @foreach($products as $product)
                         @php
                             $stockRow = $stockByProduct->get($product->id);
-                            $stockQty = $stockRow ? (int) $stockRow->quantity : 0;
+                            $stockQty = $catalogScopeIds !== null
+                                ? (int) ($branchQtyByProduct[$product->id] ?? 0)
+                                : ($stockRow ? (int) $stockRow->quantity : 0);
                             $stockUnit = $stockRow?->unit ?? 'Pcs';
                             $isLowStock = $stockQty <= $lowStockThreshold;
                         @endphp
@@ -717,6 +724,46 @@
                 </div>
             @endif
         </div>
+
+        {{-- Cross-branch search results (strict branch isolation): products
+             matching the search that are NOT in stock at the user's own
+             branch, shown with their details and the branch(es) that do have
+             them available — "out of stock here, available at X". --}}
+        @if($crossBranchResults->isNotEmpty())
+            <div class="rounded-3xl border border-line bg-surface shadow-2xs overflow-hidden">
+                <div class="px-5 sm:px-6 py-4 border-b border-line">
+                    <h2 class="text-sm font-semibold text-ink">Not in stock at your branch</h2>
+                    <p class="text-xs text-muted mt-0.5">Search matches from the shared catalog, with the branches that currently have them available.</p>
+                </div>
+                <div class="divide-y divide-line">
+                    @foreach($crossBranchResults as $result)
+                        @php $crossProduct = $result['product']; @endphp
+                        <div class="px-5 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-semibold text-ink truncate">{{ $crossProduct->displayName() }}</p>
+                                <p class="text-xs text-muted mt-0.5 tabular-nums">
+                                    {{ $crossProduct->product_id }}
+                                    @if(filled($crossProduct->barcode)) · {{ $crossProduct->barcode }} @endif
+                                    @if($crossProduct->sale_price !== null) · ৳ {{ number_format((float) $crossProduct->sale_price, 2) }} @endif
+                                </p>
+                            </div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                @forelse($result['branches'] as $availableBranch)
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-xs font-semibold text-brand-500 ring-1 ring-brand-500/20 tabular-nums">
+                                        {{ $availableBranch['location_name'] }}
+                                        <span class="text-ink/70">— {{ number_format($availableBranch['quantity']) }} {{ Str::plural('pc', $availableBranch['quantity']) }} available</span>
+                                    </span>
+                                @empty
+                                    <span class="inline-flex items-center rounded-full bg-soft px-3 py-1 text-xs font-semibold text-muted ring-1 ring-line">
+                                        Not available at any branch
+                                    </span>
+                                @endforelse
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
 
         {{-- Pagination Footer --}}
         <div class="border-t border-line px-5 sm:px-6 py-4 bg-surface">

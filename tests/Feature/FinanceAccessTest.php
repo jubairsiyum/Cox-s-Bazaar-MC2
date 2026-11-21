@@ -46,8 +46,8 @@ it('shows the finance menu when finance permissions are granted', function () {
         ->assertOk()
         ->assertSee('Finance')
         ->assertSee('Cash Accounts')
-        ->assertSee('Transactions')
-        ->assertSee('Supplier Payments');
+        ->assertSee('Transaction')
+        ->assertSee('Supplier Payment');
 });
 
 it('shows the finance menu for a Super Admin', function () {
@@ -107,7 +107,7 @@ it('verifies the finance menu gates in MenuHelper', function () {
 
     $subItemNames = collect($financeNav['subItems'])->pluck('name')->all();
 
-    expect($subItemNames)->toBe(['Cash Accounts', 'Bank Accounts', 'Transactions', 'Transfers', 'Supplier Payments']);
+    expect($subItemNames)->toBe(['Cash Accounts', 'Bank Accounts', 'Transaction', 'Transaction Category', 'Method', 'Transfer', 'Supplier Payment']);
 
     foreach ($financeNav['subItems'] as $subItem) {
         expect($subItem)->toHaveKey('canany');

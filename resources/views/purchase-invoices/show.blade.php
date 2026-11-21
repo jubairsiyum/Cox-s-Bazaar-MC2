@@ -42,6 +42,12 @@
                 </h1>
                 @include('purchase-invoices.partials.consolidated-status', ['order' => $order])
                 <x-status-badge :status="$order->payment_status->value" :label="$order->payment_status->label()" />
+                @php
+                    [$supplierStatusKey, $supplierStatusLabel] = $order->supplierDisplayStatus();
+                @endphp
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-soft px-3 py-1 text-xs font-semibold text-muted ring-1 ring-line">
+                    Supplier: <x-status-badge :status="$supplierStatusKey" :label="$supplierStatusLabel" />
+                </span>
             </div>
             <p class="text-xs sm:text-sm text-muted mt-1">
                 Ordered {{ $order->order_date->format('d M Y · h:i A') }} from <strong class="text-ink">{{ $order->supplier?->name ?? 'Unknown Supplier' }}</strong>
@@ -50,6 +56,21 @@
 
         {{-- Action Bar --}}
         <div class="flex items-center gap-2 flex-wrap shrink-0 no-print">
+            @can('update', $order)
+                @if($order->purchase_status === \App\Enums\PurchaseStatus::Ordered && $order->supplier_status === \App\Enums\SupplierOrderStatus::Accepted)
+                    <form method="POST" action="{{ route('purchase-invoices.receive', $order) }}"
+                          onsubmit="return confirm('Mark this order as Received? Stock will be added and the supplier will see it as Delivered.')">
+                        @csrf
+                        @method('PATCH')
+                        <button type="submit"
+                                class="btn-scale inline-flex items-center gap-1.5 rounded-2xl bg-brand-500 hover:bg-brand-500/90 px-4 py-2.5 text-xs sm:text-sm font-semibold text-on-brand shadow-sm transition-colors cursor-pointer">
+                            <x-icon name="check" class="size-4" />
+                            <span>Mark Received</span>
+                        </button>
+                    </form>
+                @endif
+            @endcan
+
             @can('approve', $order)
                 @if($order->approval_status === \App\Enums\ApprovalStatus::Pending)
                     <button type="button" @click="confirmModal = 'approve'"

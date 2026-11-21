@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Exports;
 
 use App\Models\PurchaseOrder;
+use App\Models\User;
+use App\Services\LocationScope;
+use App\Services\SupplierScope;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -35,6 +38,7 @@ class PurchaseOrderExport implements FromCollection, WithHeadings, WithMapping
     public function __construct(
         protected ?string $search = null,
         ?string $columns = null,
+        protected ?User $user = null,
     ) {
         if (! empty($columns)) {
             $requested = array_filter(array_map('trim', explode(',', $columns)));
@@ -48,9 +52,16 @@ class PurchaseOrderExport implements FromCollection, WithHeadings, WithMapping
 
     public function collection(): Collection
     {
-        return PurchaseOrder::query()
+        $query = PurchaseOrder::query()
             ->with(['supplier', 'location', 'creator'])
-            ->when($this->search, fn ($q) => $q->search($this->search))
+            ->when($this->search, fn ($q) => $q->search($this->search));
+
+        // Strict branch isolation: exports honour the user's scope too.
+        if ($this->user !== null) {
+            $query = SupplierScope::scopeQuery(LocationScope::scopeQuery($query, $this->user), $this->user);
+        }
+
+        return $query
             ->orderBy('order_date', 'desc')
             ->get();
     }

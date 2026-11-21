@@ -9,6 +9,7 @@ use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Models\Unit;
 use App\Models\User;
+use App\Notifications\GenericDatabaseNotification;
 use App\Services\PurchaseApprovalNotifier;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\SettingsSeeder;
@@ -45,15 +46,16 @@ function purchaseOrderPayload(Unit $unit, array $overrides = []): array
  * A purchase from before purchases became effective at creation: a pending
  * order whose stock and supplier due effects were never posted.
  */
-function legacyPendingPurchase(Unit $unit, int $quantity = 5, float $unitPrice = 200.0): PurchaseOrder
+function legacyPendingPurchase(Unit $unit, int $quantity = 5, float $unitPrice = 200.0, ?Location $location = null): PurchaseOrder
 {
     $supplier = Supplier::factory()->create(['opening_balance' => 0, 'purchase_due' => 0, 'purchase_return_due' => 0]);
 
-    $order = PurchaseOrder::factory()->create([
+    $order = PurchaseOrder::factory()->create(array_filter([
         'supplier_id' => $supplier->id,
         'purchase_status' => 'ordered',
         'approval_status' => ApprovalStatus::Pending->value,
-    ]);
+        'location_id' => $location?->id,
+    ], fn ($value) => $value !== null));
 
     $order->items()->create([
         'unit_id' => $unit->id,
@@ -88,9 +90,11 @@ it('shows the new purchase order form', function () {
         ->assertSee('Amount Paid', false)
         ->assertSee('Attach Document', false)
         ->assertSee('Purchase Status', false)
-        ->assertSee('Received')
-        ->assertSee('Pending')
-        ->assertSee('Ordered');
+        // The entry dropdown contains ONLY Ordered and Received — "Pending"
+        // is a system-driven display state, never a selectable option.
+        ->assertSee('>Received</option>', false)
+        ->assertSee('>Ordered</option>', false)
+        ->assertDontSee('>Pending</option>', false);
 });
 
 it('creates a purchase order that takes effect immediately', function () {
@@ -232,6 +236,11 @@ it('rejects statuses outside the receiving workflow at creation', function () {
         'purchase_status' => 'partially-received',
     ]))->assertSessionHasErrors('purchase_status');
 
+    // "Pending" is a system-driven display state, not an entry state.
+    $this->post(route('purchase-orders.store'), purchaseOrderPayload($unit, [
+        'purchase_status' => 'pending',
+    ]))->assertSessionHasErrors('purchase_status');
+
     expect(PurchaseOrder::count())->toBe(0)
         ->and($unit->fresh()->quantity)->toBe(50);
 });
@@ -263,10 +272,11 @@ it('lets the edit form change the receiving status of a purchase', function () {
         'quantity' => -5,
     ]);
 
-    // The edit form offers the full receiving workflow.
+    // The edit form offers the state machine without the system-driven
+    // "Pending" display state.
     $this->get(route('purchase-invoices.edit', $order))
         ->assertOk()
-        ->assertSee('>Pending</option>', false)
+        ->assertDontSee('>Pending</option>', false)
         ->assertSee('>Ordered</option>', false)
         ->assertSee('>Received</option>', false)
         ->assertSee('>Cancelled</option>', false);
@@ -302,17 +312,17 @@ it('finds the responsible managers by their assigned branch', function () {
         ->not->toContain($inactive->id, $elsewhere->id);
 });
 
-it('sends no approval notifications anywhere in the purchase flow', function () {
+it('sends no approval notifications to users anywhere in the purchase flow', function () {
     Notification::fake();
 
     $location = Location::factory()->create();
 
     // Managers exist for the outlet, exactly like the old awaiting-approval
     // audience, but nothing awaits approval anymore.
-    purchaseOrderTeamUser('Outlet Manager', ['branch_id' => $location->id]);
-    purchaseOrderTeamUser('Manager', ['branch_id' => $location->id]);
+    $outletManager = purchaseOrderTeamUser('Outlet Manager', ['branch_id' => $location->id]);
+    $branchManager = purchaseOrderTeamUser('Manager', ['branch_id' => $location->id]);
 
-    $creator = purchaseOrderTeamUser('Manager', ['branch_id' => Location::factory()->create()->id]);
+    $creator = purchaseOrderTeamUser('Manager', ['branch_id' => $location->id]);
     $unit = Unit::factory()->create(['quantity' => 50]);
 
     $this->actingAs($creator)
@@ -320,13 +330,26 @@ it('sends no approval notifications anywhere in the purchase flow', function () 
         ->assertRedirect(route('purchase-invoices.index'));
 
     // Completing a legacy pending purchase is silent as well.
-    $legacy = legacyPendingPurchase(Unit::factory()->create(['quantity' => 50]));
+    $legacy = legacyPendingPurchase(Unit::factory()->create(['quantity' => 50]), 5, 200.0, $location);
     $this->patch(route('purchase-invoices.approve', $legacy))->assertRedirect(route('purchase-invoices.index'));
 
-    $otherLegacy = legacyPendingPurchase(Unit::factory()->create(['quantity' => 50]));
+    $otherLegacy = legacyPendingPurchase(Unit::factory()->create(['quantity' => 50]), 5, 200.0, $location);
     $this->patch(route('purchase-invoices.reject', $otherLegacy))->assertRedirect(route('purchase-invoices.index'));
 
-    Notification::assertNothingSent();
+    // Nobody is ever asked to approve anything.
+    foreach ([$outletManager, $branchManager, $creator] as $user) {
+        Notification::assertNotSentTo(
+            $user,
+            GenericDatabaseNotification::class
+        );
+    }
+
+    // The one notification the flow does fire (issue 1.1) lands on the
+    // supplier's profile feed — it is not a user notification at all.
+    Notification::assertSentTo(
+        PurchaseOrder::query()->firstOrFail()->supplier,
+        GenericDatabaseNotification::class
+    );
 });
 
 it('completes a legacy pending purchase through the cleanup action', function () {

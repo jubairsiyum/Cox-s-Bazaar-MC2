@@ -17,6 +17,7 @@ use App\Models\Unit;
 use App\Services\AuditService;
 use App\Services\LocationScope;
 use App\Services\StockAdjustmentService;
+use App\Services\StockService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -73,8 +74,8 @@ class StockAdjustmentController extends Controller
             ->when($request->filled('search'), fn ($q) => $q->search($request->string('search')->toString()))
             ->when($request->string('status')->toString() === 'applied', fn ($q) => $q->whereIn('approval_status', [ApprovalStatus::Approved->value, ApprovalStatus::Pending->value]))
             ->when($request->string('status')->toString() === 'rejected', fn ($q) => $q->where('approval_status', ApprovalStatus::Rejected->value))
-            ->when($request->filled('location_id'), fn ($q) => $q->where('location_id', $request->integer('location_id')))
-            ->when($request->filled('branch'), fn ($q) => $q->whereIn(
+            ->when($request->filled('location_id') && ! LocationScope::isRestricted($request->user()), fn ($q) => $q->where('location_id', $request->integer('location_id')))
+            ->when($request->filled('branch') && ! LocationScope::isRestricted($request->user()), fn ($q) => $q->whereIn(
                 'location_id',
                 Location::query()->where('branch_id', $request->integer('branch'))->pluck('id')
             ));
@@ -255,7 +256,8 @@ class StockAdjustmentController extends Controller
     }
 
     /**
-     * Search stock lines (products) for the adjustment form.
+     * Search stock lines (products) for the adjustment form. Quantities shown
+     * are scoped to the acting user's own branch (strict branch isolation).
      */
     public function searchUnits(Request $request): JsonResponse
     {
@@ -266,12 +268,16 @@ class StockAdjustmentController extends Controller
             ->search($request->string('q')->toString())
             ->orderBy(Product::query()->select('name')->whereColumn('products.id', 'units.product_id'))
             ->limit(10)
-            ->get()
+            ->get();
+
+        $quantities = StockService::scopedQuantitiesFor($units, $request->user());
+
+        $units = $units
             ->map(fn (Unit $unit) => [
                 'id' => $unit->id,
                 'product_name' => $unit->displayName(),
                 'unit' => $unit->unit,
-                'quantity' => $unit->quantity,
+                'quantity' => $quantities[$unit->id] ?? 0,
                 'purchase_price' => (float) ($unit->product?->purchase_price ?? 0),
             ]);
 
@@ -303,7 +309,7 @@ class StockAdjustmentController extends Controller
         $filename = 'stock_adjustments_'.now()->format('Y-m-d_His').'.'.($format === 'csv' ? 'csv' : 'xlsx');
 
         return Excel::download(
-            new StockAdjustmentExport($request->string('search')->toString() ?: null, $request->string('columns')->toString() ?: null),
+            new StockAdjustmentExport($request->string('search')->toString() ?: null, $request->string('columns')->toString() ?: null, $request->user()),
             $filename
         );
     }

@@ -430,9 +430,9 @@
                                         {{ $initials }}
                                     </span>
                                     <div class="min-w-0">
-                                        <span class="block text-sm font-semibold text-ink group-hover:text-brand-500 transition-colors truncate max-w-56" title="{{ $supplier->name }}">
+                                        <a href="{{ route('suppliers.profile', $supplier) }}" class="block text-sm font-semibold text-ink group-hover:text-brand-500 transition-colors truncate max-w-56" title="{{ $supplier->name }}">
                                             {{ $supplier->name }}
-                                        </span>
+                                        </a>
                                         <span class="block text-[11px] text-muted truncate max-w-56">
                                             @if($supplier->tax_number)
                                                 TAX: {{ $supplier->tax_number }}

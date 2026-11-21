@@ -44,7 +44,8 @@ class SalesReturnService
                 $unit,
                 (int) $item->quantity,
                 $return,
-                "Sales return {$return->return_no} restocked."
+                "Sales return {$return->return_no} restocked.",
+                $return->location_id !== null ? (int) $return->location_id : null
             );
 
             $restocked = true;

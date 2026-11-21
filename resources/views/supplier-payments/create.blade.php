@@ -6,9 +6,28 @@
 @section('content')
 @php
     $selectedSupplier = $suppliers->firstWhere('id', $selectedSupplierId);
+    $selectedOrderId = (int) old('purchase_order_id', $prefillOrderId ?? 0);
+    $amountValue = old('amount', $prefillAmount ?? '');
 @endphp
 
 <div class="space-y-6">
+
+    {{-- Supplier payment request banner (prefilled from the notification) --}}
+    @if(($paymentRequest ?? null) !== null)
+        <div class="rounded-2xl border border-warning/30 bg-warning/10 p-4 flex items-start gap-3">
+            <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-warning/15 text-warning">
+                <x-icon name="chat" class="size-4" />
+            </div>
+            <div class="min-w-0 flex-1">
+                <p class="text-sm font-bold text-ink">Payment request from {{ $paymentRequest->supplier?->name }}</p>
+                <p class="text-xs text-ink/80 mt-0.5">
+                    {{ $paymentRequest->location?->name }}@if($paymentRequest->purchaseOrder) · {{ $paymentRequest->purchaseOrder->reference_no }}@endif
+                    @if($paymentRequest->amount !== null) · requested {{ \App\Helpers\Money::format($paymentRequest->amount) }}@endif
+                </p>
+                <p class="text-xs text-muted mt-0.5">{{ $paymentRequest->message }}</p>
+            </div>
+        </div>
+    @endif
 
     {{-- Top Breadcrumb & Executive Header --}}
     <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -117,6 +136,9 @@
                 <form method="POST" action="{{ route('supplier-payments.store') }}" class="space-y-6">
                     @csrf
                     <input type="hidden" name="supplier_id" value="{{ $selectedSupplier->id }}">
+                    @if(($paymentRequest ?? null) !== null)
+                        <input type="hidden" name="payment_request_id" value="{{ $paymentRequest->id }}">
+                    @endif
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                         {{-- Purchase Invoice --}}
@@ -128,7 +150,7 @@
                                 @foreach($orders as $order)
                                     <label class="flex items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 cursor-pointer hover:border-brand-500/40 transition-colors @error('purchase_order_id') border-danger @enderror">
                                         <input type="radio" name="purchase_order_id" value="{{ $order->id }}"
-                                               @checked(old('purchase_order_id') == $order->id || (! old('purchase_order_id') && $loop->first))
+                                               @checked($selectedOrderId === (int) $order->id || ($selectedOrderId === 0 && $loop->first))
                                                class="size-4 text-brand-500 focus:ring-2 focus:ring-brand-500/20">
                                         <span class="flex-1 min-w-0">
                                             <span class="block text-sm font-semibold text-ink tabular-nums">{{ $order->reference_no }}</span>
@@ -155,7 +177,7 @@
                             <label for="amount" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
                                 Amount ({{ \App\Models\Setting::get('currency_code', 'BDT') }}) <span class="text-danger">*</span>
                             </label>
-                            <input type="number" step="0.01" min="0.01" id="amount" name="amount" value="{{ old('amount') }}" required
+                            <input type="number" step="0.01" min="0.01" id="amount" name="amount" value="{{ $amountValue }}" required
                                    placeholder="0.00"
                                    class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('amount') border-danger @enderror">
                             @error('amount')
@@ -202,7 +224,11 @@
                             <select id="method" name="method"
                                     class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all cursor-pointer @error('method') border-danger @enderror">
                                 <option value="">Please Select</option>
-                                @foreach(\App\Enums\PaymentMethod::options() as $value => $label)
+                                @php $selectedMethod = old('method'); @endphp
+                                @if(filled($selectedMethod) && ! array_key_exists($selectedMethod, $methods))
+                                    <option value="{{ $selectedMethod }}" selected>{{ $selectedMethod }} (stored)</option>
+                                @endif
+                                @foreach($methods as $value => $label)
                                     <option value="{{ $value }}" @selected(old('method') === $value)>{{ $label }}</option>
                                 @endforeach
                             </select>

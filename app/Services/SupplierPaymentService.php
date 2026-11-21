@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\PurchasePayment;
+use App\Models\User;
 
 /**
  * Applies and reverses the financial effects of a supplier payment
@@ -12,6 +13,11 @@ use App\Models\PurchasePayment;
  * Dues approval flow: the purchase invoice's paid amount and the supplier's
  * purchase due move together, and — for finance-recorded payments — the money
  * leaves the chosen cash/bank account.
+ *
+ * Status effects (the purchase order state machine and the supplier's feed)
+ * are delegated to {@see PurchaseOrderWorkflow}: a payment never changes the
+ * branch side or the supplier side, and every applied payment is announced on
+ * the supplier's profile.
  */
 class SupplierPaymentService
 {
@@ -41,13 +47,19 @@ class SupplierPaymentService
         if ($payment->account_id) {
             $this->balances->debit($payment->account_id, $amount);
         }
+
+        PurchaseOrderWorkflow::paymentApplied($payment);
     }
 
     /**
      * Reverse a previously applied payment: restore the purchase invoice due,
      * the supplier's purchase due and the paying account balance.
+     *
+     * A reversal moves neither side of the order: a received order stays
+     * Received and Delivered, whatever its payment state. The re-raised due
+     * is announced on the supplier's profile.
      */
-    public function reverse(PurchasePayment $payment): void
+    public function reverse(PurchasePayment $payment, ?User $actor = null): void
     {
         $amount = round((float) $payment->amount, 2);
         $order = $payment->purchaseOrder;
@@ -67,5 +79,7 @@ class SupplierPaymentService
         if ($payment->account_id) {
             $this->balances->credit($payment->account_id, $amount);
         }
+
+        PurchaseOrderWorkflow::paymentReversed($payment, $actor);
     }
 }

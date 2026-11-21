@@ -78,7 +78,7 @@
                 </div>
                 <div class="flex items-start justify-between gap-4">
                     <dt class="text-muted">Method</dt>
-                    <dd class="text-ink">{{ $payment->method?->label() ?? '—' }}</dd>
+                    <dd class="text-ink">{{ $payment->methodLabel() ?? '—' }}</dd>
                 </div>
                 <div class="flex items-start justify-between gap-4">
                     <dt class="text-muted">Recorded By</dt>

@@ -7,9 +7,19 @@ namespace App\Policies;
 use App\Models\PurchaseReturn;
 use App\Models\User;
 use App\Services\LocationScope;
+use App\Services\SupplierScope;
 
 class PurchaseReturnPolicy
 {
+    public function before(User $user, string $ability): ?bool
+    {
+        if ($user->isSupplierPortalUser() && ! in_array($ability, ['viewAny', 'view'], true)) {
+            return false;
+        }
+
+        return null;
+    }
+
     public function viewAny(User $user): bool
     {
         return $user->can('purchase-returns.manage');
@@ -17,7 +27,9 @@ class PurchaseReturnPolicy
 
     public function view(User $user, PurchaseReturn $purchaseReturn): bool
     {
-        return $this->viewAny($user) && LocationScope::canAccess($user, $purchaseReturn->location_id);
+        return $this->viewAny($user)
+            && LocationScope::canAccess($user, $purchaseReturn->location_id)
+            && SupplierScope::canAccess($user, $purchaseReturn->supplier_id);
     }
 
     public function create(User $user): bool

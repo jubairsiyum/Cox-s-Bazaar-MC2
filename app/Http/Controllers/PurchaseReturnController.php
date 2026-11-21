@@ -18,6 +18,8 @@ use App\Models\User;
 use App\Services\AuditService;
 use App\Services\LocationScope;
 use App\Services\PurchaseReturnService;
+use App\Services\SupplierNotifier;
+use App\Services\SupplierScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
@@ -67,7 +69,7 @@ class PurchaseReturnController extends Controller
             'sort' => $sort,
             'direction' => $direction,
             'totals' => $this->totals($request),
-            'suppliers' => Supplier::query()->orderBy('name')->get(['id', 'name']),
+            'suppliers' => SupplierScope::scopeQuery(Supplier::query(), $request->user(), 'id')->orderBy('name')->get(['id', 'name']),
             'locations' => Location::query()->active()->orderBy('name')->get(['id', 'name']),
         ]);
     }
@@ -99,6 +101,8 @@ class PurchaseReturnController extends Controller
      */
     public function store(StorePurchaseReturnRequest $request): RedirectResponse
     {
+        $this->authorize('create', PurchaseReturn::class);
+
         $validated = $request->validated();
         $order = PurchaseOrder::query()->with('items')->findOrFail($validated['purchase_order_id']);
         $items = $this->returnableItems($validated['items']);
@@ -130,7 +134,9 @@ class PurchaseReturnController extends Controller
                 // The return takes effect on submission: stock leaves and the
                 // supplier return due registers immediately.
                 PurchaseReturnService::syncStock($return, []);
-                PurchaseReturnService::applySupplierDue($return);
+                $creditChange = PurchaseReturnService::applySupplierDue($return);
+
+                SupplierNotifier::returnCreditChanged($return, $creditChange, $request->user());
 
                 return $return;
             });
@@ -194,6 +200,8 @@ class PurchaseReturnController extends Controller
      */
     public function update(UpdatePurchaseReturnRequest $request, PurchaseReturn $purchaseReturn): RedirectResponse
     {
+        $this->authorize('update', $purchaseReturn);
+
         $original = $purchaseReturn->getOriginal();
         $originalQuantities = $purchaseReturn->items->pluck('quantity', 'unit_id')->all();
         $wasApproved = $purchaseReturn->approval_status === ApprovalStatus::Approved;
@@ -221,7 +229,9 @@ class PurchaseReturnController extends Controller
                 // Stock and supplier dues only move for applied returns.
                 if ($wasApproved) {
                     PurchaseReturnService::syncStock($purchaseReturn, $originalQuantities);
-                    PurchaseReturnService::applySupplierDue($purchaseReturn, $original);
+                    $creditChange = PurchaseReturnService::applySupplierDue($purchaseReturn, $original);
+
+                    SupplierNotifier::returnCreditChanged($purchaseReturn, $creditChange, $request->user());
                 }
             });
         } catch (InsufficientStockException $e) {
@@ -239,15 +249,15 @@ class PurchaseReturnController extends Controller
     /**
      * Remove the specified purchase return from storage.
      */
-    public function destroy(PurchaseReturn $purchaseReturn): RedirectResponse
+    public function destroy(Request $request, PurchaseReturn $purchaseReturn): RedirectResponse
     {
         $this->authorize('delete', $purchaseReturn);
 
         $originalQuantities = $purchaseReturn->items->pluck('quantity', 'unit_id')->all();
         $wasApproved = $purchaseReturn->approval_status === ApprovalStatus::Approved;
 
-        DB::transaction(function () use ($purchaseReturn, $originalQuantities, $wasApproved) {
-            PurchaseReturnService::releaseSupplierDue($purchaseReturn);
+        DB::transaction(function () use ($purchaseReturn, $originalQuantities, $wasApproved, $request) {
+            $creditChange = PurchaseReturnService::releaseSupplierDue($purchaseReturn);
 
             if ($purchaseReturn->document) {
                 Storage::disk('public')->delete($purchaseReturn->document);
@@ -260,6 +270,8 @@ class PurchaseReturnController extends Controller
             if ($wasApproved) {
                 PurchaseReturnService::syncStock($purchaseReturn, $originalQuantities);
             }
+
+            SupplierNotifier::returnCreditChanged($purchaseReturn, $creditChange, $request->user());
         });
 
         AuditService::deleted($purchaseReturn, "Purchase return '{$purchaseReturn->reference_no}' deleted.");
@@ -295,7 +307,9 @@ class PurchaseReturnController extends Controller
                 ]);
 
                 PurchaseReturnService::syncStock($purchaseReturn, []);
-                PurchaseReturnService::applySupplierDue($purchaseReturn, $original);
+                $creditChange = PurchaseReturnService::applySupplierDue($purchaseReturn, $original);
+
+                SupplierNotifier::returnCreditChanged($purchaseReturn, $creditChange);
             });
         } catch (InsufficientStockException $e) {
             return back()->with('error', $e->getMessage());
@@ -346,6 +360,8 @@ class PurchaseReturnController extends Controller
 
         $supplierId = (int) $request->input('supplier_id');
 
+        abort_unless(SupplierScope::canAccess($request->user(), $supplierId), 403);
+
         return response()->json([
             'success' => true,
             'purchases' => $this->supplierPurchasesList($supplierId ?: null, $request->user()),
@@ -361,7 +377,10 @@ class PurchaseReturnController extends Controller
 
         $order = PurchaseOrder::query()->with('items.unit')->find($request->input('purchase_order_id'));
 
-        if ($order === null || ! LocationScope::canAccess($request->user(), $order->location_id)) {
+        if ($order === null
+            || ! LocationScope::canAccess($request->user(), $order->location_id)
+            || ! SupplierScope::canAccess($request->user(), $order->supplier_id)
+        ) {
             return response()->json(['success' => false, 'message' => 'Purchase not found.'], 404);
         }
 
@@ -512,7 +531,7 @@ class PurchaseReturnController extends Controller
         $filename = 'purchase_returns_'.now()->format('Y-m-d_His').'.'.($format === 'csv' ? 'csv' : 'xlsx');
 
         return Excel::download(
-            new PurchaseReturnExport($search ?: null, $columns ?: null),
+            new PurchaseReturnExport($search ?: null, $columns ?: null, $request->user()),
             $filename
         );
     }
@@ -531,9 +550,9 @@ class PurchaseReturnController extends Controller
             ->when($request->filled('date_from'), fn ($q) => $q->whereDate('return_date', '>=', $request->string('date_from')->toString()))
             ->when($request->filled('date_to'), fn ($q) => $q->whereDate('return_date', '<=', $request->string('date_to')->toString()));
 
-        $query = LocationScope::scopeQuery($query, $request->user());
+        $query = SupplierScope::scopeQuery(LocationScope::scopeQuery($query, $request->user()), $request->user());
 
-        return $query->when($request->filled('location_id'), fn ($q) => $q->where('location_id', (int) $request->input('location_id')));
+        return $query->when($request->filled('location_id') && ! LocationScope::isRestricted($request->user()), fn ($q) => $q->where('location_id', (int) $request->input('location_id')));
     }
 
     /**

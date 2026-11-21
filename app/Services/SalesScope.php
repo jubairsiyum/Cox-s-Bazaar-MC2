@@ -9,13 +9,13 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Branch (location) scoping for the sales section.
+ * Branch (location) scoping facade for the sales section.
  *
- * Mirrors LocationScope's restriction rule (Outlet Managers are limited to
- * their own records while Super Admins and head-office Managers see
- * everything). A user's branch IS their assigned outlet/location, so records
- * are matched on their location only; the legacy branches-table matching is
- * gone.
+ * The strict branch-isolation concept lives in {@see BranchScope}: full
+ * cross-branch access for the Super Admin only, own-branch matching for every
+ * assigned user, and no operational data for restricted users without a
+ * branch assignment. This class is a thin facade kept for existing call
+ * sites; new code should use BranchScope directly.
  */
 class SalesScope
 {
@@ -24,7 +24,7 @@ class SalesScope
      */
     public static function isRestricted(User $user): bool
     {
-        return LocationScope::isRestricted($user);
+        return BranchScope::isRestricted($user);
     }
 
     /**
@@ -32,7 +32,7 @@ class SalesScope
      */
     public static function canAccess(User $user, int|string|null $locationId): bool
     {
-        return LocationScope::canAccess($user, $locationId);
+        return BranchScope::canAccess($user, $locationId);
     }
 
     /**
@@ -40,13 +40,14 @@ class SalesScope
      */
     public static function canAccessRecord(User $user, Model $record): bool
     {
-        return self::canAccess($user, $record->getAttribute('location_id'));
+        return BranchScope::canAccessRecord($user, $record);
     }
 
     /**
      * Approvals are reserved for the responsible branch manager (or Super
      * Admin): a manager-role user whose branch/location matches the record.
-     * Head-office Managers are unrestricted and thereby responsible for all.
+     * Under strict branch isolation nobody else may sign off across branches —
+     * the head office sees everything through the Super Admin account.
      */
     public static function canApprove(User $user, Model $record): bool
     {
@@ -63,6 +64,6 @@ class SalesScope
      */
     public static function scopeQuery(Builder $query, User $user, string $locationColumn = 'location_id'): Builder
     {
-        return LocationScope::scopeQuery($query, $user, $locationColumn);
+        return BranchScope::scopeQuery($query, $user, $locationColumn);
     }
 }

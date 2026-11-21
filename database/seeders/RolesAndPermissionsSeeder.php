@@ -129,7 +129,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'purchase-returns.manage', 'purchase-returns.approve',
             'sales-orders.manage', 'sales-invoices.view', 'sales-invoices.manage', 'sales-invoices.post',
             'sales-returns.manage', 'sales-returns.approve', 'customer-collections.manage', 'pos.access',
-            'supplier-payments.view',
+            'supplier-payments.view', 'supplier-payments.manage',
             'finance.view',
             'reports.view', 'reports.export',
         ]);
@@ -145,6 +145,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'purchase-invoices.view', 'purchase-invoices.post',
             'purchase-returns.manage',
         ]);
+
+        // ── Supplier (portal login; sees only the supplier profile linked to it) ──
+        Role::firstOrCreate(['name' => 'Supplier', 'guard_name' => 'web']);
 
         $this->command->info('Roles and permissions seeded.');
     }

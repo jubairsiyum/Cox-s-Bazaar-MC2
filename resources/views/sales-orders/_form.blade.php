@@ -4,6 +4,10 @@
     $expectedValue = old('expected_date', $isEdit ? ($order->expected_date?->format('Y-m-d') ?? '') : '');
     $taxRateValue = old('tax_rate', $isEdit ? $order->tax_rate : 0);
     $selectedLocationId = (int) old('location_id', $defaultLocationId ?? ($isEdit ? $order->location_id : 0));
+    $customerDirectory = $customers
+        ->map(fn ($customer) => ['id' => (int) $customer->id, 'name' => $customer->name, 'mobile' => $customer->mobile, 'tel_no' => $customer->tel_no, 'email' => $customer->email])
+        ->values()
+        ->all();
 @endphp
 
 <div x-data="orderForm({
@@ -63,26 +67,24 @@
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     
-                    {{-- Customer Picker (Select2 searchable + free typing for new customer) --}}
+                    {{-- Customer Picker with datalist --}}
                     <div>
-                        <label for="customer_select" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                        <label for="customer_name" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
                             Customer<span class="text-danger">*</span>
                         </label>
-                        <select id="customer_select" class="js-customer-select w-full">
-                            <option value=""></option>
-                            @if(old('customer_name') && ! old('customer_id'))
-                                <option value="{{ old('customer_name') }}" selected data-phone="{{ old('customer_phone') }}">{{ old('customer_name') }}</option>
-                            @endif
-                            @foreach($customers as $customer)
-                                <option value="{{ $customer->id }}" data-phone="{{ $customer->tel_no }}"
-                                        @selected((int) old('customer_id', $isEdit ? $order->customer_id : 0) === $customer->id)>
-                                    {{ $customer->name }}
-                                </option>
-                            @endforeach
-                        </select>
+                        <div class="relative">
+                            <input type="text" id="customer_name" name="customer_name" list="customer_options" autocomplete="off"
+                                   value="{{ old('customer_name', $isEdit ? $order->customer?->name : '') }}"
+                                   placeholder="Search an existing customer or type a new name..."
+                                   class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('customer_name') border-danger @enderror">
+                            <datalist id="customer_options">
+                                @foreach($customerDirectory as $customer)
+                                    <option value="{{ $customer['name'] }}"></option>
+                                @endforeach
+                            </datalist>
+                        </div>
                         <input type="hidden" id="customer_id" name="customer_id" value="{{ old('customer_id', $isEdit ? $order->customer_id : '') }}">
-                        <input type="hidden" id="customer_name" name="customer_name" value="{{ old('customer_name', $isEdit ? $order->customer?->name : '') }}">
-                        <p class="mt-1.5 text-xs text-muted">Select an existing customer or type a new name to register.</p>
+                        <p class="mt-1.5 text-xs text-muted">Search an existing customer or type a new name to add one.</p>
                         @error('customer_id')
                             <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
                         @enderror
@@ -91,20 +93,38 @@
                         @enderror
                     </div>
 
-                    {{-- Customer Phone Number --}}
+                    {{-- Customer Phone / Mobile Number --}}
                     <div>
-                        <label for="customer_phone" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
-                            Phone Number<span class="text-danger">*</span>
+                        <label for="mobile_no" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                            Mobile No.<span class="text-danger">*</span>
                         </label>
                         <div class="relative">
-                            <input type="text" id="customer_phone" name="customer_phone" required
-                                   value="{{ old('customer_phone', $isEdit ? $order->customer?->tel_no : '') }}"
+                            <input type="text" id="mobile_no" name="mobile_no" required
+                                   value="{{ old('mobile_no', $isEdit ? ($order->customer?->mobile ?? $order->customer?->tel_no) : '') }}"
                                    placeholder="e.g. 018XXXXXXXX"
-                                   class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 pl-10 text-sm text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('customer_phone') border-danger @enderror">
+                                   class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 pl-10 text-sm text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('mobile_no') border-danger @enderror">
                             <x-icon name="phone" class="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
                         </div>
-                        <p class="mt-1.5 text-xs text-muted">Auto-filled for existing customers. Saved to customer profile.</p>
-                        @error('customer_phone')
+                        <p class="mt-1.5 text-xs text-muted">Auto-filled for existing customers. Saved back to their profile.</p>
+                        @error('mobile_no')
+                            <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    {{-- Customer Email (Optional) --}}
+                    <div>
+                        <label for="customer_email" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                            Email
+                        </label>
+                        <div class="relative">
+                            <input type="email" id="customer_email" name="customer_email"
+                                   value="{{ old('customer_email', $isEdit ? $order->customer?->email : '') }}"
+                                   placeholder="customer@example.com"
+                                   class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 pl-10 text-sm text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('customer_email') border-danger @enderror">
+                            <x-icon name="mail" class="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                        </div>
+                        <p class="mt-1.5 text-xs text-muted">Optional. Auto-filled for existing customers.</p>
+                        @error('customer_email')
                             <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
                         @enderror
                     </div>
@@ -124,7 +144,7 @@
                                     class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 pl-10 text-sm text-ink font-medium shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('location_id') border-danger @enderror">
                                 <option value="">— Please Select Business Location —</option>
                                 @foreach($locations as $location)
-                                    <option value="{{ $location->id }}" @selected($selectedLocationId === $location->id)>
+                                    <option value="{{ $location->id }}" @selected((int) old('location_id', $defaultLocationId ?? ($isEdit ? $order->location_id : 0)) === $location->id)>
                                         {{ $location->name }}
                                     </option>
                                 @endforeach
@@ -226,7 +246,8 @@
                                    @input.debounce.250ms="searchUnits()"
                                    @keydown.enter.prevent="searchUnits()"
                                    @keydown.escape="results = []"
-                                   :placeholder="locationId ? 'Search product name, model, code or scan barcode...' : '⚠️ Please select a Business Location above first...'"
+                                   placeholder="Search product or scan barcode..."
+                                   :placeholder="locationId ? 'Search product or scan barcode...' : '⚠️ Please select a Business Location above first...'"
                                    :disabled="!locationId"
                                    class="w-full rounded-2xl border border-line bg-surface px-4 py-3 pl-11 pr-24 text-sm text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 disabled:bg-soft disabled:cursor-not-allowed transition-all">
                             
@@ -253,12 +274,6 @@
                                     Barcode / Text
                                 </span>
                             </div>
-                        </div>
-
-                        {{-- Location Warning Alert if search attempted without location --}}
-                        <div x-show="showLocationPrompt" x-cloak class="mt-2 flex items-center gap-2 rounded-xl bg-warning/10 border border-warning/20 p-2.5 text-xs text-warning">
-                            <x-icon name="alert-triangle" class="size-4 shrink-0" />
-                            <span>Please choose a <strong>Business Location</strong> above first. Stock availability is location-specific!</span>
                         </div>
 
                         {{-- Search Results Dropdown --}}
@@ -581,7 +596,7 @@
                         <span>{{ $isEdit ? 'Save Changes' : 'Create Sales Order' }}</span>
                     </button>
 
-                    <a href="{{ $cancelUrl }}"
+                    <a href="{{ $cancelUrl ?? route('sales-orders.index') }}"
                        class="btn-scale w-full inline-flex items-center justify-center rounded-2xl border border-line bg-surface hover:bg-soft px-6 py-2.5 text-xs font-semibold text-ink transition-colors">
                         Cancel
                     </a>
@@ -603,163 +618,70 @@
     </div>
 </div>
 
-{{-- Customer Picker Assets & Enhanced Dark/Light Styling --}}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
-<style>
-    .select2-container--default .select2-selection--single,
-    .select2-container--default .select2-selection--multiple {
-        border-radius: 0.75rem;
-        border: 1px solid var(--color-line, #e5e7eb);
-        background: var(--color-surface, #fff);
-        min-height: 2.75rem;
-        padding: 0.25rem 0.25rem;
-    }
-    .select2-container--default .select2-selection--single .select2-selection__rendered {
-        line-height: 2.25rem;
-        padding-left: 0.875rem;
-        padding-right: 0.875rem;
-        color: var(--color-ink, #111827);
-        font-size: 0.875rem;
-        font-weight: 500;
-    }
-    .select2-container--default .select2-selection--single .select2-selection__arrow {
-        height: 2.5rem;
-        right: 0.5rem;
-    }
-    .select2-container--default.select2-container--focus .select2-selection--single,
-    .select2-container--default.select2-container--open .select2-selection--single {
-        border-color: var(--color-brand-500, #465fff);
-        box-shadow: 0 0 0 3px rgba(70, 95, 255, 0.2);
-    }
-    .select2-container--default .select2-dropdown {
-        border-radius: 1rem;
-        border: 1px solid var(--color-line, #e5e7eb);
-        background: var(--color-surface, #fff);
-        overflow: hidden;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-        z-index: 50;
-    }
-    .select2-container--default .select2-search--dropdown {
-        padding: 0.5rem;
-    }
-    .select2-container--default .select2-search--dropdown .select2-search__field {
-        border-radius: 0.75rem;
-        border: 1px solid var(--color-line, #e5e7eb);
-        background: var(--color-soft, #f9fafb);
-        color: var(--color-ink, #111827);
-        font-size: 0.875rem;
-        padding: 0.5rem 0.875rem;
-    }
-    .select2-container--default .select2-results__option--highlighted[aria-selected] {
-        background: var(--color-brand-500, #465fff);
-        color: #ffffff;
-    }
-    .select2-container--default .select2-results__option {
-        padding: 0.5rem 0.875rem;
-        font-size: 0.875rem;
-        color: var(--color-ink, #111827);
-    }
+<script type="application/json" id="customer-contact-directory">@json($customerDirectory)</script>
 
-    /* Full Dark Mode Compatibility */
-    .dark .select2-container--default .select2-selection--single {
-        background: var(--color-surface, #1e293b);
-        border-color: var(--color-line, #334155);
-    }
-    .dark .select2-container--default .select2-selection--single .select2-selection__rendered {
-        color: var(--color-ink, #f8fafc);
-    }
-    .dark .select2-container--default .select2-dropdown {
-        background: var(--color-surface, #1e293b);
-        border-color: var(--color-line, #334155);
-    }
-    .dark .select2-container--default .select2-search--dropdown .select2-search__field {
-        background: var(--color-soft, #0f172a);
-        border-color: var(--color-line, #334155);
-        color: var(--color-ink, #f8fafc);
-    }
-    .dark .select2-container--default .select2-results__option {
-        color: var(--color-ink, #f8fafc);
-    }
-    .dark .select2-container--default .select2-results__option--highlighted[aria-selected] {
-        background: var(--color-brand-500, #465fff);
-        color: #ffffff;
-    }
-</style>
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    var select = document.getElementById('customer_select');
-    var idInput = document.getElementById('customer_id');
     var nameInput = document.getElementById('customer_name');
-    var phoneInput = document.getElementById('customer_phone');
+    var idInput = document.getElementById('customer_id');
+    var mobileInput = document.getElementById('mobile_no');
+    var emailInput = document.getElementById('customer_email');
+    var directoryBlock = document.getElementById('customer-contact-directory');
 
-    if (!select || !idInput || !nameInput || !phoneInput || typeof window.jQuery === 'undefined') {
+    if (!nameInput || !idInput || !mobileInput || !emailInput || !directoryBlock) {
         return;
     }
 
-    var $ = window.jQuery;
+    var directory = [];
+    try {
+        directory = JSON.parse(directoryBlock.textContent) || [];
+    } catch (error) {
+        directory = [];
+    }
 
-    $(select).select2({
-        tags: true,
-        width: '100%',
-        placeholder: 'Search customer or type new name...',
-        allowClear: true,
-        ajax: {
-            url: @js(route('sales-orders.search-customers')),
-            dataType: 'json',
-            delay: 250,
-            data: function (params) {
-                return { q: params.term };
-            },
-            processResults: function (data) {
-                return {
-                    results: (data.customers || []).map(function (customer) {
-                        return { id: String(customer.id), text: customer.name, tel_no: customer.tel_no };
-                    })
-                };
-            },
-            cache: true
-        },
-        createTag: function (params) {
-            var term = (params.term || '').trim();
-            if (term === '') return null;
-            return { id: term, text: term, isNew: true };
+    function normalizeName(value) {
+        return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    }
+
+    function findCustomerByName(value) {
+        var key = normalizeName(value);
+        if (key === '') {
+            return null;
         }
-    });
 
-    function syncCustomerFields(data) {
-        if (!data || !data.id) {
-            idInput.value = '';
-            nameInput.value = '';
+        for (var i = 0; i < directory.length; i++) {
+            if (normalizeName(directory[i].name) === key) {
+                return directory[i];
+            }
+        }
+
+        return null;
+    }
+
+    var mobileAutofilled = false;
+
+    function syncCustomerFields() {
+        var customer = findCustomerByName(nameInput.value);
+
+        if (customer) {
+            idInput.value = String(customer.id);
+            mobileInput.value = customer.mobile || customer.tel_no || '';
+            emailInput.value = customer.email || '';
+            mobileAutofilled = true;
             return;
         }
 
-        if (data.isNew) {
-            idInput.value = '';
-            nameInput.value = data.text;
-            return;
-        }
+        idInput.value = '';
 
-        idInput.value = data.id;
-        nameInput.value = data.text;
-
-        var phone = data.tel_no
-            || (data.element && data.element.dataset ? data.element.dataset.phone : '')
-            || '';
-
-        if (phone !== '') {
-            phoneInput.value = phone;
+        if (mobileAutofilled) {
+            mobileInput.value = '';
+            emailInput.value = '';
+            mobileAutofilled = false;
         }
     }
 
-    $(select).on('select2:select', function (event) {
-        syncCustomerFields(event.params.data);
-    });
-
-    $(select).on('select2:clear', function () {
-        syncCustomerFields(null);
-    });
+    nameInput.addEventListener('input', syncCustomerFields);
+    nameInput.addEventListener('change', syncCustomerFields);
 });
 </script>
 
@@ -781,11 +703,9 @@ function orderForm(state) {
         searchQuery: '',
         results: [],
         isSearching: false,
-        showLocationPrompt: false,
 
         init() {
-            // If location and rows already exist, verify stock levels for current location
-            if (this.locationId && this.rows.length > 0) {
+            if (this.locationId) {
                 this.syncStockForCurrentRows();
             }
         },
@@ -795,11 +715,16 @@ function orderForm(state) {
         },
 
         get totalUnits() {
-            return this.rows.reduce((sum, row) => sum + (parseInt(row.quantity) || 0), 0);
+            return this.rows.reduce((sum, r) => sum + (parseFloat(r.quantity) || 0), 0);
         },
 
         get subtotal() {
-            return this.rows.reduce((sum, row) => sum + Math.max(0, ((parseFloat(row.quantity) || 0) * (parseFloat(row.unit_price) || 0)) - (parseFloat(row.discount) || 0)), 0);
+            return this.rows.reduce((sum, row) => {
+                const q = parseFloat(row.quantity) || 0;
+                const p = parseFloat(row.unit_price) || 0;
+                const d = parseFloat(row.discount) || 0;
+                return sum + Math.max(0, (q * p) - d);
+            }, 0);
         },
 
         get discountTotal() {
@@ -807,62 +732,46 @@ function orderForm(state) {
         },
 
         get taxAmount() {
-            return this.subtotal * (parseFloat(this.taxRate) || 0) / 100;
+            return (this.subtotal * (parseFloat(this.taxRate) || 0)) / 100;
         },
 
         get grandTotal() {
-            return this.subtotal + this.taxAmount;
+            return Math.max(0, this.subtotal + this.taxAmount);
         },
 
         get hasStockErrors() {
-            return this.rows.some(row => (parseFloat(row.quantity) || 0) > (parseFloat(row.stock) || 0));
+            return this.rows.some(r => (parseFloat(r.quantity) || 0) > (parseFloat(r.stock) || 0));
         },
 
-        formatMoney(value) {
-            if (typeof window.formatBDT === 'function') {
-                return window.formatBDT(value);
-            }
-            return '৳' + (parseFloat(value) || 0).toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        formatMoney(amount) {
+            return '৳ ' + Number(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         },
 
         onLocationChange(event) {
-            this.showLocationPrompt = false;
-            this.results = [];
-            this.searchQuery = '';
-            if (this.locationId && this.rows.length > 0) {
-                this.syncStockForCurrentRows();
+            this.syncStockForCurrentRows();
+            if (this.searchQuery.trim().length >= 2) {
+                this.searchUnits();
             }
         },
 
         async searchUnits() {
             const query = this.searchQuery.trim();
-
-            if (query.length < 1) {
+            if (query.length < 2) {
                 this.results = [];
                 return;
             }
 
-            if (!this.locationId) {
-                this.showLocationPrompt = true;
-                this.results = [];
-                return;
-            }
-
-            this.showLocationPrompt = false;
             this.isSearching = true;
-
             try {
-                const url = @js(route('sales-orders.search-units')) + '?search=' + encodeURIComponent(query) + '&location_id=' + encodeURIComponent(this.locationId);
-                const response = await fetch(url, {
+                const url = @js(route('sales-orders.search-units')) + '?search=' + encodeURIComponent(query) + (this.locationId ? '&location_id=' + encodeURIComponent(this.locationId) : '');
+                const res = await fetch(url, {
                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
                 });
-                const data = await response.json();
-                
+                const data = await res.json();
                 this.results = (data.units || []).map(unit => ({
                     id: unit.id,
                     display_name: unit.display_name,
                     unit: unit.unit || 'Pcs',
-                    quantity: parseFloat(unit.quantity) || 0,
                     stock: parseFloat(unit.quantity) || 0,
                     sale_price: parseFloat(unit.sale_price) || 0,
                     barcode: unit.barcode || ''
@@ -878,7 +787,6 @@ function orderForm(state) {
             if (!this.locationId || this.rows.length === 0) return;
 
             try {
-                // Fetch stock for items in rows
                 for (let row of this.rows) {
                     const url = @js(route('sales-orders.search-units')) + '?search=' + encodeURIComponent(row.product_name) + '&location_id=' + encodeURIComponent(this.locationId);
                     const res = await fetch(url, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
@@ -936,7 +844,6 @@ function orderForm(state) {
         },
 
         validateStock(row) {
-            // Guard against negative or NaN
             if (isNaN(row.quantity) || row.quantity < 1) {
                 row.quantity = 1;
             }

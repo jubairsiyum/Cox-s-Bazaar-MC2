@@ -4,89 +4,82 @@
 @section('page_title', 'Distribution Dashboard')
 
 @php
-  // ── 1. Role & Outlet Scope Resolution ──────────────────────────────────────
-  $user = auth()->user();
-  $roles = $user ? $user->roles->pluck('name')->all() : [];
+  // ── 1. Role & Outlet Scope Resolution (Strict BranchScope) ──────────────────
+  $viewer = auth()->user();
+  $roles = $viewer ? $viewer->roles->pluck('name')->all() : [];
   $primaryRole = !empty($roles) ? ucfirst(str_replace(['_', '-'], ' ', $roles[0])) : 'Staff';
 
   // STRICT ACCESS RULE: ONLY Super Admin can view all branches and network overview.
-  // All other roles (Manager, Outlet Manager, Sales Staff, Storekeeper, etc.) are strictly locked to their outlet.
-  $isSuperAdmin = $user?->hasRole('Super Admin') ?? false;
-  $isRestricted = ! $isSuperAdmin;
-
-  // Resolve user assigned outlet / branch
-  $assignedLocationId = $user?->branch_id ?? $user?->location_id;
-  $assignedLocation = $assignedLocationId ? \App\Models\Location::find($assignedLocationId) : null;
-
-  // If a non-Super Admin account does not have an assigned branch yet, fallback to primary Outlet 1
-  // so they NEVER view cross-outlet or network-wide data!
-  if ($isRestricted && ! $assignedLocation) {
-      $assignedLocation = \App\Models\Location::where('status', 'active')
-          ->where('type', '!=', \App\Enums\LocationType::Warehouse->value ?? 'warehouse')
-          ->orderBy('id')
-          ->first()
-          ?? \App\Models\Location::where('status', 'active')->orderBy('id')->first();
-      $assignedLocationId = $assignedLocation?->id;
-  }
+  // All other roles (Manager, Outlet Manager, Sales Staff, Storekeeper, etc.) are strictly locked to their assigned outlet.
+  $isSuperAdmin = $viewer?->hasRole('Super Admin') ?? false;
+  $isRestricted = $viewer !== null && \App\Services\BranchScope::isRestricted($viewer);
 
   // All active business locations for Super Admin switcher
   $allLocations = $isSuperAdmin
       ? \App\Models\Location::where('status', 'active')->orderBy('name')->get(['id', 'name', 'type'])
       : collect();
 
-  // Resolve active scope
+  // Resolve target location and active scope
   if ($isRestricted) {
-      // Non-Super Admin: permanently locked to their outlet (or Outlet 1 fallback)
-      $scopedLocationId = $assignedLocationId ? (int) $assignedLocationId : -1;
+      $assignedLocationId = $viewer !== null ? \App\Services\BranchScope::locationId($viewer) : null;
+      $assignedLocation = $assignedLocationId ? \App\Models\Location::find($assignedLocationId) : null;
+      $targetLocationId = $assignedLocationId;
+      $scopedLocationId = $assignedLocationId ? (int) $assignedLocationId : null;
       $activeScopeLocation = $assignedLocation;
   } else {
-      // Super Admin: can view all network or filter to any individual outlet
       $requestedLocationId = request()->filled('location_id') ? (int) request('location_id') : null;
       if ($requestedLocationId && $allLocations->contains('id', $requestedLocationId)) {
+          $targetLocationId = $requestedLocationId;
           $scopedLocationId = $requestedLocationId;
           $activeScopeLocation = $allLocations->firstWhere('id', $requestedLocationId);
       } else {
+          $targetLocationId = null;
           $scopedLocationId = null;
           $activeScopeLocation = null;
       }
   }
 
-  $scopeTitle = $activeScopeLocation ? $activeScopeLocation->name : 'All Outlets & Warehouses';
+  $branchScoped = $isRestricted || ($targetLocationId !== null);
+  $scopeTitle = $activeScopeLocation ? $activeScopeLocation->name : ($isSuperAdmin ? 'All Outlets & Warehouses' : 'No branch assigned');
+  $branchQuantities = ($targetLocationId !== null && $targetLocationId > 0)
+      ? \App\Services\StockService::quantitiesByUnitAt($targetLocationId)
+      : [];
+
+  // Scoped query helper
+  $scoped = function ($query) use ($viewer, $isRestricted, $targetLocationId) {
+      if ($isRestricted) {
+          return $viewer !== null ? \App\Services\BranchScope::scopeQuery($query, $viewer) : $query->whereRaw('1 = 0');
+      }
+      if ($targetLocationId !== null) {
+          return $query->where('location_id', $targetLocationId);
+      }
+      return $query;
+  };
 
   // ── 2. Safe Dynamic Data Resolution ────────────────────────────────────────
   try {
-      // 2.1 Live Sales Query (Scoped to location if active)
-      $baseSalesQuery = \App\Models\SalesInvoice::query();
-      if ($scopedLocationId) {
-          $baseSalesQuery->where('location_id', $scopedLocationId);
-      }
-
-      $todaySales = (float) (clone $baseSalesQuery)
-          ->whereDate('invoice_date', today())
-          ->where('status', \App\Enums\SalesInvoiceStatus::Posted)
+      // 2.1 Live Sales Metrics
+      $todaySales = (float) $scoped(\App\Models\SalesInvoice::query()->whereDate('invoice_date', today())
+          ->where('status', \App\Enums\SalesInvoiceStatus::Posted))
           ->sum('grand_total');
 
-      $yesterdaySales = (float) (clone $baseSalesQuery)
-          ->whereDate('invoice_date', today()->subDay())
-          ->where('status', \App\Enums\SalesInvoiceStatus::Posted)
+      $yesterdaySales = (float) $scoped(\App\Models\SalesInvoice::query()->whereDate('invoice_date', today()->subDay())
+          ->where('status', \App\Enums\SalesInvoiceStatus::Posted))
           ->sum('grand_total');
 
       $salesChangePct = $yesterdaySales > 0
           ? (int) round((($todaySales - $yesterdaySales) / $yesterdaySales) * 100)
           : ($todaySales > 0 ? 100 : 0);
 
-      $todayInvoicesCount = (int) (clone $baseSalesQuery)
-          ->whereDate('invoice_date', today())
-          ->where('status', \App\Enums\SalesInvoiceStatus::Posted)
+      $todayInvoicesCount = (int) $scoped(\App\Models\SalesInvoice::query()->whereDate('invoice_date', today())
+          ->where('status', \App\Enums\SalesInvoiceStatus::Posted))
           ->count();
 
-      // 2.2 Collections (Scoped payments on sales invoices)
-      $todayCollection = (float) (clone $baseSalesQuery)
-          ->whereDate('invoice_date', today())
+      // 2.2 Collections (Payments recorded on sales invoices)
+      $todayCollection = (float) $scoped(\App\Models\SalesInvoice::query()->whereDate('invoice_date', today()))
           ->sum('paid_amount');
 
-      $yesterdayCollection = (float) (clone $baseSalesQuery)
-          ->whereDate('invoice_date', today()->subDay())
+      $yesterdayCollection = (float) $scoped(\App\Models\SalesInvoice::query()->whereDate('invoice_date', today()->subDay()))
           ->sum('paid_amount');
 
       $collectionChangePct = $yesterdayCollection > 0
@@ -94,30 +87,39 @@
           : ($todayCollection > 0 ? 100 : 0);
 
       // 2.3 Retailer Dues (Total Outstanding Receivables on posted invoices)
-      $totalReceivableDue = (float) (clone $baseSalesQuery)
-          ->where('status', \App\Enums\SalesInvoiceStatus::Posted)
+      $totalReceivableDue = (float) $scoped(\App\Models\SalesInvoice::query()->where('status', \App\Enums\SalesInvoiceStatus::Posted))
           ->sum('due_amount');
 
-      $overdueReceivable = (float) (clone $baseSalesQuery)
-          ->where('status', \App\Enums\SalesInvoiceStatus::Posted)
+      $overdueReceivable = (float) $scoped(\App\Models\SalesInvoice::query()->where('status', \App\Enums\SalesInvoiceStatus::Posted)
           ->whereDate('invoice_date', '<', today()->subDays(30))
-          ->where('due_amount', '>', 0)
+          ->where('due_amount', '>', 0))
           ->sum('due_amount');
 
       // Scoped active retailers count
-      $activeRetailersCount = $scopedLocationId
-          ? (int) \App\Models\SalesInvoice::where('location_id', $scopedLocationId)->whereNotNull('customer_id')->distinct('customer_id')->count('customer_id')
+      $activeRetailersCount = $targetLocationId !== null
+          ? (int) $scoped(\App\Models\SalesInvoice::query())->whereNotNull('customer_id')->distinct('customer_id')->count('customer_id')
           : (int) \App\Models\Customer::where('status', 'active')->count();
 
       // 2.4 Stock Valuation & Inventory Units
-      // Main Super Admin / Network view includes all branches; individual branch scope shows branch-only stock.
-      $isAllBranchesStock = ! $scopedLocationId 
-          || ($activeScopeLocation && (
-              $activeScopeLocation->name === 'Main Warehouse' 
-              || ($activeScopeLocation->type?->value ?? $activeScopeLocation->type) === 'warehouse'
-          ));
+      if ($branchScoped) {
+          $totalStockUnits = (int) array_sum($branchQuantities);
 
-      if ($isAllBranchesStock) {
+          $unitCosts = $branchQuantities === []
+              ? collect()
+              : \Illuminate\Support\Facades\DB::table('units')
+                  ->join('products', 'products.id', '=', 'units.product_id')
+                  ->whereNull('products.deleted_at')
+                  ->whereNull('units.deleted_at')
+                  ->whereIn('units.id', array_keys($branchQuantities))
+                  ->selectRaw('units.id as unit_id, COALESCE(products.purchase_price, products.sale_price, 0) as cost')
+                  ->get();
+
+          $totalStockValue = (float) $unitCosts->sum(fn ($row) => ($branchQuantities[(int) $row->unit_id] ?? 0) * (float) $row->cost);
+          $primaryWarehouse = $targetLocationId !== null
+              ? ($activeScopeLocation?->name ?? 'My Branch')
+              : 'No branch assigned';
+          $stockScopeCaption = $primaryWarehouse;
+      } else {
           $totalStockUnits = (int) \App\Models\Unit::sum('quantity');
 
           $rawStockValue = \Illuminate\Support\Facades\DB::table('units')
@@ -126,33 +128,17 @@
               ->whereNull('units.deleted_at')
               ->selectRaw('SUM(units.quantity * COALESCE(products.purchase_price, products.sale_price, 0)) as total_val')
               ->value('total_val');
-          $totalStockValue = (float) ($rawStockValue ?? 0);
 
-          $primaryWarehouse = $activeScopeLocation?->name ?? (
-              \App\Models\Location::where('status', 'active')
-                  ->where('type', \App\Enums\LocationType::Warehouse->value ?? 'warehouse')
-                  ->value('name') ?? 'Main Warehouse'
-          );
+          $totalStockValue = $rawStockValue ? (float) $rawStockValue : 0;
+          $primaryWarehouse = \App\Models\Location::where('status', 'active')
+              ->where('type', \App\Enums\LocationType::Warehouse->value ?? 'warehouse')
+              ->value('name')
+              ?? \App\Models\Location::where('status', 'active')->value('name')
+              ?? 'Central Warehouse';
           $stockScopeCaption = 'All branches included';
-      } else {
-          $locationStockMovements = \App\Models\StockMovement::where('location_id', $scopedLocationId)->sum('quantity');
-          $totalStockUnits = max(0, (int) $locationStockMovements);
-
-          $rawStockValue = \Illuminate\Support\Facades\DB::table('stock_movements')
-              ->join('units', 'stock_movements.unit_id', '=', 'units.id')
-              ->join('products', 'units.product_id', '=', 'products.id')
-              ->where('stock_movements.location_id', $scopedLocationId)
-              ->whereNull('products.deleted_at')
-              ->whereNull('units.deleted_at')
-              ->selectRaw('SUM(stock_movements.quantity * COALESCE(products.purchase_price, products.sale_price, 0)) as total_val')
-              ->value('total_val');
-          $totalStockValue = max(0, (float) ($rawStockValue ?? 0));
-          $primaryWarehouse = $activeScopeLocation->name;
-          $stockScopeCaption = $primaryWarehouse;
       }
 
       // 2.4.1 Day-over-Day (DoD) Stock Value % Change
-      // Compares current stock value against yesterday's closing value based on today's net inventory movements.
       $todayMovementsQuery = \Illuminate\Support\Facades\DB::table('stock_movements')
           ->join('units', 'stock_movements.unit_id', '=', 'units.id')
           ->join('products', 'units.product_id', '=', 'products.id')
@@ -160,8 +146,8 @@
           ->whereNull('products.deleted_at')
           ->whereNull('units.deleted_at');
 
-      if (! $isAllBranchesStock && $scopedLocationId) {
-          $todayMovementsQuery->where('stock_movements.location_id', $scopedLocationId);
+      if ($branchScoped && $targetLocationId !== null) {
+          $todayMovementsQuery->where('stock_movements.location_id', $targetLocationId);
       }
 
       $todayStockDelta = (float) ($todayMovementsQuery->selectRaw(
@@ -179,26 +165,34 @@
       }
 
       // 2.5 Stock Transfers & Field Placement
-      $transferQuery = \App\Models\StockTransfer::whereDate('transfer_date', today());
-      if ($scopedLocationId) {
-          $transferQuery->where(function ($q) use ($scopedLocationId) {
-              $q->where('from_location_id', $scopedLocationId)
-                ->orWhere('to_location_id', $scopedLocationId);
-          });
-      }
+      $scopedTransfers = function ($query) use ($viewer, $isRestricted, $targetLocationId) {
+          if ($isRestricted) {
+              return $viewer !== null
+                  ? \App\Services\BranchScope::scopeQueryAny($query, $viewer, 'from_location_id', 'to_location_id')
+                  : $query->whereRaw('1 = 0');
+          }
+          if ($targetLocationId !== null) {
+              return $query->where(function ($q) use ($targetLocationId) {
+                  $q->where('from_location_id', $targetLocationId)
+                    ->orWhere('to_location_id', $targetLocationId);
+              });
+          }
+          return $query;
+      };
 
-      $todayPlaced = (int) (clone $transferQuery)
-          ->where('stock_transfers.status', \App\Enums\StockTransferStatus::Received->value)
+      $todayDispatched = (int) $scopedTransfers(\App\Models\StockTransfer::query()->whereDate('transfer_date', today()))
           ->join('stock_transfer_items', 'stock_transfers.id', '=', 'stock_transfer_items.stock_transfer_id')
           ->sum('stock_transfer_items.quantity');
 
-      $todayInTransit = (int) (clone $transferQuery)
-          ->where('stock_transfers.status', \App\Enums\StockTransferStatus::InTransit->value)
+      $todayPlaced = (int) $scopedTransfers(\App\Models\StockTransfer::query()->whereDate('transfer_date', today())
+          ->where('stock_transfers.status', \App\Enums\StockTransferStatus::Received->value ?? 'received'))
           ->join('stock_transfer_items', 'stock_transfers.id', '=', 'stock_transfer_items.stock_transfer_id')
           ->sum('stock_transfer_items.quantity');
 
-      $todayDispatched = $todayPlaced + $todayInTransit;
-      $activeRoutes = $scopedLocationId ? 1 : (int) \App\Models\Location::where('status', 'active')->count();
+      $todayInTransit = max(0, $todayDispatched - $todayPlaced);
+      $activeRoutes = $branchScoped
+          ? ($targetLocationId !== null ? 1 : 0)
+          : (int) \App\Models\Location::where('status', 'active')->count();
 
       // Dynamic captions
       $todaySalesCaption = $todayInvoicesCount > 0
@@ -219,41 +213,22 @@
 
       // 2.6 Dynamic Low Stock & Reorder Alerts
       $lowStockThreshold = (int) \App\Models\Setting::get('low_stock_threshold', 10);
-      if ($scopedLocationId) {
-          $locationStockSub = \Illuminate\Support\Facades\DB::table('stock_movements')
-              ->join('units', 'stock_movements.unit_id', '=', 'units.id')
-              ->where('stock_movements.location_id', $scopedLocationId)
-              ->groupBy('units.product_id')
-              ->selectRaw('units.product_id, SUM(stock_movements.quantity) as loc_stock');
 
-          $lowStockProducts = \App\Models\Product::with(['brand'])
-              ->joinSub($locationStockSub, 'loc_stock_tbl', function ($join) {
-                  $join->on('products.id', '=', 'loc_stock_tbl.product_id');
-              })
-              ->where('products.status', 'active')
-              ->where('loc_stock_tbl.loc_stock', '<=', $lowStockThreshold)
-              ->orderBy('loc_stock_tbl.loc_stock', 'asc')
+      if ($branchScoped) {
+          $lowStockUnitIds = array_keys(array_filter(
+              $branchQuantities,
+              fn (int $quantity): bool => $quantity <= $lowStockThreshold
+          ));
+
+          $lowStockProducts = \App\Models\Product::with(['brand', 'stockRow'])
+              ->where('status', 'active')
+              ->whereHas('stockRow', fn ($q) => $q->whereIn('units.id', $lowStockUnitIds))
               ->take(5)
-              ->select('products.*', 'loc_stock_tbl.loc_stock as location_quantity')
               ->get();
 
-          $dynamicAlertItems = $lowStockProducts->map(function ($p) use ($lowStockThreshold) {
-              $stock = max(0, (int) ($p->location_quantity ?? 0));
-              $brandName = $p->brand?->name ?? 'Brand';
-              $modelName = $p->model
-                  ? "{$p->name} ({$p->model})"
-                  : ($p->storage ? "{$p->name} ({$p->storage})" : $p->name);
-
-              return [
-                  'sku' => $p->product_id ?? ('PRD-' . str_pad((string) $p->id, 4, '0', STR_PAD_LEFT)),
-                  'brand' => $brandName,
-                  'model' => $modelName,
-                  'color' => $p->color ?? 'Standard',
-                  'stock' => $stock,
-                  'min' => $lowStockThreshold,
-                  'status' => $stock <= 3 ? 'critical' : 'low',
-              ];
-          })->all();
+          $alertQuantities = collect($lowStockProducts)
+              ->mapWithKeys(fn ($p): array => [$p->id => (int) ($branchQuantities[$p->stockRow?->id] ?? 0)])
+              ->all();
       } else {
           $lowStockProducts = \App\Models\Product::with(['brand', 'stockRow'])
               ->where('status', 'active')
@@ -261,33 +236,36 @@
               ->take(5)
               ->get();
 
-          $dynamicAlertItems = $lowStockProducts->map(function ($p) use ($lowStockThreshold) {
-              $stock = (int) ($p->stockRow?->quantity ?? 0);
-              $brandName = $p->brand?->name ?? 'Brand';
-              $modelName = $p->model
-                  ? "{$p->name} ({$p->model})"
-                  : ($p->storage ? "{$p->name} ({$p->storage})" : $p->name);
-
-              return [
-                  'sku' => $p->product_id ?? ('PRD-' . str_pad((string) $p->id, 4, '0', STR_PAD_LEFT)),
-                  'brand' => $brandName,
-                  'model' => $modelName,
-                  'color' => $p->color ?? 'Standard',
-                  'stock' => $stock,
-                  'min' => $lowStockThreshold,
-                  'status' => $stock <= 3 ? 'critical' : 'low',
-              ];
-          })->all();
+          $alertQuantities = collect($lowStockProducts)
+              ->mapWithKeys(fn ($p): array => [$p->id => (int) ($p->stockRow?->quantity ?? 0)])
+              ->all();
       }
+
+      $dynamicAlertItems = $lowStockProducts->map(function ($p) use ($lowStockThreshold, $alertQuantities) {
+          $stock = (int) ($alertQuantities[$p->id] ?? 0);
+          $brandName = $p->brand?->name ?? 'Brand';
+          $modelName = $p->model
+              ? "{$p->name} ({$p->model})"
+              : ($p->storage ? "{$p->name} ({$p->storage})" : $p->name);
+
+          return [
+              'sku' => $p->product_id ?? ('PRD-' . str_pad((string) $p->id, 4, '0', STR_PAD_LEFT)),
+              'brand' => $brandName,
+              'model' => $modelName,
+              'color' => $p->color ?? 'Standard',
+              'stock' => $stock,
+              'min' => $lowStockThreshold,
+              'status' => $stock <= 3 ? 'critical' : 'low',
+          ];
+      })->all();
 
       // 2.7 Dynamic Sales & Collection Trend Chart Data
       $start7d = today()->subDays(6);
-      $invoices7d = (clone $baseSalesQuery)
-          ->whereDate('invoice_date', '>=', $start7d)
+      $invoices7d = $scoped(\App\Models\SalesInvoice::query()->whereDate('invoice_date', '>=', $start7d)
           ->selectRaw("DATE(invoice_date) as d, 
                        SUM(CASE WHEN status = 'posted' THEN grand_total ELSE 0 END) as s_total, 
                        SUM(paid_amount) as c_total")
-          ->groupBy('d')
+          ->groupBy('d'))
           ->get()
           ->keyBy('d');
 
@@ -307,12 +285,11 @@
       $weeksSales = [0, 0, 0, 0];
       $weeksCollections = [0, 0, 0, 0];
       $start30d = today()->subDays(27);
-      $invoices30d = (clone $baseSalesQuery)
-          ->whereDate('invoice_date', '>=', $start30d)
+      $invoices30d = $scoped(\App\Models\SalesInvoice::query()->whereDate('invoice_date', '>=', $start30d)
           ->selectRaw("DATE(invoice_date) as d, 
                        SUM(CASE WHEN status = 'posted' THEN grand_total ELSE 0 END) as s_total, 
                        SUM(paid_amount) as c_total")
-          ->groupBy('d')
+          ->groupBy('d'))
           ->get()
           ->keyBy('d');
 
@@ -333,12 +310,14 @@
       $yearMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       $yearSales = array_fill(0, 12, 0);
       $yearCollections = array_fill(0, 12, 0);
-      $invoicesYear = (clone $baseSalesQuery)
-          ->whereYear('invoice_date', now()->year)
-          ->selectRaw("MONTH(invoice_date) as m, 
+      $monthExpr = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'sqlite'
+          ? "CAST(strftime('%m', invoice_date) AS INTEGER)"
+          : 'MONTH(invoice_date)';
+      $invoicesYear = $scoped(\App\Models\SalesInvoice::query()->whereYear('invoice_date', now()->year)
+          ->selectRaw("{$monthExpr} as m, 
                        SUM(CASE WHEN status = 'posted' THEN grand_total ELSE 0 END) as s_total, 
                        SUM(paid_amount) as c_total")
-          ->groupBy('m')
+          ->groupBy('m'))
           ->get()
           ->keyBy('m');
 
@@ -370,10 +349,9 @@
           ],
       ];
 
-      // 2.8 Dynamic Recent Invoices (Scoped to outlet/location)
-      $recentInvoicesList = (clone $baseSalesQuery)
-          ->with(['customer', 'items.unit', 'creator', 'location'])
-          ->latest('invoice_date')
+      // 2.8 Dynamic Recent Invoices
+      $recentInvoicesList = $scoped(\App\Models\SalesInvoice::query()->with(['customer', 'items.unit', 'creator', 'location'])
+          ->latest('invoice_date'))
           ->take(5)
           ->get();
 
@@ -400,27 +378,34 @@
 
       // 2.9 Stocked Brands Share
       $totalRegisteredBrands = (int) \App\Models\Brand::query()->count();
-      if ($scopedLocationId) {
-          $stockedBrandRows = \Illuminate\Support\Facades\DB::table('brands')
-              ->join('products', function ($join) {
-                  $join->on('products.brand_id', '=', 'brands.id')
-                      ->whereNull('products.deleted_at');
-              })
-              ->join('units', function ($join) {
-                  $join->on('units.product_id', '=', 'products.id')
-                      ->whereNull('units.deleted_at');
-              })
-              ->join('stock_movements', function ($join) use ($scopedLocationId) {
-                  $join->on('stock_movements.unit_id', '=', 'units.id')
-                      ->where('stock_movements.location_id', '=', $scopedLocationId);
-              })
-              ->whereNull('brands.deleted_at')
-              ->groupBy('brands.id', 'brands.name')
-              ->havingRaw('SUM(stock_movements.quantity) > 0')
-              ->selectRaw('brands.id, brands.name, SUM(stock_movements.quantity) as stock_units, COUNT(DISTINCT products.id) as sku_count, SUM(stock_movements.quantity * COALESCE(products.sale_price, products.purchase_price, 0)) as stock_value')
-              ->orderByDesc('stock_value')
-              ->orderByDesc('stock_units')
-              ->get();
+
+      if ($branchScoped) {
+          $stockedBrandRows = ($targetLocationId === null || $targetLocationId < 1)
+              ? collect()
+              : \Illuminate\Support\Facades\DB::table('brands')
+                  ->join('products', function ($join) {
+                      $join->on('products.brand_id', '=', 'brands.id')
+                          ->whereNull('products.deleted_at');
+                  })
+                  ->join('units', function ($join) {
+                      $join->on('units.product_id', '=', 'products.id')
+                          ->whereNull('units.deleted_at');
+                  })
+                  ->joinSub(
+                      \App\Models\StockMovement::query()
+                          ->selectRaw('unit_id, COALESCE(SUM(quantity), 0) as quantity')
+                          ->where('location_id', $targetLocationId)
+                          ->groupBy('unit_id'),
+                      'branch_stock',
+                      fn ($join) => $join->on('branch_stock.unit_id', '=', 'units.id')
+                  )
+                  ->whereNull('brands.deleted_at')
+                  ->groupBy('brands.id', 'brands.name')
+                  ->havingRaw('SUM(branch_stock.quantity) > 0')
+                  ->selectRaw('brands.id, brands.name, SUM(branch_stock.quantity) as stock_units, COUNT(DISTINCT products.id) as sku_count, SUM(branch_stock.quantity * COALESCE(products.sale_price, products.purchase_price, 0)) as stock_value')
+                  ->orderByDesc('stock_value')
+                  ->orderByDesc('stock_units')
+                  ->get();
       } else {
           $stockedBrandRows = \Illuminate\Support\Facades\DB::table('brands')
               ->join('products', function ($join) {

@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\ApprovalStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\PurchaseStatus;
+use App\Enums\SupplierOrderStatus;
 use App\Services\NumberingService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -37,6 +38,10 @@ class PurchaseOrder extends Model
         'approval_status',
         'approved_by',
         'approved_at',
+        'supplier_status',
+        'accepted_at',
+        'delivered_at',
+        'received_at',
     ];
 
     protected function casts(): array
@@ -47,6 +52,10 @@ class PurchaseOrder extends Model
             'payment_status' => PaymentStatus::class,
             'approval_status' => ApprovalStatus::class,
             'approved_at' => 'datetime',
+            'supplier_status' => SupplierOrderStatus::class,
+            'accepted_at' => 'datetime',
+            'delivered_at' => 'datetime',
+            'received_at' => 'datetime',
             'subtotal' => 'decimal:2',
             'tax_rate' => 'decimal:2',
             'tax_amount' => 'decimal:2',
@@ -93,6 +102,66 @@ class PurchaseOrder extends Model
     public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(PurchasePayment::class);
+    }
+
+    public function paymentRequests(): HasMany
+    {
+        return $this->hasMany(SupplierPaymentRequest::class);
+    }
+
+    // ── Status displays ──────────────────────────────────────────────
+
+    /**
+     * Manager-facing status badge: the branch side reads "Pending" while the
+     * supplier has not accepted a placed order, "Ordered" once accepted and
+     * "Received" once the branch marks the goods received, whatever the
+     * payment state. The approval dimension wins for legacy rows created
+     * before purchases took effect at creation.
+     *
+     * @return array{0: string, 1: string} [badge status key, label]
+     */
+    public function managerDisplayStatus(): array
+    {
+        return match (true) {
+            $this->approval_status === ApprovalStatus::Rejected => ['rejected', ApprovalStatus::Rejected->label()],
+            $this->purchase_status === PurchaseStatus::Cancelled => ['cancelled', PurchaseStatus::Cancelled->label()],
+            $this->approval_status === ApprovalStatus::Pending => ['pending', 'Awaiting Approval'],
+            $this->purchase_status === PurchaseStatus::Received => ['received', PurchaseStatus::Received->label()],
+            $this->purchase_status === PurchaseStatus::Ordered
+                && $this->supplier_status !== SupplierOrderStatus::Pending => ['ordered', PurchaseStatus::Ordered->label()],
+            default => ['pending', PurchaseStatus::Pending->label()],
+        };
+    }
+
+    /**
+     * Supplier-facing status badge. "Delivered" once the supplier side is
+     * Delivered (accepted and goods received by the branch). Until then the
+     * supplier sees "Pending" before accepting and "Accepted" after, never
+     * "Received".
+     * The accepted badge reuses the "ordered" key for the info badge style.
+     *
+     * @return array{0: string, 1: string} [badge status key, label]
+     */
+    public function supplierDisplayStatus(): array
+    {
+        if ($this->supplier_status === SupplierOrderStatus::Delivered) {
+            return ['delivered', 'Delivered'];
+        }
+
+        [$status, $label] = $this->managerDisplayStatus();
+
+        if (! in_array($status, ['ordered', 'received'], true)) {
+            return [$status, $label];
+        }
+
+        return $this->supplier_status === SupplierOrderStatus::Pending
+            ? ['pending', 'Pending']
+            : ['ordered', 'Accepted'];
     }
 
     // ── Accessors ────────────────────────────────────────────────────

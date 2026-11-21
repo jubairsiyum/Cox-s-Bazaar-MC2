@@ -22,6 +22,7 @@ use App\Services\AuditService;
 use App\Services\CustomerResolver;
 use App\Services\SalesInvoiceService;
 use App\Services\SalesScope;
+use App\Services\StockService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -110,7 +111,8 @@ class SalesOrderController extends Controller
             $customer = CustomerResolver::resolveOrCreate(
                 self::customerId($validated),
                 $validated['customer_name'] ?? null,
-                $validated['customer_phone'] ?? null,
+                $validated['mobile_no'] ?? null,
+                $validated['customer_email'] ?? null,
                 $request->user()?->id
             );
 
@@ -196,7 +198,8 @@ class SalesOrderController extends Controller
             $customer = CustomerResolver::resolveOrCreate(
                 self::customerId($validated),
                 $validated['customer_name'] ?? null,
-                $validated['customer_phone'] ?? null,
+                $validated['mobile_no'] ?? null,
+                $validated['customer_email'] ?? null,
                 $request->user()?->id
             );
 
@@ -340,13 +343,17 @@ class SalesOrderController extends Controller
             ->limit(20)
             ->get();
 
+        $quantities = StockService::scopedQuantitiesFor($units, $request->user());
+
         return response()->json([
             'success' => true,
             'units' => $units->map(fn (Unit $unit) => [
                 'id' => (int) $unit->id,
                 'display_name' => $unit->displayName(),
                 'unit' => $unit->unit,
-                'quantity' => self::resolveLocationStock($unit, $locationId),
+                'quantity' => $locationId !== null
+                    ? self::resolveLocationStock($unit, $locationId)
+                    : (float) ($quantities[$unit->id] ?? 0),
                 'sale_price' => (float) ($unit->product?->sale_price ?? 0),
                 'barcode' => $unit->product?->barcode,
             ])->values()->all(),
@@ -413,9 +420,9 @@ class SalesOrderController extends Controller
 
     /**
      * Customer lookup for the order form's customer picker: matches name,
-     * phone or customer code and returns each phone number so the form can
-     * autofill it. Typed names that match nothing become new customers on
-     * submit (see {@see CustomerResolver}).
+     * phone or customer code and returns each phone number and email so the
+     * form can autofill them. Typed names that match nothing become new
+     * customers on submit (see {@see CustomerResolver}).
      */
     public function searchCustomers(Request $request): JsonResponse
     {
@@ -428,14 +435,16 @@ class SalesOrderController extends Controller
             ->when($term !== '', fn (Builder $query) => $query->search($term))
             ->orderBy('name')
             ->limit(10)
-            ->get(['id', 'name', 'tel_no']);
+            ->get(['id', 'name', 'mobile', 'tel_no', 'email']);
 
         return response()->json([
             'success' => true,
             'customers' => $customers->map(fn (Customer $customer) => [
                 'id' => (int) $customer->id,
                 'name' => $customer->name,
+                'mobile' => $customer->mobile,
                 'tel_no' => $customer->tel_no,
+                'email' => $customer->email,
             ])->values()->all(),
         ]);
     }
@@ -457,8 +466,8 @@ class SalesOrderController extends Controller
         $query = SalesScope::scopeQuery($query, $request->user());
 
         return $query
-            ->when($request->filled('location_id'), fn ($q) => $q->where('location_id', (int) $request->input('location_id')))
-            ->when($request->filled('branch_id'), fn ($q) => $q->where('branch_id', (int) $request->input('branch_id')));
+            ->when($request->filled('location_id') && ! SalesScope::isRestricted($request->user()), fn ($q) => $q->where('location_id', (int) $request->input('location_id')))
+            ->when($request->filled('branch_id') && ! SalesScope::isRestricted($request->user()), fn ($q) => $q->where('branch_id', (int) $request->input('branch_id')));
     }
 
     /**

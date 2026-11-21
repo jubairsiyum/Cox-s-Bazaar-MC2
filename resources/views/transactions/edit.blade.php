@@ -78,7 +78,8 @@
             </div>
         </div>
 
-        <form method="POST" action="{{ route('transactions.update', $transaction) }}" class="space-y-6">
+        <form method="POST" action="{{ route('transactions.update', $transaction) }}" class="space-y-6"
+              x-data="{ entryType: @js(old('type', $transaction->type->value) ?: '') }">
             @csrf
             @method('PATCH')
 
@@ -88,7 +89,7 @@
                     <label for="type" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
                         Entry Type <span class="text-danger">*</span>
                     </label>
-                    <select id="type" name="type" required
+                    <select id="type" name="type" required x-model="entryType"
                             class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all cursor-pointer @error('type') border-danger @enderror">
                         @foreach(\App\Enums\AccountTransactionType::options() as $value => $label)
                             <option value="{{ $value }}" @selected(old('type', $transaction->type->value) === $value)>{{ $label }}</option>
@@ -117,17 +118,30 @@
                     @enderror
                 </div>
 
-                {{-- Category --}}
+                {{-- Category (populated from Transaction Category reference data) --}}
                 <div>
                     <label for="category" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
                         Category <span class="text-danger">*</span>
                     </label>
-                    <select id="category" name="category" required
-                            class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all cursor-pointer @error('category') border-danger @enderror">
-                        @foreach($categories as $category)
-                            <option value="{{ $category }}" @selected(old('category', $transaction->category) === $category)>{{ $category }}</option>
-                        @endforeach
-                    </select>
+                    @php $selectedCategory = old('category', $transaction->category); @endphp
+                    @if($categories->isNotEmpty())
+                        <select id="category" name="category" required
+                                class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all cursor-pointer @error('category') border-danger @enderror">
+                            @if(filled($selectedCategory) && ! $categories->contains('name', $selectedCategory))
+                                <option value="{{ $selectedCategory }}" selected>{{ $selectedCategory }} (stored)</option>
+                            @endif
+                            @foreach($categories as $category)
+                                <option value="{{ $category->name }}" @selected($selectedCategory === $category->name)
+                                        :hidden="(entryType === 'income' && '{{ $category->type->value }}' === 'expense') || (entryType === 'expense' && '{{ $category->type->value }}' === 'income')">
+                                    {{ $category->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    @else
+                        <input type="text" id="category" name="category" value="{{ $selectedCategory }}" required maxlength="50"
+                               placeholder="No categories configured yet — type one"
+                               class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('category') border-danger @enderror">
+                    @endif
                     @error('category')
                         <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
                     @enderror
@@ -157,16 +171,20 @@
                     @enderror
                 </div>
 
-                {{-- Method --}}
+                {{-- Method (populated from the Method reference data) --}}
                 <div>
                     <label for="method" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
                         Method
                     </label>
+                    @php $selectedMethod = old('method', $transaction->method); @endphp
                     <select id="method" name="method"
                             class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all cursor-pointer @error('method') border-danger @enderror">
                         <option value="">Please Select</option>
-                        @foreach(\App\Enums\AccountMethod::options() as $value => $label)
-                            <option value="{{ $value }}" @selected(old('method', $transaction->method?->value) === $value)>{{ $label }}</option>
+                        @if(filled($selectedMethod) && ! array_key_exists($selectedMethod, $methods))
+                            <option value="{{ $selectedMethod }}" selected>{{ $selectedMethod }} (stored)</option>
+                        @endif
+                        @foreach($methods as $value => $label)
+                            <option value="{{ $value }}" @selected($selectedMethod === $value)>{{ $label }}</option>
                         @endforeach
                     </select>
                     @error('method')

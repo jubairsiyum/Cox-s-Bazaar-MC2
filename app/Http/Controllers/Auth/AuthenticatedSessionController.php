@@ -39,6 +39,10 @@ class AuthenticatedSessionController extends Controller
 
         AuditService::log('login', null, [], [], 'User signed in.');
 
+        if ($user->hasRole('Supplier')) {
+            return redirect()->route('suppliers.my-profile');
+        }
+
         return redirect()->intended(route('dashboard'));
     }
 

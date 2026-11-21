@@ -46,7 +46,7 @@ function salesOrderWithItem(Unit $unit, int $quantity = 3, float $rate = 250.0, 
 /**
  * A minimal valid order payload for the given stock row. The customer is
  * created up front so the payload carries a consistent customer_id /
- * customer_name / customer_phone trio (the phone is the customer's own, so
+ * customer_name / mobile_no trio (the phone is the customer's own, so
  * the identity rules never flag it).
  *
  * @param  array<string, mixed>  $overrides
@@ -61,7 +61,7 @@ function salesOrderPayload(Unit $unit, array $overrides = []): array
         'expected_date' => now()->addDays(3)->toDateString(),
         'customer_id' => $customer->id,
         'customer_name' => $customer->name,
-        'customer_phone' => $customer->tel_no,
+        'mobile_no' => $customer->mobile,
         'location_id' => Location::factory()->create()->id,
         'tax_rate' => 0,
         'note' => null,
@@ -220,7 +220,7 @@ it('edits a draft order and recomputes the totals', function () {
     $this->patch(route('sales-orders.update', $order), salesOrderPayload($unit, [
         'customer_id' => $order->customer_id,
         'customer_name' => $order->customer->name,
-        'customer_phone' => $order->customer->tel_no,
+        'mobile_no' => $order->customer->mobile,
         'location_id' => $order->location_id,
         'items' => [
             ['unit_id' => $unit->id, 'quantity' => 5, 'unit_price' => 100, 'discount' => 50],

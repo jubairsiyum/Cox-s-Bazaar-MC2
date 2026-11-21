@@ -5,7 +5,12 @@ declare(strict_types=1);
 namespace App\Policies;
 
 use App\Models\User;
+use App\Services\BranchScope;
 
+/**
+ * User administration. Strict branch isolation: branch users manage only
+ * their own branch's accounts (the Super Admin manages everyone).
+ */
 class UserPolicy
 {
     /**
@@ -21,7 +26,8 @@ class UserPolicy
      */
     public function view(User $user, User $model): bool
     {
-        return $user->can('users.view');
+        return $user->can('users.view')
+            && BranchScope::canAccess($user, $model->branch_id);
     }
 
     /**
@@ -42,7 +48,8 @@ class UserPolicy
             return false;
         }
 
-        return $user->can('users.update');
+        return $user->can('users.update')
+            && BranchScope::canAccess($user, $model->branch_id);
     }
 
     /**
@@ -59,7 +66,8 @@ class UserPolicy
             return false;
         }
 
-        return $user->can('users.deactivate');
+        return $user->can('users.deactivate')
+            && BranchScope::canAccess($user, $model->branch_id);
     }
 
     /**
@@ -76,6 +84,7 @@ class UserPolicy
             return false;
         }
 
-        return $user->can('users.deactivate');
+        return $user->can('users.deactivate')
+            && BranchScope::canAccess($user, $model->branch_id);
     }
 }

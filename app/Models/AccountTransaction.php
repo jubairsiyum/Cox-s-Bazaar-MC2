@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\AccountEntryStatus;
-use App\Enums\AccountMethod;
 use App\Enums\AccountTransactionType;
 use App\Services\NumberingService;
 use Illuminate\Database\Eloquent\Builder;
@@ -25,6 +24,8 @@ class AccountTransaction extends Model
 
     /**
      * Suggested categories for a mobile phone shop's income/expense entries.
+     * Legacy list kept for reference data seeding — dropdowns now come from
+     * the TransactionCategory table (see TransactionCategory::options()).
      *
      * @var array<int, string>
      */
@@ -35,6 +36,7 @@ class AccountTransaction extends Model
 
     protected $fillable = [
         'account_id',
+        'location_id',
         'type',
         'category',
         'amount',
@@ -52,10 +54,10 @@ class AccountTransaction extends Model
     {
         return [
             'account_id' => 'integer',
+            'location_id' => 'integer',
             'type' => AccountTransactionType::class,
             'amount' => 'decimal:2',
             'transaction_date' => 'date',
-            'method' => AccountMethod::class,
             'status' => AccountEntryStatus::class,
             'approved_at' => 'datetime',
         ];
@@ -69,6 +71,14 @@ class AccountTransaction extends Model
                     ? NumberingService::next('income_prefix', 'INC')
                     : NumberingService::next('expense_prefix', 'EXP');
             }
+
+            // Strict branch isolation: the entry is stamped with the branch it
+            // happened at — the account's location, falling back to the
+            // creator's own branch (see BranchScope).
+            if ($transaction->location_id === null) {
+                $transaction->location_id = $transaction->account?->location_id
+                    ?? User::query()->whereKey($transaction->created_by)->value('branch_id');
+            }
         });
     }
 
@@ -77,6 +87,15 @@ class AccountTransaction extends Model
     public function account(): BelongsTo
     {
         return $this->belongsTo(Account::class);
+    }
+
+    /**
+     * The branch (location) this entry happened at, when known. NULL marks
+     * shared/head-office activity visible to the Super Admin only.
+     */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(Location::class);
     }
 
     public function creator(): BelongsTo

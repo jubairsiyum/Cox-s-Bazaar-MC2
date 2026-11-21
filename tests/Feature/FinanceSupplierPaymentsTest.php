@@ -3,10 +3,14 @@
 declare(strict_types=1);
 
 use App\Enums\ApprovalStatus;
+use App\Enums\PurchaseStatus;
+use App\Enums\SupplierOrderStatus;
+use App\Enums\SupplierPaymentRequestStatus;
 use App\Models\Account;
 use App\Models\PurchaseOrder;
 use App\Models\PurchasePayment;
 use App\Models\Supplier;
+use App\Models\SupplierPaymentRequest;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\SettingsSeeder;
@@ -41,7 +45,10 @@ function financeDuePurchase(array $paymentAttributes = []): array
         'paid_amount' => 2000,
     ], $paymentAttributes));
 
-    $account = Account::factory()->cash()->withBalance(2000)->create(['name' => 'Counter Cash Box']);
+    $account = Account::factory()->cash()->withBalance(2000)->create([
+        'name' => 'Counter Cash Box',
+        'location_id' => $order->location_id,
+    ]);
 
     return [$supplier, $order, $account];
 }
@@ -212,7 +219,7 @@ it('gates recording and reversing supplier payments by permission', function () 
         ])
         ->assertForbidden();
 
-    $manager = User::factory()->create(['status' => 'active']);
+    $manager = User::factory()->create(['status' => 'active', 'branch_id' => $order->location_id]);
     $manager->givePermissionTo('supplier-payments.manage');
 
     $this->actingAs($manager)
@@ -254,4 +261,56 @@ it('keeps the purchase dues screens working alongside finance payments', functio
         ->assertOk()
         ->assertSee($order->reference_no)
         ->assertSee('2,000.00');
+});
+
+it('keeps the purchase Ordered when a finance payment settles it in full', function () {
+    actingAsSuperAdmin();
+
+    [$supplier, $order] = financeDuePurchase(['purchase_status' => 'ordered', 'supplier_status' => 'accepted']);
+    $richAccount = Account::factory()->cash()->withBalance(9000)->create(['name' => 'Main Cash Box']);
+
+    $this->post(route('supplier-payments.store'), [
+        'supplier_id' => $supplier->id,
+        'purchase_order_id' => $order->id,
+        'amount' => '3000',
+        'payment_date' => now()->toDateString(),
+        'account_id' => $richAccount->id,
+        'method' => 'bank',
+    ])->assertRedirect(route('supplier-payments.index'));
+
+    $order->refresh();
+
+    // Settling the invoice does not receive the goods: the branch side stays
+    // Ordered and the supplier side Accepted until the goods are received.
+    expect((float) $order->paid_amount)->toBe(5000.0)
+        ->and($order->purchase_status)->toBe(PurchaseStatus::Ordered)
+        ->and($order->supplier_status)->toBe(SupplierOrderStatus::Accepted)
+        ->and($order->managerDisplayStatus()[1])->toBe('Ordered')
+        ->and($order->supplierDisplayStatus()[1])->toBe('Accepted');
+});
+
+it('lists supplier payment requests with their state and a pre-filled action link', function () {
+    actingAsSuperAdmin();
+
+    [$supplier, $order] = financeDuePurchase();
+
+    $paymentRequest = SupplierPaymentRequest::factory()->forOrder($order)->create([
+        'message' => 'Please settle the invoice this week.',
+        'amount' => 500,
+    ]);
+
+    $this->get(route('supplier-payments.index'))
+        ->assertOk()
+        ->assertSee('Supplier Payment Requests')
+        ->assertSee('Please settle the invoice this week.')
+        ->assertSee('>Open</span>', false)
+        ->assertSee('payment_request_id='.$paymentRequest->id, false);
+
+    // Actioned requests link to the payment that settled them instead.
+    $paymentRequest->update(['status' => SupplierPaymentRequestStatus::Actioned]);
+
+    $this->get(route('supplier-payments.index'))
+        ->assertOk()
+        ->assertSee('>Actioned</span>', false)
+        ->assertDontSee('payment_request_id='.$paymentRequest->id, false);
 });

@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\AccountTransaction;
 
-use App\Enums\AccountMethod;
 use App\Enums\AccountTransactionType;
 use App\Models\AccountTransaction;
+use App\Models\PaymentMethod;
+use App\Models\TransactionCategory;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\ValidationRule;
@@ -23,13 +24,15 @@ class StoreAccountTransactionRequest extends FormRequest
      */
     public function rules(): array
     {
+        $entryType = $this->string('type')->toString() ?: null;
+
         return [
             'account_id' => ['required', 'integer', 'exists:accounts,id'],
             'type' => ['required', new Enum(AccountTransactionType::class)],
-            'category' => ['required', 'string', 'max:50'],
+            'category' => ['required', 'string', 'max:50', ...TransactionCategory::nameRules($entryType)],
             'amount' => ['required', 'numeric', 'min:0.01', 'max:99999999999.99'],
             'transaction_date' => ['required', 'date'],
-            'method' => ['nullable', new Enum(AccountMethod::class)],
+            'method' => ['nullable', 'string', 'max:20', ...PaymentMethod::nameRules()],
             'reference_no' => ['nullable', 'string', 'max:50'],
             'note' => ['nullable', 'string', 'max:500'],
         ];

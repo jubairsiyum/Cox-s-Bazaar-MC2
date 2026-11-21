@@ -8,8 +8,14 @@ use App\Enums\AccountEntryStatus;
 use App\Enums\AccountTransactionType;
 use App\Models\AccountTransaction;
 use App\Models\User;
+use App\Services\BranchScope;
 use App\Services\FinanceApprovals;
 
+/**
+ * Income/expense entries. Every decision is additionally branch-scoped:
+ * users may only act on entries stamped with their own branch (strict branch
+ * isolation — see BranchScope).
+ */
 class AccountTransactionPolicy
 {
     /**
@@ -55,21 +61,25 @@ class AccountTransactionPolicy
         // Cancelled entries are frozen; completed ones are editable but their
         // balance effect is reversed and re-applied by the service layer.
         return $accountTransaction->status !== AccountEntryStatus::Cancelled
-            && $this->canManage($user, $accountTransaction->type);
+            && $this->canManage($user, $accountTransaction->type)
+            && BranchScope::canAccess($user, $accountTransaction->location_id);
     }
 
     public function delete(User $user, AccountTransaction $accountTransaction): bool
     {
-        return $this->canManage($user, $accountTransaction->type);
+        return $this->canManage($user, $accountTransaction->type)
+            && BranchScope::canAccess($user, $accountTransaction->location_id);
     }
 
     public function approve(User $user, AccountTransaction $accountTransaction): bool
     {
-        return FinanceApprovals::canDecide(
-            $user,
-            self::approverPermissions($accountTransaction->type),
-            $accountTransaction->created_by
-        );
+        return BranchScope::canAccess($user, $accountTransaction->location_id)
+            && FinanceApprovals::canDecide(
+                $user,
+                self::approverPermissions($accountTransaction->type),
+                $accountTransaction->created_by,
+                $accountTransaction->location_id
+            );
     }
 
     public function reject(User $user, AccountTransaction $accountTransaction): bool

@@ -15,6 +15,7 @@ use App\Models\Unit;
 use App\Services\AuditService;
 use App\Services\SalesInvoiceService;
 use App\Services\SalesScope;
+use App\Services\StockService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -133,13 +134,15 @@ class PosController extends Controller
             ->limit(20)
             ->get();
 
+        $quantities = StockService::scopedQuantitiesFor($units, $request->user());
+
         return response()->json([
             'success' => true,
             'units' => $units->map(fn (Unit $unit) => [
                 'id' => (int) $unit->id,
                 'display_name' => $unit->displayName(),
                 'unit' => $unit->unit,
-                'quantity' => (float) $unit->quantity,
+                'quantity' => (float) ($quantities[$unit->id] ?? 0),
                 'sale_price' => (float) ($unit->product?->sale_price ?? 0),
                 'barcode' => $unit->product?->barcode,
             ])->values()->all(),
