@@ -162,3 +162,83 @@ it('searches products by name and barcode for the POS picker', function () {
         ->assertJsonPath('units.0.id', $unit->id)
         ->assertJsonPath('units.0.quantity', 12);
 });
+
+it('applies a cart-level discount to the grand total', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+
+    $this->post(route('pos.store'), posSalePayload($unit, 900, ['cart_discount' => 100]))
+        ->assertRedirect(route('pos.index'));
+
+    $invoice = SalesInvoice::first();
+
+    expect((float) $invoice->subtotal)->toBe(1000.0)
+        ->and((float) $invoice->cart_discount)->toBe(100.0)
+        ->and((float) $invoice->discount_amount)->toBe(100.0)
+        ->and((float) $invoice->grand_total)->toBe(900.0)
+        ->and((float) $invoice->paid_amount)->toBe(900.0)
+        ->and((float) $invoice->due_amount)->toBe(0.0);
+});
+
+it('applies tax after the cart discount', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+
+    // 1000 subtotal − 100 cart discount = 900, + 10% tax = 990.
+    $this->post(route('pos.store'), posSalePayload($unit, 990, ['cart_discount' => 100, 'tax_rate' => 10]));
+
+    $invoice = SalesInvoice::first();
+
+    expect((float) $invoice->grand_total)->toBe(990.0)
+        ->and((float) $invoice->tax_amount)->toBe(90.0);
+});
+
+it('never floors the grand total below zero when the discount exceeds the subtotal', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+
+    $this->post(route('pos.store'), posSalePayload($unit, 0, ['cart_discount' => 5000]));
+
+    expect((float) SalesInvoice::first()->grand_total)->toBe(0.0);
+});
+
+it('shows only the branch products to a branch user in the POS search', function () {
+    $branchA = Location::factory()->create(['name' => 'Branch A']);
+    $branchB = Location::factory()->create(['name' => 'Branch B']);
+
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $branchA->id]);
+    $manager->assignRole('Outlet Manager');
+
+    $unitA = Unit::factory()->create(['quantity' => 5]);
+    $unitB = Unit::factory()->create(['quantity' => 5]);
+    stockAtLocation($unitA, 5, $branchA->id);
+    stockAtLocation($unitB, 5, $branchB->id);
+
+    $this->actingAs($manager)
+        ->get(route('pos.search-units'))
+        ->assertOk()
+        ->assertJsonCount(1, 'units')
+        ->assertJsonPath('units.0.id', $unitA->id)
+        ->assertJsonPath('units.0.quantity', 5);
+});
+
+it('shows branch availability to the super admin in the POS search', function () {
+    actingAsSuperAdmin();
+
+    $branchA = Location::factory()->create(['name' => 'Branch A']);
+    $branchB = Location::factory()->create(['name' => 'Branch B']);
+    $unit = Unit::factory()->create(['quantity' => 5]);
+    stockAtLocation($unit, 3, $branchA->id);
+    stockAtLocation($unit, 2, $branchB->id);
+
+    $this->get(route('pos.search-units'))
+        ->assertOk()
+        ->assertJsonPath('units.0.quantity', 5)
+        ->assertJsonPath('units.0.branches.0.name', 'Branch A')
+        ->assertJsonPath('units.0.branches.0.quantity', 3)
+        ->assertJsonPath('units.0.branches.1.name', 'Branch B')
+        ->assertJsonPath('units.0.branches.1.quantity', 2);
+});

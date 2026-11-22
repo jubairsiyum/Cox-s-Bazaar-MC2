@@ -10,13 +10,14 @@ use App\Helpers\Money;
 use App\Http\Requests\Pos\StorePosSaleRequest;
 use App\Models\Customer;
 use App\Models\Location;
+use App\Models\Product;
 use App\Models\SalesInvoice;
 use App\Models\Unit;
 use App\Services\AuditService;
+use App\Services\BranchScope;
 use App\Services\SalesInvoiceService;
 use App\Services\SalesScope;
 use App\Services\StockService;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -65,6 +66,7 @@ class PosController extends Controller
                     'branch_id' => $request->user()?->branch?->branch_id,
                     'status' => SalesInvoiceStatus::Draft,
                     'tax_rate' => (float) ($validated['tax_rate'] ?? 0),
+                    'cart_discount' => round((float) ($validated['cart_discount'] ?? 0), 2),
                     'note' => $validated['note'] ?? 'POS sale',
                     'created_by' => $request->user()?->id,
                 ]);
@@ -112,40 +114,69 @@ class PosController extends Controller
     }
 
     /**
-     * Product search for the POS picker: name, variant, barcode and price.
+     * Product search for the POS picker, branch-isolated: a branch user only
+     * sees products stocked at their own branch (with that branch's quantity),
+     * while the Super Admin sees every product plus the branches it is stocked
+     * at.
      */
     public function searchUnits(Request $request): JsonResponse
     {
         $this->authorize('create', SalesInvoice::class);
 
         $term = $request->string('search')->toString();
+        $user = $request->user();
+        $restricted = BranchScope::isRestricted($user);
 
-        $units = Unit::query()
+        $query = Unit::query()
             ->with('product:id,name,barcode,sale_price')
-            ->when($term !== '', function (Builder $query) use ($term) {
-                $query->where(function (Builder $q) use ($term) {
-                    $q->where('product_name', 'like', "%{$term}%")
-                        ->orWhere('units.note', 'like', "%{$term}%")
-                        ->orWhereHas('product', fn (Builder $p) => $p->where('name', 'like', "%{$term}%")
-                            ->orWhere('barcode', 'like', "%{$term}%"));
-                });
-            })
-            ->orderBy('product_name')
-            ->limit(20)
-            ->get();
+            ->search($term)
+            ->orderBy(Product::query()->select('name')->whereColumn('products.id', 'units.product_id'))
+            ->limit(20);
 
-        $quantities = StockService::scopedQuantitiesFor($units, $request->user());
+        $branchQuantities = [];
+
+        if ($restricted) {
+            $branchId = BranchScope::locationId($user);
+            $branchQuantities = $branchId === null ? [] : StockService::quantitiesByUnitAt($branchId);
+            $inStock = array_keys(array_filter($branchQuantities, fn (int $qty): bool => $qty > 0));
+            $query->whereIn('units.id', $inStock);
+        }
+
+        $units = $query->get();
+
+        // Super Admin: total stock plus a per-branch availability breakdown.
+        $availability = $restricted
+            ? collect()
+            : StockService::availabilityAcross($units)->groupBy('unit_id');
 
         return response()->json([
             'success' => true,
-            'units' => $units->map(fn (Unit $unit) => [
-                'id' => (int) $unit->id,
-                'display_name' => $unit->displayName(),
-                'unit' => $unit->unit,
-                'quantity' => (float) ($quantities[$unit->id] ?? 0),
-                'sale_price' => (float) ($unit->product?->sale_price ?? 0),
-                'barcode' => $unit->product?->barcode,
-            ])->values()->all(),
+            'units' => $units->map(function (Unit $unit) use ($restricted, $branchQuantities, $availability) {
+                $quantity = $restricted
+                    ? (int) ($branchQuantities[$unit->id] ?? 0)
+                    : (int) $unit->quantity;
+
+                $branches = [];
+                if (! $restricted && $availability->has($unit->id)) {
+                    $branches = $availability->get($unit->id)
+                        ->map(fn (array $row): array => [
+                            'name' => $row['location_name'],
+                            'quantity' => $row['quantity'],
+                        ])
+                        ->values()
+                        ->all();
+                }
+
+                return [
+                    'id' => (int) $unit->id,
+                    'display_name' => $unit->displayName(),
+                    'unit' => $unit->unit,
+                    'quantity' => $quantity,
+                    'sale_price' => (float) ($unit->product?->sale_price ?? 0),
+                    'barcode' => $unit->product?->barcode,
+                    'branches' => $branches,
+                ];
+            })->values()->all(),
         ]);
     }
 }

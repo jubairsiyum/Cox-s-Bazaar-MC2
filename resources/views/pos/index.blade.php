@@ -93,6 +93,8 @@
                                 <div class="min-w-0">
                                     <div class="text-sm font-semibold text-ink truncate" x-text="unit.display_name"></div>
                                     <div class="text-[11px] text-muted" x-text="unit.unit + ' · Stock: ' + unit.quantity + (unit.barcode ? ' · ' + unit.barcode : '')"></div>
+                                    <div x-show="unit.branches && unit.branches.length" class="text-[11px] text-brand-500"
+                                         x-text="unit.branches ? unit.branches.map(b => b.name + ': ' + b.quantity).join(' · ') : ''"></div>
                                 </div>
                                 <span class="text-xs font-bold text-brand-500 tabular-nums" x-text="formatMoney(unit.sale_price)"></span>
                             </button>
@@ -246,13 +248,52 @@
                         </div>
                         <div class="flex items-center justify-between">
                             <dt class="text-muted">Discount</dt>
-                            <dd class="font-semibold text-ink tabular-nums" x-text="formatMoney(discountTotal)"></dd>
+                            <dd class="font-semibold text-ink tabular-nums" x-text="formatMoney(totalDiscount)"></dd>
                         </div>
                         <div class="flex items-center justify-between pt-3 border-t border-line">
                             <dt class="font-bold text-ink">Grand Total</dt>
                             <dd class="text-xl font-extrabold text-brand-500 tabular-nums" x-text="formatMoney(grandTotal)"></dd>
                         </div>
                     </dl>
+
+                    <div class="mt-5">
+                        <span class="block text-xs font-semibold uppercase tracking-wider text-ink mb-2">Cart Discount</span>
+
+                        {{-- Percentage / Amount toggle --}}
+                        <div class="flex rounded-xl border border-line bg-soft/50 p-1 mb-3">
+                            <button type="button" @click="discountMode = 'percent'"
+                                    class="flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
+                                    :class="discountMode === 'percent' ? 'bg-brand-500 text-on-brand shadow-xs' : 'text-muted hover:text-ink'">
+                                Percentage (%)
+                            </button>
+                            <button type="button" @click="discountMode = 'amount'"
+                                    class="flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
+                                    :class="discountMode === 'amount' ? 'bg-brand-500 text-on-brand shadow-xs' : 'text-muted hover:text-ink'">
+                                Amount (৳)
+                            </button>
+                        </div>
+
+                        {{-- Quick percentage presets --}}
+                        <div class="flex flex-wrap gap-1.5 mb-3">
+                            <template x-for="pct in [5, 10, 15, 20]" :key="pct">
+                                <button type="button" @click="applyPercent(pct)"
+                                        class="rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink hover:border-brand-500/40 hover:text-brand-500 transition-colors cursor-pointer"
+                                        x-text="pct + '%'"></button>
+                            </template>
+                            <button type="button" @click="clearDiscount()"
+                                    class="rounded-xl border border-danger/30 bg-danger/10 px-3 py-1.5 text-xs font-semibold text-danger hover:bg-danger hover:text-on-brand transition-colors cursor-pointer">
+                                Clear
+                            </button>
+                        </div>
+
+                        <label for="discount_value" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                            Manual Discount <span x-text="discountMode === 'percent' ? '(%)' : '(৳)'"></span>
+                        </label>
+                        <input type="number" id="discount_value" step="0.01" min="0"
+                               x-model.number="discountValue"
+                               class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm font-semibold text-ink tabular-nums shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all">
+                        <input type="hidden" name="cart_discount" :value="cartDiscount">
+                    </div>
 
                     <div class="mt-5">
                         <label for="paid_amount" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
@@ -297,6 +338,8 @@ function posTerminal(state) {
         searchQuery: '',
         results: [],
         paidAmount: 0,
+        discountMode: 'percent',
+        discountValue: 0,
         locationId: state.locationId || null,
 
         formatMoney(value) {
@@ -344,6 +387,21 @@ function posTerminal(state) {
             return Math.max(0, (row.quantity || 0) * (row.unit_price || 0) - (row.discount || 0));
         },
 
+        applyPercent(pct) {
+            this.discountMode = 'percent';
+            this.discountValue = pct;
+        },
+
+        clearDiscount() {
+            this.discountValue = 0;
+        },
+
+        get cartDiscount() {
+            const value = parseFloat(this.discountValue) || 0;
+            const amount = this.discountMode === 'percent' ? this.subtotal * value / 100 : value;
+            return Math.min(this.subtotal, Math.round(amount * 100) / 100);
+        },
+
         get subtotal() {
             return this.rows.reduce((sum, row) => sum + this.lineTotal(row), 0);
         },
@@ -352,8 +410,12 @@ function posTerminal(state) {
             return this.rows.reduce((sum, row) => sum + (parseFloat(row.discount) || 0), 0);
         },
 
+        get totalDiscount() {
+            return this.discountTotal + this.cartDiscount;
+        },
+
         get grandTotal() {
-            return this.subtotal;
+            return Math.max(0, this.subtotal - this.cartDiscount);
         },
 
         get change() {
