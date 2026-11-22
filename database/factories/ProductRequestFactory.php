@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\ProductRequestDeliveryStatus;
 use App\Enums\ProductRequestStatus;
 use App\Models\Location;
 use App\Models\Product;
@@ -42,6 +43,7 @@ class ProductRequestFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'status' => ProductRequestStatus::Approved->value,
+            'delivery_status' => ProductRequestDeliveryStatus::InTransit->value,
             'reviewed_at' => now(),
             'created_product_id' => Product::factory(),
         ]);

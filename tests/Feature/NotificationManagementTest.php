@@ -169,7 +169,7 @@ it('delivers a supplier payment request as an in-app message on the notification
         ->assertOk()
         ->assertSee('Payment request from Bismillah Telecom')
         ->assertSee('Please settle the outstanding dues')
-        ->assertSee(route('supplier-payments.create'), false);
+        ->assertSee('/supplier-payments/create', false);
 
     // The message carries a direct action link to the pre-filled screen.
     $notification = $manager->notifications()->first();

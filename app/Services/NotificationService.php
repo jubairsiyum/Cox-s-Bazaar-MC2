@@ -21,7 +21,7 @@ class NotificationService
      */
     public static function notify(User $user, string $title, string $body = '', ?string $url = null, string $type = 'info', ?int $locationId = null): void
     {
-        $user->notify(new GenericDatabaseNotification($title, $body, $url, $type, $locationId));
+        $user->notify(new GenericDatabaseNotification($title, $body, self::relativeUrl($url), $type, $locationId));
     }
 
     /**
@@ -33,6 +33,8 @@ class NotificationService
      */
     public static function notifySupplier(Supplier $supplier, string $title, string $body = '', ?string $url = null, string $type = 'info', ?int $locationId = null): void
     {
+        $url = self::relativeUrl($url);
+
         $supplier->notify(new GenericDatabaseNotification($title, $body, $url, $type, $locationId));
 
         $login = $supplier->user;
@@ -84,5 +86,38 @@ class NotificationService
             $q->whereNull('data->location_id')
                 ->orWhere('data->location_id', BranchScope::locationId($user));
         });
+    }
+
+    /**
+     * Store notification links as site-relative paths (path + query + fragment)
+     * instead of absolute URLs. An absolute URL hard-codes the host the request
+     * was generated on (e.g. "localhost" vs "127.0.0.1"), so clicking it can
+     * land the user on a different origin where their session cookie does not
+     * exist and they are bounced to the login page. Relative links always
+     * resolve against the host the user is actually signed in to.
+     */
+    private static function relativeUrl(?string $url): ?string
+    {
+        if ($url === null || $url === '') {
+            return $url;
+        }
+
+        $parsed = parse_url($url);
+
+        if ($parsed === false || ! isset($parsed['path'])) {
+            return $url;
+        }
+
+        $path = $parsed['path'];
+
+        if (isset($parsed['query'])) {
+            $path .= '?'.$parsed['query'];
+        }
+
+        if (isset($parsed['fragment'])) {
+            $path .= '#'.$parsed['fragment'];
+        }
+
+        return $path;
     }
 }

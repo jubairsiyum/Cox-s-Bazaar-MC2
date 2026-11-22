@@ -81,7 +81,7 @@ it('puts the placed purchase order alert in the linked supplier login bell and o
 
     expect($alert->data['title'])->toBe("New purchase order {$order->reference_no}")
         ->and($alert->data['body'])->toContain('Chakaria Outlet')
-        ->and($alert->data['url'])->toBe(route('suppliers.profile', $supplier))
+        ->and($alert->data['url'])->toBe('/suppliers/'.$supplier->id.'/profile')
         ->and($alert->data['type'])->toBe('info')
         ->and($alert->data['location_id'])->toBe($location->id)
         ->and($supplier->notifications()->count())->toBe(1);

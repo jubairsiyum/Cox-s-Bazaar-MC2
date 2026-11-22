@@ -205,6 +205,7 @@ Route::middleware('auth')->group(function () {
         Route::get('products/requests/{productRequest}', [ProductRequestController::class, 'show'])->name('products.requests.show');
         Route::patch('products/requests/{productRequest}/approve', [ProductRequestController::class, 'approve'])->name('products.requests.approve');
         Route::patch('products/requests/{productRequest}/reject', [ProductRequestController::class, 'reject'])->name('products.requests.reject');
+        Route::patch('products/requests/{productRequest}/receive', [ProductRequestController::class, 'receive'])->name('products.requests.receive');
     });
 
     Route::middleware(['verified', 'permission:products.manage'])->group(function () {

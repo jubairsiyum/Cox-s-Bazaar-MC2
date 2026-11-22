@@ -5,8 +5,9 @@
 
 @section('content')
 @php
-    $canApprove = auth()->user()?->can('approve', $productRequest) ?? false;
-    $canReject = auth()->user()?->can('reject', $productRequest) ?? false;
+    $canApprove = auth()->user()?->can('approve', $productRequest) && $productRequest->isPending();
+    $canReject = auth()->user()?->can('reject', $productRequest) && $productRequest->isPending();
+    $canReceive = $productRequest->isApproved() && $productRequest->isInTransit() && auth()->user()?->can('receive', $productRequest);
     $createdProduct = $productRequest->createdProduct;
 @endphp
 
@@ -31,6 +32,9 @@
             <div class="flex items-center gap-3 flex-wrap">
                 <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink">{{ $productRequest->displayName() }}</h1>
                 <x-status-badge :status="$productRequest->status" />
+                @if($productRequest->delivery_status)
+                    <x-status-badge :status="$productRequest->delivery_status" />
+                @endif
             </div>
             <p class="text-xs sm:text-sm text-muted mt-1">
                 Requested {{ $productRequest->created_at->format('d M Y, h:i A') }} by {{ $productRequest->requester?->name ?? 'a branch user' }} from {{ $productRequest->location?->name ?? 'an unassigned branch' }}
@@ -57,6 +61,19 @@
                     <x-svg.x class="size-4" />
                     <span>Reject</span>
                 </a>
+            @endif
+
+            @if($canReceive)
+                <form method="POST" action="{{ route('products.requests.receive', $productRequest) }}"
+                      onsubmit="return confirm('Confirm receipt of this product at your branch?');">
+                    @csrf
+                    @method('PATCH')
+                    <button type="submit"
+                            class="btn-scale inline-flex items-center gap-1.5 rounded-2xl bg-brand-500 px-4 py-2.5 text-xs sm:text-sm font-semibold text-on-brand shadow-sm hover:bg-brand-600 transition-colors cursor-pointer">
+                        <x-icon name="check" class="size-4" />
+                        <span>Receive Product</span>
+                    </button>
+                </form>
             @endif
 
             <a href="{{ route('products.requests.index') }}"
@@ -210,6 +227,24 @@
                         <dt class="text-muted">Decided at</dt>
                         <dd class="font-semibold text-ink text-right tabular-nums">{{ $productRequest->reviewed_at?->format('d M Y, h:i A') ?? '—' }}</dd>
                     </div>
+                    @if($productRequest->isApproved())
+                        <div class="flex items-start justify-between gap-3">
+                            <dt class="text-muted">Delivery</dt>
+                            <dd class="font-semibold text-ink text-right">
+                                <x-status-badge :status="$productRequest->delivery_status" />
+                            </dd>
+                        </div>
+                        @if($productRequest->isDelivered())
+                            <div class="flex items-start justify-between gap-3">
+                                <dt class="text-muted">Received by</dt>
+                                <dd class="font-semibold text-ink text-right">{{ $productRequest->receivedBy?->name ?? '—' }}</dd>
+                            </div>
+                            <div class="flex items-start justify-between gap-3">
+                                <dt class="text-muted">Received at</dt>
+                                <dd class="font-semibold text-ink text-right tabular-nums">{{ $productRequest->delivered_at?->format('d M Y, h:i A') ?? '—' }}</dd>
+                            </div>
+                        @endif
+                    @endif
                 </dl>
 
                 @if($productRequest->status->value === 'rejected' && filled($productRequest->rejection_reason))

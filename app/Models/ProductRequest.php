@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\ProductRequestDeliveryStatus;
 use App\Enums\ProductRequestStatus;
 use App\Services\BranchScope;
 use Illuminate\Database\Eloquent\Builder;
@@ -41,16 +42,21 @@ class ProductRequest extends Model
         'reviewed_at',
         'rejection_reason',
         'created_product_id',
+        'delivery_status',
+        'delivered_at',
+        'received_by',
     ];
 
     protected function casts(): array
     {
         return [
             'status' => ProductRequestStatus::class,
+            'delivery_status' => ProductRequestDeliveryStatus::class,
             'purchase_price' => 'decimal:2',
             'sale_price' => 'decimal:2',
             'quantity' => 'integer',
             'reviewed_at' => 'datetime',
+            'delivered_at' => 'datetime',
         ];
     }
 
@@ -86,11 +92,31 @@ class ProductRequest extends Model
         return $this->belongsTo(Product::class, 'created_product_id');
     }
 
+    public function receivedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'received_by');
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────
 
     public function isPending(): bool
     {
         return $this->status === ProductRequestStatus::Pending;
+    }
+
+    public function isApproved(): bool
+    {
+        return $this->status === ProductRequestStatus::Approved;
+    }
+
+    public function isInTransit(): bool
+    {
+        return $this->delivery_status === ProductRequestDeliveryStatus::InTransit;
+    }
+
+    public function isDelivered(): bool
+    {
+        return $this->delivery_status === ProductRequestDeliveryStatus::Delivered;
     }
 
     /**

@@ -185,7 +185,7 @@ it('sends a payment request to a branch and notifies its users with a direct act
         ->and($notification->data['body'])->toContain('Chakaria Outlet')
         ->and($notification->data['body'])->toContain($order->reference_no)
         ->and($notification->data['body'])->toContain('Please settle the outstanding dues')
-        ->and($notification->data['url'])->toContain(route('supplier-payments.create'))
+        ->and($notification->data['url'])->toContain('/supplier-payments/create')
         ->and($notification->data['url'])->toContain('payment_request_id='.$paymentRequest->id)
         ->and($notification->data['type'])->toBe('warning');
 

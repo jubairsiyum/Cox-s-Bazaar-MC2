@@ -81,6 +81,69 @@ class StockService
     }
 
     /**
+     * Move stock between two explicit locations in one atomic step, preserving
+     * the global invariant "units.quantity equals the sum of its movements".
+     * The global row total is unchanged; only the location attribution of the
+     * movements changes (a -qty at the source, a +qty at the destination).
+     *
+     * Either location may be null, which is the central pool (movements with no
+     * location stamp). This is what the per-actor `transferOut`/`transferIn`
+     * pair cannot express: a branch user moving stock out of the central pool.
+     *
+     * @throws InsufficientStockException when the source holds less than the requested quantity.
+     */
+    public static function transferBetweenLocations(Unit $unit, int $quantity, ?int $fromLocationId, ?int $toLocationId, ?Model $reference = null, ?string $note = null): void
+    {
+        if ($quantity < 1) {
+            throw new InvalidArgumentException('Stock quantity must be at least 1.');
+        }
+
+        DB::transaction(function () use ($unit, $quantity, $fromLocationId, $toLocationId, $reference, $note): void {
+            $locked = self::lock($unit);
+            $available = self::availableAt($locked, $fromLocationId);
+
+            if ($available < $quantity) {
+                $fromName = $fromLocationId === null ? null : Location::query()->whereKey($fromLocationId)->value('name');
+
+                throw InsufficientStockException::for($locked->displayName(), $available, $quantity, $fromName);
+            }
+
+            $global = (int) $locked->quantity;
+            $creatorId = Auth::id() ?? $locked->created_by;
+
+            $locked->stockMovements()->create([
+                'location_id' => $fromLocationId,
+                'type' => StockMovementType::TransferOut,
+                'quantity' => -$quantity,
+                'quantity_after' => $global,
+                'reference_type' => $reference?->getMorphClass(),
+                'reference_id' => $reference?->getKey(),
+                'note' => $note,
+                'created_by' => $creatorId,
+            ]);
+
+            $locked->stockMovements()->create([
+                'location_id' => $toLocationId,
+                'type' => StockMovementType::TransferIn,
+                'quantity' => $quantity,
+                'quantity_after' => $global,
+                'reference_type' => $reference?->getMorphClass(),
+                'reference_id' => $reference?->getKey(),
+                'note' => $note,
+                'created_by' => $creatorId,
+            ]);
+
+            AuditService::log(
+                'updated',
+                $locked,
+                ['quantity' => $global],
+                ['quantity' => $global],
+                "Transferred {$quantity} {$locked->unit} of '{$locked->displayName()}' to a branch."
+            );
+        });
+    }
+
+    /**
      * Set the stock to an absolute quantity (stock count / correction).
      * Returns null when the quantity is already correct.
      */

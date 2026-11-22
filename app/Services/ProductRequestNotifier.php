@@ -77,6 +77,22 @@ class ProductRequestNotifier
         );
     }
 
+    /**
+     * Delivered: the requesting branch received the product, so the Super
+     * Admin's tracking flips from In Transit to Delivered.
+     */
+    public static function delivered(ProductRequest $productRequest, ?User $receiver): void
+    {
+        NotificationService::notifyMany(
+            User::query()->active()->role('Super Admin')->get(),
+            "Product request '{$productRequest->displayName()}' delivered.",
+            ($receiver?->name ?? 'The requesting branch').' received the product at '.self::branchName($productRequest).'.',
+            route('products.requests.show', $productRequest),
+            'success',
+            $productRequest->location_id
+        );
+    }
+
     private static function notifyRequestingBranch(ProductRequest $productRequest, string $title, string $body, string $type): void
     {
         NotificationService::notifyMany(

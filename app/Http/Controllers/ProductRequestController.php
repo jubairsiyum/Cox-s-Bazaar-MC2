@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\ProductRequestDeliveryStatus;
 use App\Enums\ProductRequestStatus;
+use App\Exceptions\InsufficientStockException;
 use App\Http\Requests\Product\SubmitProductRequestRequest;
 use App\Models\Brand;
 use App\Models\Category;
@@ -14,6 +16,7 @@ use App\Services\AuditService;
 use App\Services\BranchScope;
 use App\Services\ProductRequestNotifier;
 use App\Services\ProductService;
+use App\Services\StockService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -157,6 +160,7 @@ class ProductRequestController extends Controller
 
             $locked->update([
                 'status' => ProductRequestStatus::Approved,
+                'delivery_status' => ProductRequestDeliveryStatus::InTransit,
                 'reviewed_by' => Auth::id(),
                 'reviewed_at' => now(),
                 'created_product_id' => $product->id,
@@ -210,6 +214,64 @@ class ProductRequestController extends Controller
 
         return redirect()->route('products.requests.show', $productRequest)
             ->with('success', "Product request '{$productRequest->displayName()}' rejected.");
+    }
+
+    /**
+     * The requesting branch receives the approved product: the delivery leg
+     * flips to "Delivered" and the product's opening stock moves from the
+     * central pool to the branch's ledger.
+     */
+    public function receive(ProductRequest $productRequest): RedirectResponse
+    {
+        $this->authorize('receive', $productRequest);
+
+        if (! $productRequest->isApproved() || ! $productRequest->isInTransit()) {
+            return back()->with('error', "Product request '{$productRequest->displayName()}' is not awaiting delivery.");
+        }
+
+        try {
+            DB::transaction(function () use ($productRequest): void {
+                $locked = ProductRequest::query()->whereKey($productRequest->id)->lockForUpdate()->firstOrFail();
+
+                if (! $locked->isApproved() || ! $locked->isInTransit()) {
+                    throw new \RuntimeException('No longer awaiting delivery.');
+                }
+
+                $unit = $locked->createdProduct?->stockRow;
+                $branchId = $locked->location_id;
+                $quantity = (int) $locked->quantity;
+
+                if ($unit !== null && $quantity > 0 && $branchId !== null) {
+                    StockService::transferBetweenLocations(
+                        $unit,
+                        $quantity,
+                        null,
+                        $branchId,
+                        $locked,
+                        "Product request '{$locked->displayName()}' received at the branch."
+                    );
+                }
+
+                $locked->update([
+                    'delivery_status' => ProductRequestDeliveryStatus::Delivered,
+                    'delivered_at' => now(),
+                    'received_by' => Auth::id(),
+                ]);
+            });
+        } catch (\RuntimeException) {
+            return back()->with('error', "Product request '{$productRequest->displayName()}' is no longer awaiting delivery.");
+        } catch (InsufficientStockException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+
+        $productRequest->refresh();
+
+        AuditService::updated($productRequest, $productRequest->getOriginal(), "Product request '{$productRequest->displayName()}' received at ".($productRequest->location?->name ?? 'the branch').'.');
+
+        ProductRequestNotifier::delivered($productRequest, Auth::user());
+
+        return redirect()->route('products.requests.show', $productRequest)
+            ->with('success', "Product request '{$productRequest->displayName()}' received at ".($productRequest->location?->name ?? 'the branch').'.');
     }
 
     /**

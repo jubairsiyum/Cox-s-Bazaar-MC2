@@ -57,4 +57,15 @@ class ProductRequestPolicy
     {
         return $this->approve($user, $productRequest);
     }
+
+    /**
+     * The requesting branch receives an approved product while it is in
+     * transit; the Super Admin may do so too.
+     */
+    public function receive(User $user, ProductRequest $productRequest): bool
+    {
+        return $this->view($user, $productRequest)
+            && $productRequest->isApproved()
+            && $productRequest->isInTransit();
+    }
 }

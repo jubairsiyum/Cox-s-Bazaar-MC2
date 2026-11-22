@@ -115,14 +115,19 @@
                                 {{ $productRequest->created_at->format('d M Y, h:i A') }}
                             </td>
                             <td class="py-4 px-5 text-start whitespace-nowrap">
-                                <x-status-badge :status="$productRequest->status" />
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <x-status-badge :status="$productRequest->status" />
+                                    @if($productRequest->delivery_status)
+                                        <x-status-badge :status="$productRequest->delivery_status" />
+                                    @endif
+                                </div>
                                 @if($productRequest->status->value === 'approved' && $productRequest->createdProduct)
                                     <div class="text-[11px] text-muted mt-1 font-mono">{{ $productRequest->createdProduct->product_id }}</div>
                                 @endif
                             </td>
                             <td class="py-4 px-5 text-end whitespace-nowrap">
                                 <div class="inline-flex items-center justify-end gap-2">
-                                    @can('approve', $productRequest)
+                                    @if($productRequest->isPending() && auth()->user()?->can('approve', $productRequest))
                                         <form method="POST" action="{{ route('products.requests.approve', $productRequest) }}"
                                               onsubmit="return confirm('Approve this request and add the product to the catalog?');" class="inline">
                                             @csrf
@@ -138,7 +143,19 @@
                                             <x-svg.x class="size-3.5" />
                                             <span>Reject</span>
                                         </a>
-                                    @endcan
+                                    @endif
+                                    @if($productRequest->isInTransit() && auth()->user()?->can('receive', $productRequest))
+                                        <form method="POST" action="{{ route('products.requests.receive', $productRequest) }}"
+                                              onsubmit="return confirm('Confirm receipt of this product at your branch?');" class="inline">
+                                            @csrf
+                                            @method('PATCH')
+                                            <button type="submit"
+                                                    class="btn-scale inline-flex items-center gap-1.5 rounded-xl bg-brand-500 px-3 py-1.5 text-xs font-semibold text-on-brand shadow-sm hover:opacity-95 transition-opacity cursor-pointer">
+                                                <x-icon name="check" class="size-3.5" />
+                                                <span>Receive</span>
+                                            </button>
+                                        </form>
+                                    @endif
                                     <a href="{{ route('products.requests.show', $productRequest) }}"
                                        class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs hover:border-brand-500 hover:text-brand-500 hover:bg-soft transition-colors">
                                         <span>View</span>
