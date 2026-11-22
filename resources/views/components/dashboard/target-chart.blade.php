@@ -249,79 +249,54 @@ $status = $targetAmount <= 0 ? 'not_set' : ($achievedSales>= $targetAmount ? 'ac
                 </div>
             </div>
 
-            {{-- Daily Sales Activity Bar Chart (Nov 1 – 30) --}}
+            {{-- Daily Sales Activity Area Chart (TailAdmin Line Chart 5 Design) --}}
             @php
-            $dailyData = ($isSuperAdmin && $networkOverview)
-            ? ($networkOverview['daily_sales'] ?? [])
-            : ($perf['daily_sales'] ?? []);
-            $dailyDays = $dailyData['days'] ?? [];
-            $maxDailyVal = (float) ($dailyData['max_sales'] ?? 1);
-            if ($maxDailyVal <= 0) $maxDailyVal=1;
-                @endphp
+                $dailyData = ($isSuperAdmin && $networkOverview)
+                    ? ($networkOverview['daily_sales'] ?? [])
+                    : ($perf['daily_sales'] ?? []);
+                $dailyDays = $dailyData['days'] ?? [];
+                $maxDailyVal = (float) ($dailyData['max_sales'] ?? 0);
+                $shortMonth = $activeDate->format('M');
 
-                @if (!empty($dailyDays))
-                <div class="mt-6 pt-5 border-t border-line/60" x-data="{ hoveredDay: null }">
-                <div class="flex items-center justify-between gap-3 mb-2.5">
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs font-bold text-ink">Daily Sales Trajectory</span>
-                        <span class="text-[11px] text-muted font-medium">({{ $monthName }})</span>
-                    </div>
+                $trajectoryCategories = [];
+                $trajectorySeriesData = [];
+                foreach ($dailyDays as $d) {
+                    $trajectoryCategories[] = $shortMonth . ' ' . str_pad((string) $d['day'], 2, '0', STR_PAD_LEFT);
+                    $trajectorySeriesData[] = round((float) $d['sales'], 2);
+                }
 
-                    {{-- Dynamic Tooltip or Peak/Average Display --}}
-                    <div class="text-[11px] font-semibold tabular-nums">
-                        <template x-if="hoveredDay">
-                            <span class="text-brand-600 dark:text-brand-400">
-                                Day <span x-text="hoveredDay.day"></span>: <strong x-text="'৳ ' + Number(hoveredDay.sales).toLocaleString()"></strong>
-                            </span>
-                        </template>
-                        <template x-if="!hoveredDay">
-                            <span class="text-muted">
-                                Peak Day: <strong class="text-ink">৳ {{ number_format($maxDailyVal) }}</strong>
-                            </span>
-                        </template>
-                    </div>
-                </div>
+                $trajectoryConfig = [
+                    'categories' => $trajectoryCategories,
+                    'series' => [
+                        [
+                            'name' => 'Daily Sales',
+                            'data' => $trajectorySeriesData,
+                        ],
+                    ],
+                    'monthName' => $monthName,
+                    'maxSales' => $maxDailyVal,
+                ];
+            @endphp
 
-                {{-- 30-Day Bar Histogram with Motion Entrance --}}
-                <div class="h-16 sm:h-20 flex items-end gap-1 w-full pt-2">
-                    @foreach ($dailyDays as $d)
-                    @php
-                    $dayNum = $d['day'];
-                    $salesVal = (float) $d['sales'];
-                    $isToday = $d['is_today'];
-                    $isFuture = $d['is_future'];
-                    $barPct = $maxDailyVal > 0 ? max(6, min(100, (int) round(($salesVal / $maxDailyVal) * 100))) : 6;
-                    @endphp
-                    <div class="flex-1 flex flex-col items-center h-full justify-end group relative cursor-pointer"
-                        @mouseenter="hoveredDay = { day: {{ $dayNum }}, sales: {{ $salesVal }} }"
-                        @mouseleave="hoveredDay = null">
-
-                        {{-- Hover Popover (Desktop) --}}
-                        <div class="pointer-events-none absolute -top-8 z-30 hidden group-hover:flex flex-col items-center whitespace-nowrap rounded-lg bg-ink text-surface px-2 py-0.5 text-[10px] font-bold shadow-md">
-                            <span>Day {{ $dayNum }}: ৳ {{ number_format($salesVal) }}</span>
-                            <span class="size-1.5 rotate-45 bg-ink -mb-1 mt-0.5"></span>
+            @if (!empty($dailyDays))
+                <div class="mt-5 pt-4 border-t border-line/60">
+                    <div class="flex items-center justify-between gap-3 mb-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-ink">Daily Sales Trajectory</span>
+                            <span class="text-[11px] text-muted font-medium">({{ $monthName }})</span>
                         </div>
 
-                        {{-- Bar Column with Motion Animation --}}
-                        <div class="bar w-full rounded-t-sm transition-colors duration-200 {{ $isToday ? 'bg-emerald-500 shadow-xs ring-1 ring-emerald-400' : ($salesVal > 0 ? 'bg-brand-500/80 hover:bg-brand-500 dark:bg-brand-400/80' : ($isFuture ? 'bg-line/30 dark:bg-soft/20' : 'bg-soft dark:bg-line/40')) }}"
-                            style="height: {{ $barPct }}%; --bar-i: 0; --bar-offset: {{ $loop->index * 20 }}ms;">
+                        <div class="text-[11px] font-semibold text-muted tabular-nums">
+                            Peak Day: <strong class="text-ink font-bold">৳ {{ number_format($maxDailyVal) }}</strong>
                         </div>
                     </div>
-                    @endforeach
-                </div>
 
-                {{-- Axis Day Labels --}}
-                <div class="bar-label flex justify-between items-center text-[10px] font-semibold text-muted mt-1.5 px-0.5 select-none tabular-nums" style="--bar-i: 3;">
-                    <span>Day 1</span>
-                    <span>Day 5</span>
-                    <span>Day 10</span>
-                    <span>Day 15</span>
-                    <span>Day 20</span>
-                    <span>Day 25</span>
-                    <span>Day {{ count($dailyDays) }}</span>
+                    {{-- ApexCharts Smooth Gradient Area Chart (Line Chart 5) --}}
+                    <div class="w-full">
+                        <div data-dashboard-chart="daily-sales-trajectory" data-config='@json($trajectoryConfig)'></div>
+                    </div>
                 </div>
-        </div>
-        @endif
+            @endif
         </div>
 
         {{-- Card Footer --}}
