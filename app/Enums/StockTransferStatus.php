@@ -8,6 +8,7 @@ enum StockTransferStatus: string
 {
     case Draft = 'draft';
     case InTransit = 'in-transit';
+    case Requested = 'requested';
     case Received = 'received';
     case Rejected = 'rejected';
     case Cancelled = 'cancelled';
@@ -17,6 +18,7 @@ enum StockTransferStatus: string
         return match ($this) {
             self::Draft => 'Draft',
             self::InTransit => 'In Transit',
+            self::Requested => 'Requested',
             self::Received => 'Received',
             self::Rejected => 'Rejected',
             self::Cancelled => 'Cancelled',
@@ -49,6 +51,7 @@ enum StockTransferStatus: string
         return match ($from) {
             self::Draft => [self::Draft, self::InTransit, self::Received, self::Cancelled],
             self::InTransit => [self::InTransit, self::Received, self::Cancelled],
+            self::Requested => [self::Requested],
             self::Received => [self::Received, self::Cancelled],
             self::Rejected => [self::Rejected],
             self::Cancelled => [self::Cancelled],

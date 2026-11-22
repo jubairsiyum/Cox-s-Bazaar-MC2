@@ -3,6 +3,7 @@
 use App\Models\Product;
 use App\Models\Unit;
 use App\Models\User;
+use App\Services\StockService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -79,6 +80,23 @@ function stockRowFor(string $productName, array $attributes = []): Unit
     ]);
 
     return Unit::factory()->for($product)->create($attributes);
+}
+
+/**
+ * Move stock from the central pool into a branch location, as a branch that
+ * received it would hold it. The overall stock is unchanged; the location now
+ * holds up to the requested quantity (capped at what the central pool has).
+ */
+function stockAtLocation(Unit $unit, int $quantity, int $locationId): void
+{
+    $quantity = min($quantity, StockService::availableAt($unit, null));
+
+    if ($quantity < 1) {
+        return;
+    }
+
+    StockService::transferOut($unit, $quantity, null, 'Test stock moved to branch.', null);
+    StockService::transferIn($unit, $quantity, null, 'Test stock moved to branch.', $locationId);
 }
 
 /**

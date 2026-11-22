@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\Unit;
 use App\Services\AuditService;
 use App\Services\BranchScope;
+use App\Services\ProductService;
 use App\Services\StockService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -152,16 +153,7 @@ class ProductController extends Controller
         $validated['created_by'] = $request->user()->id;
         $validated['photo'] = $this->storePhoto($request);
 
-        $product = Product::create($validated);
-
-        // Every product gets a single stock row so it shows up in Units and Transfers.
-        $product->stockRow()->create([
-            'quantity' => $quantity,
-            'unit' => $unitOfMeasure,
-            'created_by' => $request->user()->id,
-        ]);
-
-        AuditService::created($product, "Product '{$product->name}' ({$product->product_id}) created.");
+        $product = ProductService::create($validated, $quantity, $unitOfMeasure);
 
         return redirect()->route('products.index')
             ->with('success', "Product '{$product->name}' created successfully.");

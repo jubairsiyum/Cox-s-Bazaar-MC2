@@ -57,6 +57,8 @@ function dueNotifyPlaceOrder(Supplier $supplier, Location $location, float $paid
 {
     $unit = Unit::factory()->create(['quantity' => 50]);
 
+    stockAtLocation($unit, 5, $location->id);
+
     test()->post(route('purchase-orders.store'), [
         'order_date' => now()->format('Y-m-d\TH:i'),
         'reference_no' => null,

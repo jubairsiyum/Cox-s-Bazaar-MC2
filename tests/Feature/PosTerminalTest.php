@@ -24,9 +24,13 @@ beforeEach(function () {
  */
 function posSalePayload(Unit $unit, float $paid, array $overrides = []): array
 {
+    $location = Location::factory()->create();
+
+    stockAtLocation($unit, 2, $location->id);
+
     return array_merge([
         'customer_id' => null,
-        'location_id' => Location::factory()->create()->id,
+        'location_id' => $location->id,
         'paid_amount' => $paid,
         'note' => null,
         'items' => [

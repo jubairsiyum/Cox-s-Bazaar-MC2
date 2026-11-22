@@ -30,6 +30,8 @@ class StockTransfer extends Model
         'created_by',
         'approved_by',
         'approved_at',
+        'is_request',
+        'rejection_reason',
     ];
 
     protected function casts(): array
@@ -40,6 +42,7 @@ class StockTransfer extends Model
             'shipping_charges' => 'decimal:2',
             'total_amount' => 'decimal:2',
             'approved_at' => 'datetime',
+            'is_request' => 'boolean',
         ];
     }
 
@@ -102,7 +105,12 @@ class StockTransfer extends Model
             && LocationScope::canAccess($user, $this->to_location_id)
             && ! LocationScope::canAccess($user, $this->from_location_id);
 
+        $sourceSide = $user !== null && LocationScope::canAccess($user, $this->from_location_id);
+
         return match ($this->status) {
+            StockTransferStatus::Requested => $sourceSide
+                ? ['value' => 'awaiting-approval', 'label' => 'Awaiting Approval']
+                : ['value' => 'requested', 'label' => 'Requested'],
             StockTransferStatus::Received => $senderSide
                 ? ['value' => 'delivered', 'label' => 'Delivered']
                 : ['value' => 'received', 'label' => 'Received'],

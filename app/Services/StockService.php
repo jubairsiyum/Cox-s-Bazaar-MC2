@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\StockMovementType;
 use App\Exceptions\InsufficientStockException;
+use App\Models\Location;
 use App\Models\Setting;
 use App\Models\StockMovement;
 use App\Models\Unit;
@@ -98,6 +99,8 @@ class StockService
                 return null;
             }
 
+            self::assertNotBelowZero($locked, $delta, $locationId);
+
             $locked->updateQuietly(['quantity' => $quantity]);
 
             return self::record($locked, StockMovementType::Adjustment, $delta, $current, $quantity, null, $note ?? 'Stock adjusted', $locationId);
@@ -125,11 +128,9 @@ class StockService
                 return null;
             }
 
-            $global = (int) $locked->quantity + $delta;
+            self::assertNotBelowZero($locked, $delta, $locationId);
 
-            if ($global < 0 && ! self::allowsNegativeStock()) {
-                throw InsufficientStockException::for($locked->displayName(), (int) $locked->quantity, abs($delta));
-            }
+            $global = (int) $locked->quantity + $delta;
 
             $locked->updateQuietly(['quantity' => $global]);
 
@@ -150,6 +151,23 @@ class StockService
         return (int) StockMovement::query()
             ->where('unit_id', $unit instanceof Unit ? $unit->id : $unit)
             ->where('location_id', $locationId)
+            ->sum('quantity');
+    }
+
+    /**
+     * Stock of one unit available at one location, where null is the central
+     * pool (movements with no location stamp). This is the figure stock
+     * transfers and every stock decrease are checked against.
+     */
+    public static function availableAt(Unit|int $unit, ?int $locationId): int
+    {
+        return (int) StockMovement::query()
+            ->where('unit_id', $unit instanceof Unit ? $unit->id : $unit)
+            ->when(
+                $locationId === null,
+                fn ($query) => $query->whereNull('location_id'),
+                fn ($query) => $query->where('location_id', $locationId)
+            )
             ->sum('quantity');
     }
 
@@ -237,16 +255,49 @@ class StockService
         return DB::transaction(function () use ($unit, $delta, $type, $reference, $note, $locationId) {
             $locked = self::lock($unit);
             $current = (int) $locked->quantity;
-            $new = $current + $delta;
 
-            if ($new < 0 && ! self::allowsNegativeStock()) {
-                throw InsufficientStockException::for($locked->displayName(), $current, abs($delta));
-            }
+            self::assertNotBelowZero($locked, $delta, $locationId);
+
+            $new = $current + $delta;
 
             $locked->updateQuietly(['quantity' => $new]);
 
             return self::record($locked, $type, $delta, $current, $new, $reference, $note, $locationId);
         });
+    }
+
+    /**
+     * Guard: a stock change must never leave a unit below zero, neither in its
+     * overall stock nor at the location it lands on. Increases are never
+     * blocked. Callers must hold the unit's row lock (see lock()), so the
+     * figures checked here cannot change before the write. Negative stock is
+     * only allowed when the "allow_negative_stock" setting is on.
+     *
+     * @throws InsufficientStockException
+     */
+    public static function assertNotBelowZero(Unit $unit, int $delta, ?int $locationId = null): void
+    {
+        if ($delta >= 0 || self::allowsNegativeStock()) {
+            return;
+        }
+
+        $location = $locationId ?? self::actorLocationId();
+        $availableHere = self::availableAt($unit, $location);
+        $availableOverall = (int) $unit->quantity;
+
+        if ($availableHere + $delta >= 0 && $availableOverall + $delta >= 0) {
+            return;
+        }
+
+        $locationName = $location === null ? null : Location::query()->whereKey($location)->value('name');
+        $shortfallHere = $availableHere + $delta < 0;
+
+        throw InsufficientStockException::for(
+            $unit->displayName(),
+            $shortfallHere ? $availableHere : $availableOverall,
+            abs($delta),
+            $shortfallHere ? $locationName : null
+        );
     }
 
     /**
@@ -314,7 +365,7 @@ class StockService
     /**
      * Whether negative stock is permitted by the shop settings.
      */
-    private static function allowsNegativeStock(): bool
+    public static function allowsNegativeStock(): bool
     {
         return (bool) Setting::get('allow_negative_stock', '0');
     }

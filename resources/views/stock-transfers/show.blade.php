@@ -8,10 +8,10 @@
     $transferStatus = $transfer->displayStatusFor(auth()->user());
     $itemsSubtotal = $transfer->items->sum('subtotal');
     $totalUnits = $transfer->items->sum('quantity');
-    $canDecide = in_array($transfer->status, [\App\Enums\StockTransferStatus::Draft, \App\Enums\StockTransferStatus::InTransit], true);
+    $canDecide = in_array($transfer->status, [\App\Enums\StockTransferStatus::Draft, \App\Enums\StockTransferStatus::InTransit, \App\Enums\StockTransferStatus::Requested], true);
     $canApprove = auth()->user()?->can('approve', $transfer) && $canDecide;
     $canReject = auth()->user()?->can('reject', $transfer) && $canDecide;
-    $canCancel = auth()->user()?->can('cancel', $transfer) && $canDecide;
+    $canCancel = auth()->user()?->can('cancel', $transfer) && in_array($transfer->status, [\App\Enums\StockTransferStatus::Draft, \App\Enums\StockTransferStatus::InTransit], true);
 @endphp
 
 <style>
@@ -80,6 +80,19 @@
                 </button>
             @endif
 
+            @if($transfer->created_by === auth()->id() && auth()->user()?->can('withdraw', $transfer))
+                <form method="POST" action="{{ route('stock-transfers.withdraw', $transfer) }}"
+                      onsubmit="return confirm('Withdraw this stock request? The source will not need to decide on it.')">
+                    @csrf
+                    @method('PATCH')
+                    <button type="submit"
+                            class="btn-scale inline-flex items-center gap-1.5 rounded-2xl border border-line bg-surface px-4 py-2.5 text-xs sm:text-sm font-semibold text-muted hover:text-ink hover:bg-soft transition-colors cursor-pointer">
+                        <x-svg.x class="size-4" />
+                        <span>Withdraw Request</span>
+                    </button>
+                </form>
+            @endif
+
             @can('update', $transfer)
                 <a href="{{ route('stock-transfers.edit', $transfer) }}"
                    class="btn-scale inline-flex items-center gap-1.5 rounded-2xl border border-line bg-surface px-4 py-2.5 text-xs sm:text-sm font-semibold text-ink shadow-2xs hover:border-brand-500 hover:text-brand-500 hover:bg-soft transition-colors">
@@ -103,6 +116,21 @@
             </a>
         </div>
     </div>
+
+    @if($transfer->is_request)
+        <div class="rounded-2xl border border-brand-500/25 bg-brand-500/5 p-4 text-sm text-ink no-print">
+            <p>
+                <span class="font-bold">Stock request.</span>
+                {{ $transfer->toLocation?->name ?? 'This branch' }} asked {{ $transfer->fromLocation?->name ?? 'the source location' }} for these products.
+                @if($transfer->status === \App\Enums\StockTransferStatus::Requested)
+                    Stock moves only once {{ $transfer->fromLocation?->name ?? 'the source' }} approves it.
+                @endif
+            </p>
+            @if($transfer->status === \App\Enums\StockTransferStatus::Rejected && filled($transfer->rejection_reason))
+                <p class="mt-2 text-xs font-semibold text-danger">Rejection reason: {{ $transfer->rejection_reason }}</p>
+            @endif
+        </div>
+    @endif
 
     {{-- Route Visualization + Approval Audit Grid --}}
     <div class="grid gap-5 lg:grid-cols-12">
@@ -176,10 +204,15 @@
                                 <x-icon name="check" class="size-3.5" />
                                 Approved
                             </span>
-                        @elseif($transfer->status === \App\Enums\StockTransferStatus::Cancelled)
+                        @elseif($transfer->status === \App\Enums\StockTransferStatus::Rejected)
                             <span class="inline-flex items-center gap-1 text-danger">
                                 <x-svg.x class="size-3.5" />
                                 Rejected
+                            </span>
+                        @elseif($transfer->status === \App\Enums\StockTransferStatus::Cancelled)
+                            <span class="inline-flex items-center gap-1 text-danger">
+                                <x-svg.x class="size-3.5" />
+                                Cancelled
                             </span>
                         @else
                             <span class="inline-flex items-center gap-1 text-warning">
@@ -304,10 +337,18 @@
                         x-text="confirmModal.kind === 'approve' ? 'Accept and receive transfer?' : (confirmModal.kind === 'cancel' ? 'Cancel this transfer?' : 'Reject this transfer?')"></h3>
                     <p class="mt-1.5 text-xs text-muted leading-relaxed">
                         <template x-if="confirmModal.kind === 'approve'">
-                            <span>Receiving <strong class="text-ink">{{ $transfer->reference_no }}</strong> posts {{ number_format($totalUnits) }} {{ Str::plural('unit', $totalUnits) }} to <strong class="text-ink">{{ $transfer->toLocation?->name }}</strong> and marks it Delivered for the sender.</span>
+                            @if($transfer->is_request)
+                                <span>Approving <strong class="text-ink">{{ $transfer->reference_no }}</strong> sends {{ number_format($totalUnits) }} {{ Str::plural('unit', $totalUnits) }} from <strong class="text-ink">{{ $transfer->fromLocation?->name }}</strong> to <strong class="text-ink">{{ $transfer->toLocation?->name }}</strong>. The source's stock must cover the request.</span>
+                            @else
+                                <span>Receiving <strong class="text-ink">{{ $transfer->reference_no }}</strong> posts {{ number_format($totalUnits) }} {{ Str::plural('unit', $totalUnits) }} to <strong class="text-ink">{{ $transfer->toLocation?->name }}</strong> and marks it Delivered for the sender.</span>
+                            @endif
                         </template>
                         <template x-if="confirmModal.kind === 'reject'">
-                            <span>Rejecting <strong class="text-ink">{{ $transfer->reference_no }}</strong> marks it Rejected and returns any dispatched stock to <strong class="text-ink">{{ $transfer->fromLocation?->name }}</strong>.</span>
+                            @if($transfer->is_request)
+                                <span>Rejecting <strong class="text-ink">{{ $transfer->reference_no }}</strong> tells <strong class="text-ink">{{ $transfer->toLocation?->name }}</strong> that <strong class="text-ink">{{ $transfer->fromLocation?->name }}</strong> will not send this stock. No stock moves.</span>
+                            @else
+                                <span>Rejecting <strong class="text-ink">{{ $transfer->reference_no }}</strong> marks it Rejected and returns any dispatched stock to <strong class="text-ink">{{ $transfer->fromLocation?->name }}</strong>.</span>
+                            @endif
                         </template>
                         <template x-if="confirmModal.kind === 'cancel'">
                             <span>Cancelling <strong class="text-ink">{{ $transfer->reference_no }}</strong> notifies the receiving side and returns any dispatched stock to <strong class="text-ink">{{ $transfer->fromLocation?->name }}</strong>.</span>
@@ -336,6 +377,12 @@
                     <form x-show="confirmModal.kind === 'reject'" method="POST" action="{{ route('stock-transfers.reject', $transfer) }}">
                         @csrf
                         @method('PATCH')
+                        @if($transfer->is_request)
+                            <label for="rejection-reason" class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-ink">Reason <span class="text-danger">*</span></label>
+                            <textarea id="rejection-reason" name="reason" rows="2" required maxlength="500"
+                                      placeholder="Why can this stock not be sent?"
+                                      class="mb-3 w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 resize-none"></textarea>
+                        @endif
                         <button type="submit"
                                 class="btn-scale inline-flex items-center gap-1.5 rounded-xl bg-danger px-4 py-2 text-xs font-semibold text-on-brand shadow-sm hover:opacity-95 transition-opacity cursor-pointer">
                             <x-svg.x class="size-3.5" />

@@ -45,6 +45,7 @@
     $pageDraftCount = $transfers->filter(fn ($t) => $t->status === \App\Enums\StockTransferStatus::Draft)->count();
     $pageTransitCount = $transfers->filter(fn ($t) => $t->status === \App\Enums\StockTransferStatus::InTransit)->count();
     $pageReceivedCount = $transfers->filter(fn ($t) => $t->status === \App\Enums\StockTransferStatus::Received)->count();
+    $pageRequestedCount = $transfers->filter(fn ($t) => $t->status === \App\Enums\StockTransferStatus::Requested)->count();
     $pageRejectedCount = $transfers->filter(fn ($t) => $t->status === \App\Enums\StockTransferStatus::Rejected)->count();
     $pageCancelledCount = $transfers->filter(fn ($t) => $t->status === \App\Enums\StockTransferStatus::Cancelled)->count();
 @endphp
@@ -238,6 +239,18 @@
                         {{ $pageDraftCount }}
                     </span>
                 </button>
+                @if($pageRequestedCount > 0)
+                    <button type="button"
+                            @click="statusFilter = 'requested'"
+                            :class="statusFilter === 'requested' ? 'bg-brand-500 text-on-brand shadow-xs' : 'bg-soft text-muted hover:text-ink'"
+                            class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer">
+                        <span>Requested</span>
+                        <span class="rounded-full px-1.5 py-0.5 text-[10px]"
+                              :class="statusFilter === 'requested' ? 'bg-surface/20 text-on-brand' : 'bg-surface text-brand-500'">
+                            {{ $pageRequestedCount }}
+                        </span>
+                    </button>
+                @endif
                 @if($pageRejectedCount > 0)
                     <button type="button"
                             @click="statusFilter = 'rejected'"
@@ -474,6 +487,9 @@
                                     <span>{{ $transfer->reference_no }}</span>
                                     <x-icon name="arrow-up-right" class="size-3 opacity-60" />
                                 </a>
+                                @if($transfer->is_request)
+                                    <span class="mt-1 block text-[11px] font-semibold text-brand-500">Requested from {{ $transfer->fromLocation?->name ?? '—' }}</span>
+                                @endif
                             </td>
                             <td x-show="columns.from_location" data-col="from_location" class="py-4 px-5 text-start whitespace-nowrap">
                                 <span class="inline-flex items-center gap-1.5 rounded-xl bg-soft/70 px-2.5 py-1 text-xs font-semibold text-ink border border-line/80">
@@ -504,7 +520,7 @@
                                     <div class="inline-flex items-center justify-end gap-1.5">
                                         {{-- Prominent Accept button when eligible --}}
                                         @can('approve', $transfer)
-                                            @if(in_array($transfer->status, [\App\Enums\StockTransferStatus::Draft, \App\Enums\StockTransferStatus::InTransit], true))
+                                            @if(in_array($transfer->status, [\App\Enums\StockTransferStatus::Draft, \App\Enums\StockTransferStatus::InTransit, \App\Enums\StockTransferStatus::Requested], true))
                                                 <button type="button"
                                                         @click="openActionModal('approve', @js(route('stock-transfers.approve', $transfer)), @js($transfer->reference_no))"
                                                         class="btn-scale inline-flex items-center gap-1 rounded-xl bg-success px-2.5 py-1.5 text-xs font-semibold text-on-brand shadow-2xs hover:opacity-95 transition-opacity cursor-pointer"
@@ -517,7 +533,15 @@
 
                                         {{-- Reject button when eligible --}}
                                         @can('reject', $transfer)
-                                            @if(in_array($transfer->status, [\App\Enums\StockTransferStatus::Draft, \App\Enums\StockTransferStatus::InTransit], true))
+                                            @if($transfer->is_request && $transfer->status === \App\Enums\StockTransferStatus::Requested)
+                                                {{-- A stock request is rejected with a reason on its invoice page. --}}
+                                                <a href="{{ route('stock-transfers.show', $transfer) }}"
+                                                   class="btn-scale inline-flex items-center gap-1 rounded-xl border border-danger/30 bg-danger/10 px-2.5 py-1.5 text-xs font-semibold text-danger hover:bg-danger hover:text-on-brand transition-colors"
+                                                   title="Review this stock request">
+                                                    <x-svg.x class="size-3.5" />
+                                                    <span>Review</span>
+                                                </a>
+                                            @elseif(! $transfer->is_request && in_array($transfer->status, [\App\Enums\StockTransferStatus::Draft, \App\Enums\StockTransferStatus::InTransit], true))
                                                 <button type="button"
                                                         @click="openActionModal('reject', @js(route('stock-transfers.reject', $transfer)), @js($transfer->reference_no))"
                                                         class="btn-scale inline-flex items-center gap-1 rounded-xl border border-danger/30 bg-danger/10 px-2.5 py-1.5 text-xs font-semibold text-danger hover:bg-danger hover:text-on-brand transition-colors cursor-pointer"
@@ -527,6 +551,21 @@
                                                 </button>
                                             @endif
                                         @endcan
+
+                                        {{-- Withdraw a pending request (requesting branch only) --}}
+                                        @if($transfer->created_by === auth()->id() && auth()->user()?->can('withdraw', $transfer))
+                                            <form method="POST" action="{{ route('stock-transfers.withdraw', $transfer) }}" class="inline-block"
+                                                  onsubmit="return confirm('Withdraw this stock request? The source will not need to decide on it.')">
+                                                @csrf
+                                                @method('PATCH')
+                                                <button type="submit"
+                                                        class="btn-scale inline-flex items-center gap-1 rounded-xl border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-muted hover:text-ink hover:bg-soft transition-colors cursor-pointer"
+                                                        title="Withdraw this stock request">
+                                                    <x-svg.x class="size-3.5" />
+                                                    <span>Withdraw</span>
+                                                </button>
+                                            </form>
+                                        @endif
 
                                         {{-- Cancel button for the sending side --}}
                                         @can('cancel', $transfer)

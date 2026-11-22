@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Requests\StockTransfer;
 
 use App\Enums\StockTransferStatus;
+use App\Models\Location;
 use App\Models\StockTransfer;
 use App\Services\LocationScope;
+use App\Services\StockService;
+use App\Services\StockTransferService;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -33,7 +36,7 @@ class StoreStockTransferRequest extends FormRequest
             'additional_notes' => ['nullable', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.unit_id' => ['required', 'integer', 'exists:units,id', 'distinct'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.quantity' => ['required', 'integer', 'min:1', $this->quantityWithinSourceStockRule()],
             'items.*.unit_price' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
         ];
     }
@@ -46,6 +49,27 @@ class StoreStockTransferRequest extends FormRequest
         return function (string $attribute, mixed $value, Closure $fail): void {
             if ($this->user() === null || ! LocationScope::canAccess($this->user(), $value)) {
                 $fail('You may only dispatch stock from your own location.');
+            }
+        };
+    }
+
+    /**
+     * A line may not ask for more than the source location has available.
+     */
+    protected function quantityWithinSourceStockRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            $location = Location::query()->find((int) $this->input('from_location_id'));
+            $unitId = (int) data_get($this->all(), str_replace('.quantity', '.unit_id', $attribute));
+
+            if ($location === null || $unitId === 0) {
+                return;
+            }
+
+            $available = StockService::availableAt($unitId, $location->id);
+
+            if ((int) $value > $available) {
+                $fail(StockTransferService::availabilityMessage($available, $location->name));
             }
         };
     }

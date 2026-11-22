@@ -28,6 +28,8 @@ function returnParentOrder(Unit $unit, int $quantity = 5, float $unitPrice = 200
 
     $order = PurchaseOrder::factory()->create(['supplier_id' => $supplier->id]);
 
+    stockAtLocation($unit, $quantity, $order->location_id);
+
     $order->items()->create([
         'unit_id' => $unit->id,
         'quantity' => $quantity,

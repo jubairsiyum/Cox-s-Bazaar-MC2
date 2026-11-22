@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\StockTransferStatus;
+use App\Models\Location;
 use App\Models\StockTransfer;
 use App\Models\Unit;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Keeps the stock ledger in sync with a stock transfer's lifecycle.
@@ -59,6 +61,47 @@ class StockTransferService
                 StockService::transferOut($unit, $quantity, $transfer, self::note($transfer, 'receipt reversed'), $transfer->to_location_id !== null ? (int) $transfer->to_location_id : null);
             }
         }
+    }
+
+    /**
+     * Guard: every line must be covered by the stock available at the source
+     * location. Runs under the units' row locks, so two transfers cannot both
+     * take the same stock. Errors are keyed to the offending line.
+     *
+     * @param  array<int, array{unit_id: int|string, quantity: int|string}>  $items
+     *
+     * @throws ValidationException
+     */
+    public static function assertAvailableAtSource(int $fromLocationId, array $items): void
+    {
+        $unitIds = collect($items)->map(fn (array $item): int => (int) $item['unit_id'])->unique()->sort()->values()->all();
+
+        Unit::query()->whereIn('id', $unitIds)->orderBy('id')->lockForUpdate()->get();
+
+        $locationName = Location::query()->whereKey($fromLocationId)->value('name') ?? 'the source location';
+        $errors = [];
+
+        foreach ($items as $index => $item) {
+            $available = StockService::availableAt((int) $item['unit_id'], $fromLocationId);
+
+            if ((int) $item['quantity'] > $available) {
+                $errors["items.{$index}.quantity"] = self::availabilityMessage($available, $locationName);
+            }
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
+    /**
+     * The line error shown when a requested quantity exceeds the stock at the source.
+     */
+    public static function availabilityMessage(int $available, string $locationName): string
+    {
+        return $available > 0
+            ? "Only {$available} available at {$locationName}."
+            : "No stock available at {$locationName}.";
     }
 
     /**

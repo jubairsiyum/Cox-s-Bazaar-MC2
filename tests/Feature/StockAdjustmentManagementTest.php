@@ -24,10 +24,14 @@ beforeEach(function () {
  */
 function adjustmentPayload(Unit $unit, string $type = 'set', int $quantity = 5, float $unitPrice = 200.0, ?string $reason = 'Stock count correction', ?Location $location = null): array
 {
+    $location ??= Location::factory()->create();
+
+    stockAtLocation($unit, (int) $unit->fresh()->quantity, $location->id);
+
     return [
         'reference_no' => null,
         'adjustment_date' => now()->format('Y-m-d\TH:i'),
-        'location_id' => ($location ?? Location::factory()->create())->id,
+        'location_id' => $location->id,
         'type' => $type,
         'reason' => $reason,
         'items' => [
@@ -111,8 +115,10 @@ it('applies the stock effect immediately when the adjustment is saved', function
     $admin = actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 30]);
+    $payload = adjustmentPayload($unit, 'add', 5, 200.0, 'Found in back store');
+    $movementsBefore = $unit->stockMovements()->count();
 
-    $this->post(route('stock-adjustments.store'), adjustmentPayload($unit, 'add', 5, 200.0, 'Found in back store'))
+    $this->post(route('stock-adjustments.store'), $payload)
         ->assertRedirect(route('stock-adjustments.index'));
 
     $adjustment = StockAdjustment::first();
@@ -129,8 +135,8 @@ it('applies the stock effect immediately when the adjustment is saved', function
     expect((int) $item->quantity_before)->toBe(30)
         ->and((int) $item->quantity_after)->toBe(35);
 
-    // Opening stock plus exactly one adjustment movement.
-    expect($unit->fresh()->stockMovements()->count())->toBe(2);
+    // Exactly one adjustment movement is added by saving.
+    expect($unit->fresh()->stockMovements()->count())->toBe($movementsBefore + 1);
 
     $this->assertDatabaseHas('audit_logs', [
         'event' => 'created',

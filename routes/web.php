@@ -12,6 +12,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
+use App\Http\Controllers\BranchStockRequestController;
 use App\Http\Controllers\BrandController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
@@ -22,6 +23,7 @@ use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\PlaceholderController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductRequestController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PurchaseDueController;
 use App\Http\Controllers\PurchaseOrderController;
@@ -196,6 +198,15 @@ Route::middleware('auth')->group(function () {
         Route::get('products', [ProductController::class, 'index'])->name('products.index');
     });
 
+    Route::middleware(['verified', 'permission:products.view|products.manage'])->group(function () {
+        Route::get('products/requests', [ProductRequestController::class, 'index'])->name('products.requests.index');
+        Route::get('products/requests/create', [ProductRequestController::class, 'create'])->name('products.requests.create');
+        Route::post('products/requests', [ProductRequestController::class, 'store'])->name('products.requests.store');
+        Route::get('products/requests/{productRequest}', [ProductRequestController::class, 'show'])->name('products.requests.show');
+        Route::patch('products/requests/{productRequest}/approve', [ProductRequestController::class, 'approve'])->name('products.requests.approve');
+        Route::patch('products/requests/{productRequest}/reject', [ProductRequestController::class, 'reject'])->name('products.requests.reject');
+    });
+
     Route::middleware(['verified', 'permission:products.manage'])->group(function () {
         Route::get('products/create', [ProductController::class, 'create'])->name('products.create');
         Route::post('products', [ProductController::class, 'store'])->name('products.store');
@@ -304,12 +315,15 @@ Route::middleware('auth')->group(function () {
         Route::get('stock-transfers/search-units', [StockTransferController::class, 'searchUnits'])->name('stock-transfers.search-units');
         Route::get('stock-transfers/create', [StockTransferController::class, 'create'])->name('stock-transfers.create');
         Route::post('stock-transfers', [StockTransferController::class, 'store'])->name('stock-transfers.store');
+        Route::get('stock-transfers/requests/create', [BranchStockRequestController::class, 'create'])->name('stock-transfers.requests.create');
+        Route::post('stock-transfers/requests', [BranchStockRequestController::class, 'store'])->name('stock-transfers.requests.store');
         Route::get('stock-transfers/pdf-view', [StockTransferController::class, 'pdfView'])->name('stock-transfers.pdf-view');
         Route::get('stock-transfers/print-view', [StockTransferController::class, 'printView'])->name('stock-transfers.print-view');
         Route::get('stock-transfers/export/{format?}', [StockTransferController::class, 'export'])->name('stock-transfers.export');
         Route::get('stock-transfers/{stockTransfer}/edit', [StockTransferController::class, 'edit'])->name('stock-transfers.edit');
         Route::patch('stock-transfers/{stockTransfer}', [StockTransferController::class, 'update'])->name('stock-transfers.update');
         Route::patch('stock-transfers/{stockTransfer}/cancel', [StockTransferController::class, 'cancel'])->name('stock-transfers.cancel');
+        Route::patch('stock-transfers/{stockTransfer}/withdraw', [StockTransferController::class, 'withdraw'])->name('stock-transfers.withdraw');
         Route::delete('stock-transfers/{stockTransfer}', [StockTransferController::class, 'destroy'])->name('stock-transfers.destroy');
         Route::get('stock-transfers/{stockTransfer}', [StockTransferController::class, 'show'])->name('stock-transfers.show');
     });

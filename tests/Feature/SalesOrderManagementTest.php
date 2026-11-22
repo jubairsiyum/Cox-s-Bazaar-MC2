@@ -22,9 +22,13 @@ beforeEach(function () {
  */
 function salesOrderWithItem(Unit $unit, int $quantity = 3, float $rate = 250.0, array $attributes = []): SalesOrder
 {
+    $locationId = $attributes['location_id'] ?? Location::factory()->create()->id;
+
+    stockAtLocation($unit, $quantity, $locationId);
+
     $order = SalesOrder::factory()->create(array_merge([
         'customer_id' => Customer::factory()->create()->id,
-        'location_id' => Location::factory()->create()->id,
+        'location_id' => $locationId,
     ], $attributes));
 
     $order->items()->create([
@@ -55,6 +59,9 @@ function salesOrderWithItem(Unit $unit, int $quantity = 3, float $rate = 250.0, 
 function salesOrderPayload(Unit $unit, array $overrides = []): array
 {
     $customer = Customer::factory()->create();
+    $location = Location::factory()->create();
+
+    stockAtLocation($unit, 3, $location->id);
 
     return array_merge([
         'order_date' => now()->format('Y-m-d\TH:i'),
@@ -62,7 +69,7 @@ function salesOrderPayload(Unit $unit, array $overrides = []): array
         'customer_id' => $customer->id,
         'customer_name' => $customer->name,
         'mobile_no' => $customer->mobile,
-        'location_id' => Location::factory()->create()->id,
+        'location_id' => $location->id,
         'tax_rate' => 0,
         'note' => null,
         'items' => [

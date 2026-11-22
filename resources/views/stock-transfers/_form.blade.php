@@ -222,9 +222,12 @@
                                     </td>
                                     <td class="py-3.5 px-4">
                                         <input type="number" min="1" step="1"
+                                               :max="item.stock ?? null"
                                                :name="`items[${index}][quantity]`"
                                                x-model="item.quantity"
-                                               class="w-28 rounded-xl border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink tabular-nums focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20">
+                                               :class="item.error ? 'border-danger' : 'border-line'"
+                                               class="w-28 rounded-xl border bg-surface px-3 py-2 text-sm font-semibold text-ink tabular-nums focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20">
+                                        <p x-show="item.error" x-cloak x-text="item.error" class="mt-1 max-w-xs text-xs font-medium text-danger"></p>
                                     </td>
                                     <td class="py-3.5 px-4">
                                         <input type="number" min="0" step="0.01"

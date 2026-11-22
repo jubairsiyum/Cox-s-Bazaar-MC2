@@ -20,9 +20,13 @@ beforeEach(function () {
  */
 function unpaidOrderWithItem(Unit $unit, int $quantity = 3, float $rate = 250.0): SalesOrder
 {
+    $location = Location::factory()->create();
+
+    stockAtLocation($unit, $quantity, $location->id);
+
     $order = SalesOrder::factory()->create([
         'customer_id' => Customer::factory()->create()->id,
-        'location_id' => Location::factory()->create()->id,
+        'location_id' => $location->id,
     ]);
 
     $order->items()->create([
@@ -205,9 +209,12 @@ it('keeps the POS quick sale as an already paid register sale', function () {
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 50]);
+    $location = Location::factory()->create();
+
+    stockAtLocation($unit, 1, $location->id);
 
     $this->post(route('pos.store'), [
-        'location_id' => Location::factory()->create()->id,
+        'location_id' => $location->id,
         'paid_amount' => 500,
         'items' => [
             ['unit_id' => $unit->id, 'quantity' => 1, 'unit_price' => 500, 'discount' => 0],

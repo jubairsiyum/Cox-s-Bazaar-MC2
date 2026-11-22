@@ -180,6 +180,7 @@ it('shows accept and reject options to the receiving manager for a submitted req
     $from = Location::factory()->create();
     $to = Location::factory()->create();
     $unit = Unit::factory()->create(['quantity' => 50]);
+    stockAtLocation($unit, 5, $from->id);
 
     $sender = outletManagerUser($from);
     $receiver = outletManagerUser($to);
@@ -227,6 +228,7 @@ it('lets the receiving manager reject a submitted request', function () {
     $from = Location::factory()->create();
     $to = Location::factory()->create();
     $unit = Unit::factory()->create(['quantity' => 50]);
+    stockAtLocation($unit, 5, $from->id);
 
     $sender = outletManagerUser($from);
     $receiver = outletManagerUser($to);

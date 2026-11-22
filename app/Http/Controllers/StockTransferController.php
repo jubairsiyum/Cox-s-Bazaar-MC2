@@ -19,6 +19,7 @@ use App\Services\AuditService;
 use App\Services\LocationScope;
 use App\Services\NotificationService;
 use App\Services\PurchaseApprovalNotifier;
+use App\Services\StockRequestNotifier;
 use App\Services\StockService;
 use App\Services\StockTransferService;
 use Illuminate\Database\Eloquent\Collection;
@@ -27,6 +28,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -131,6 +133,8 @@ class StockTransferController extends Controller
                     'created_by' => $request->user()->id,
                 ]);
 
+                StockTransferService::assertAvailableAtSource((int) $validated['from_location_id'], $items);
+
                 $this->saveItems($transfer, $items);
 
                 StockTransferService::applyStatusChange($transfer, null, $transfer->status);
@@ -167,6 +171,7 @@ class StockTransferController extends Controller
     public function edit(StockTransfer $stockTransfer): View
     {
         $this->authorize('update', $stockTransfer);
+        abort_if($stockTransfer->is_request, 403, 'Stock requests are decided by their source and cannot be edited.');
 
         $itemsEditable = $stockTransfer->status === StockTransferStatus::Draft;
 
@@ -196,6 +201,8 @@ class StockTransferController extends Controller
      */
     public function update(UpdateStockTransferRequest $request, StockTransfer $stockTransfer): RedirectResponse
     {
+        abort_if($stockTransfer->is_request, 403, 'Stock requests are decided by their source and cannot be edited.');
+
         $original = $stockTransfer->getOriginal();
         $fromStatus = StockTransferStatus::from((string) $stockTransfer->getRawOriginal('status'));
         $validated = $request->validated();
@@ -206,6 +213,8 @@ class StockTransferController extends Controller
         try {
             DB::transaction(function () use ($stockTransfer, $validated, $items, $itemsEditable, $shipping, $fromStatus) {
                 if ($itemsEditable) {
+                    StockTransferService::assertAvailableAtSource((int) $validated['from_location_id'], $items);
+
                     $stockTransfer->items()->delete();
                     $this->saveItems($stockTransfer, $items);
                 }
@@ -248,6 +257,8 @@ class StockTransferController extends Controller
     {
         $this->authorize('delete', $stockTransfer);
 
+        abort_if($stockTransfer->status === StockTransferStatus::Requested, 403, 'A pending stock request must be approved or rejected before it can be deleted.');
+
         if ($stockTransfer->status === StockTransferStatus::InTransit) {
             return back()->with('error', "Stock transfer '{$stockTransfer->reference_no}' is in transit. Cancel it before deleting.");
         }
@@ -270,7 +281,7 @@ class StockTransferController extends Controller
     {
         $this->authorize('approve', $stockTransfer);
 
-        if (! in_array($stockTransfer->status, [StockTransferStatus::Draft, StockTransferStatus::InTransit], true)) {
+        if (! in_array($stockTransfer->status, [StockTransferStatus::Draft, StockTransferStatus::InTransit, StockTransferStatus::Requested], true)) {
             return back()->with('error', "Stock transfer '{$stockTransfer->reference_no}' can no longer be approved.");
         }
 
@@ -279,6 +290,17 @@ class StockTransferController extends Controller
 
         try {
             DB::transaction(function () use ($stockTransfer, $fromStatus) {
+                // A draft or a stock request has not dispatched yet, so its stock is still to be taken from the source.
+                if (in_array($fromStatus, [StockTransferStatus::Draft, StockTransferStatus::Requested], true)) {
+                    StockTransferService::assertAvailableAtSource(
+                        (int) $stockTransfer->from_location_id,
+                        $stockTransfer->items()->orderBy('id')->get()
+                            ->map(fn ($item) => ['unit_id' => $item->unit_id, 'quantity' => $item->quantity])
+                            ->values()
+                            ->all()
+                    );
+                }
+
                 $stockTransfer->update([
                     'status' => StockTransferStatus::Received,
                     'approved_by' => Auth::id(),
@@ -287,11 +309,20 @@ class StockTransferController extends Controller
 
                 StockTransferService::applyStatusChange($stockTransfer, $fromStatus, StockTransferStatus::Received);
             });
-        } catch (InsufficientStockException $e) {
-            return back()->with('error', $e->getMessage());
+        } catch (InsufficientStockException|ValidationException $e) {
+            return back()->with('error', $e instanceof ValidationException
+                ? collect($e->errors())->flatten()->first()
+                : $e->getMessage());
         }
 
         AuditService::updated($stockTransfer, $original, "Stock transfer '{$stockTransfer->reference_no}' approved and received.");
+
+        if ($fromStatus === StockTransferStatus::Requested) {
+            StockRequestNotifier::approved($stockTransfer, Auth::user());
+
+            return redirect()->route('stock-transfers.index')
+                ->with('success', "Stock request '{$stockTransfer->reference_no}' approved. The stock has been sent to {$stockTransfer->toLocation?->name}.");
+        }
 
         $this->notifyCreator(
             $stockTransfer,
@@ -311,26 +342,42 @@ class StockTransferController extends Controller
 
     /**
      * Reject an incoming transfer: the receiving manager turns the request
-     * down. Any dispatched stock returns to the sending location.
+     * down. Any dispatched stock returns to the sending location. A stock
+     * request is turned down by its source with a reason; nothing has moved
+     * for it, so nothing returns.
      */
-    public function reject(StockTransfer $stockTransfer): RedirectResponse
+    public function reject(Request $request, StockTransfer $stockTransfer): RedirectResponse
     {
         $this->authorize('reject', $stockTransfer);
 
-        if (! in_array($stockTransfer->status, [StockTransferStatus::Draft, StockTransferStatus::InTransit], true)) {
+        if (! in_array($stockTransfer->status, [StockTransferStatus::Draft, StockTransferStatus::InTransit, StockTransferStatus::Requested], true)) {
             return back()->with('error', "Stock transfer '{$stockTransfer->reference_no}' can no longer be rejected.");
         }
+
+        $reason = $stockTransfer->is_request
+            ? $request->validate(['reason' => ['required', 'string', 'max:500']])['reason']
+            : null;
 
         $original = $stockTransfer->getOriginal();
         $fromStatus = StockTransferStatus::from((string) $stockTransfer->getRawOriginal('status'));
 
-        DB::transaction(function () use ($stockTransfer, $fromStatus) {
-            $stockTransfer->update(['status' => StockTransferStatus::Rejected]);
+        DB::transaction(function () use ($stockTransfer, $fromStatus, $reason) {
+            $stockTransfer->update([
+                'status' => StockTransferStatus::Rejected,
+                'rejection_reason' => $reason,
+            ]);
 
             StockTransferService::applyStatusChange($stockTransfer, $fromStatus, StockTransferStatus::Rejected);
         });
 
         AuditService::updated($stockTransfer, $original, "Stock transfer '{$stockTransfer->reference_no}' rejected.");
+
+        if ($stockTransfer->is_request) {
+            StockRequestNotifier::rejected($stockTransfer, Auth::user(), $reason);
+
+            return redirect()->route('stock-transfers.index')
+                ->with('success', "Stock request '{$stockTransfer->reference_no}' rejected.");
+        }
 
         $this->notifyCreator(
             $stockTransfer,
@@ -346,6 +393,27 @@ class StockTransferController extends Controller
 
         return redirect()->route('stock-transfers.index')
             ->with('success', "Stock transfer '{$stockTransfer->reference_no}' rejected.");
+    }
+
+    /**
+     * Withdraw a pending stock request: the requesting branch calls it back
+     * before the source decides. No stock has moved, so nothing is reversed.
+     */
+    public function withdraw(Request $request, StockTransfer $stockTransfer): RedirectResponse
+    {
+        $this->authorize('withdraw', $stockTransfer);
+        abort_unless((int) $stockTransfer->created_by === (int) $request->user()?->id, 403);
+
+        $original = $stockTransfer->getOriginal();
+
+        $stockTransfer->update(['status' => StockTransferStatus::Cancelled]);
+
+        AuditService::updated($stockTransfer, $original, "Stock request '{$stockTransfer->reference_no}' withdrawn by the requesting branch.");
+
+        StockRequestNotifier::withdrawn($stockTransfer, $request->user());
+
+        return redirect()->route('stock-transfers.index')
+            ->with('success', "Stock request '{$stockTransfer->reference_no}' withdrawn.");
     }
 
     /**
@@ -564,17 +632,21 @@ class StockTransferController extends Controller
             ->get()
             ->keyBy('id');
 
-        return collect($rows)->map(function (array $row) use ($units) {
+        $stocks = StockService::scopedQuantitiesFor($units, Auth::user());
+
+        return collect($rows)->values()->map(function (array $row, int $index) use ($units, $stocks) {
             $unit = $units->get((int) ($row['unit_id'] ?? 0));
 
             return [
                 'unit_id' => (int) ($row['unit_id'] ?? 0),
                 'product_name' => $unit?->displayName() ?? 'Unknown product',
                 'unit' => $unit?->unit ?? '',
+                'stock' => $unit ? ($stocks[$unit->id] ?? 0) : null,
                 'quantity' => (int) ($row['quantity'] ?? 1),
                 'unit_price' => (float) ($row['unit_price'] ?? 0),
+                'error' => session('errors')?->first("items.{$index}.quantity"),
             ];
-        })->values()->all();
+        })->all();
     }
 
     /**
@@ -584,10 +656,13 @@ class StockTransferController extends Controller
      */
     private function presentItems(StockTransfer $stockTransfer): array
     {
+        $stocks = StockService::scopedQuantitiesFor($stockTransfer->items->pluck('unit')->filter(), Auth::user());
+
         return $stockTransfer->items->map(fn ($item) => [
             'unit_id' => (int) $item->unit_id,
             'product_name' => $item->unit?->displayName() ?? 'Unknown product',
             'unit' => $item->unit?->unit ?? '',
+            'stock' => $stocks[(int) $item->unit_id] ?? null,
             'quantity' => (int) $item->quantity,
             'unit_price' => (float) $item->unit_price,
         ])->values()->all();

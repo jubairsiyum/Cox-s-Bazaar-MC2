@@ -43,9 +43,13 @@ function salesInvoicePayload(Unit $unit, array $overrides = []): array
  */
 function salesDraftInvoice(Unit $unit, int $quantity = 2, float $rate = 500.0, array $attributes = []): SalesInvoice
 {
+    $locationId = $attributes['location_id'] ?? Location::factory()->create()->id;
+
+    stockAtLocation($unit, $quantity, $locationId);
+
     $invoice = SalesInvoice::factory()->create(array_merge([
         'customer_id' => Customer::factory()->create()->id,
-        'location_id' => Location::factory()->create()->id,
+        'location_id' => $locationId,
     ], $attributes));
 
     $invoice->items()->create([

@@ -36,6 +36,14 @@
         || request()->filled('brand_id')
         || request()->filled('category_id');
 
+    $pendingProductRequestsCount = \App\Models\ProductRequest::query()
+        ->visibleTo(auth()->user())
+        ->where('status', \App\Enums\ProductRequestStatus::Pending)
+        ->count();
+
+    $canRequestStock = \App\Services\BranchScope::locationId(auth()->user()) !== null
+        && auth()->user()->can('createRequest', \App\Models\StockTransfer::class);
+
     $currentStatus = request('status', '');
     $statusLink = fn (?string $status) => route('products.index', array_filter([
         'search' => request('search'),
@@ -251,6 +259,28 @@
                         {{ number_format($inactiveProductsCount) }}
                     </span>
                 </a>
+
+                <span class="mx-1 hidden sm:inline-block h-5 w-px bg-line" aria-hidden="true"></span>
+
+                @can('viewAny', \App\Models\ProductRequest::class)
+                    <a href="{{ route('products.requests.index') }}"
+                       class="btn-scale inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs hover:border-brand-500 hover:text-brand-500 transition-colors">
+                        <span>Product Requests</span>
+                        @if($pendingProductRequestsCount > 0)
+                            <span class="rounded-full bg-warning/10 px-1.5 py-0.2 text-[10px] font-bold text-warning tabular-nums">
+                                {{ number_format($pendingProductRequestsCount) }}
+                            </span>
+                        @endif
+                    </a>
+                @endcan
+
+                @can('create', \App\Models\ProductRequest::class)
+                    <a href="{{ route('products.requests.create') }}"
+                       class="btn-scale inline-flex items-center gap-1.5 rounded-full bg-brand-500 px-3 py-1.5 text-xs font-semibold text-on-brand shadow-xs hover:bg-brand-600 transition-colors">
+                        <x-icon name="plus" class="size-3.5" />
+                        <span>New Product Request</span>
+                    </a>
+                @endcan
             </div>
         </div>
 
@@ -508,6 +538,14 @@
                             {{-- Actions --}}
                             <td class="py-4 px-5 text-end whitespace-nowrap">
                                 <div class="inline-flex items-center justify-end gap-2">
+                                    @if($canRequestStock && $stockRow)
+                                        <a href="{{ route('stock-transfers.requests.create', ['product' => $product->id]) }}"
+                                           class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-brand-500/30 bg-brand-500/10 px-3 py-1.5 text-xs font-semibold text-brand-500 hover:bg-brand-500 hover:text-on-brand transition-colors"
+                                           title="Request stock of {{ $product->name }}">
+                                            <x-icon name="truck" class="size-3.5" />
+                                            <span>Request Stock</span>
+                                        </a>
+                                    @endif
                                     @can('update', $product)
                                         <a href="{{ route('products.edit', $product) }}"
                                            class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs hover:border-brand-500 hover:text-brand-500 hover:bg-soft transition-colors"
@@ -672,6 +710,14 @@
                                     {{ $product->brand?->name ?? 'Unbranded' }}
                                 </span>
                                 <div class="inline-flex items-center gap-1.5">
+                                    @if($canRequestStock && $stockRow)
+                                        <a href="{{ route('stock-transfers.requests.create', ['product' => $product->id]) }}"
+                                           class="btn-scale inline-flex items-center gap-1 rounded-xl border border-brand-500/30 bg-brand-500/10 px-3 py-1.5 text-xs font-semibold text-brand-500 hover:bg-brand-500 hover:text-on-brand transition-colors"
+                                           title="Request stock of {{ $product->name }}">
+                                            <x-icon name="truck" class="size-3.5" />
+                                            <span>Request Stock</span>
+                                        </a>
+                                    @endif
                                     @can('update', $product)
                                         <a href="{{ route('products.edit', $product) }}"
                                            class="btn-scale inline-flex items-center gap-1 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs hover:border-brand-500 hover:text-brand-500 hover:bg-soft transition-colors">
@@ -758,6 +804,14 @@
                                         Not available at any branch
                                     </span>
                                 @endforelse
+                                @if($canRequestStock && $crossProduct->stockRow)
+                                    <a href="{{ route('stock-transfers.requests.create', ['product' => $crossProduct->id]) }}"
+                                       class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-brand-500/30 bg-brand-500/10 px-3 py-1.5 text-xs font-semibold text-brand-500 hover:bg-brand-500 hover:text-on-brand transition-colors"
+                                       title="Request stock of {{ $crossProduct->name }}">
+                                        <x-icon name="truck" class="size-3.5" />
+                                        <span>Request Stock</span>
+                                    </a>
+                                @endif
                             </div>
                         </div>
                     @endforeach

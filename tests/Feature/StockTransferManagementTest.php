@@ -21,11 +21,15 @@ beforeEach(function () {
  */
 function transferPayload(Unit $unit, string $status = 'draft', int $quantity = 5, float $unitPrice = 200.0, float $shipping = 100.0): array
 {
+    $from = Location::factory()->create();
+
+    stockAtLocation($unit, $quantity, $from->id);
+
     return [
         'transfer_date' => now()->format('Y-m-d\TH:i'),
         'reference_no' => null,
         'status' => $status,
-        'from_location_id' => Location::factory()->create()->id,
+        'from_location_id' => $from->id,
         'to_location_id' => Location::factory()->create()->id,
         'shipping_charges' => $shipping,
         'additional_notes' => 'Handle with care',
@@ -98,11 +102,13 @@ it('does not move stock while a transfer is a draft', function () {
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 50]);
+    $payload = transferPayload($unit);
+    $movementsBefore = $unit->stockMovements()->count();
 
-    $this->post(route('stock-transfers.store'), transferPayload($unit))->assertRedirect();
+    $this->post(route('stock-transfers.store'), $payload)->assertRedirect();
 
     expect($unit->fresh()->quantity)->toBe(50)
-        ->and($unit->stockMovements()->count())->toBe(1); // opening stock only
+        ->and($unit->stockMovements()->count())->toBe($movementsBefore);
 });
 
 it('moves stock out when a transfer is dispatched and back in when received', function () {
@@ -160,7 +166,7 @@ it('blocks dispatching more stock than available', function () {
     $unit = Unit::factory()->create(['quantity' => 3]);
 
     $this->post(route('stock-transfers.store'), transferPayload($unit, 'in-transit', 5))
-        ->assertSessionHas('error');
+        ->assertSessionHasErrors(['items.0.quantity']);
 
     $this->assertDatabaseCount('stock_transfers', 0);
     expect($unit->fresh()->quantity)->toBe(3);
@@ -344,6 +350,7 @@ it('notifies the receiving managers on creation and the creator on decisions', f
 
     expect($admin->fresh()->notifications()->first()->data['type'])->toBe('success');
 
+    stockAtLocation($unit, 5, $payload['from_location_id']);
     $this->post(route('stock-transfers.store'), $payload)->assertRedirect();
     $second = StockTransfer::latest('id')->first();
 
@@ -352,6 +359,7 @@ it('notifies the receiving managers on creation and the creator on decisions', f
     expect(collect($admin->fresh()->notifications)->pluck('data.type')->all())
         ->toContain('error');
 
+    stockAtLocation($unit, 5, $payload['from_location_id']);
     $this->post(route('stock-transfers.store'), $payload)->assertRedirect();
     $third = StockTransfer::latest('id')->first();
 

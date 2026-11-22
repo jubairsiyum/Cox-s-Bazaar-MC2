@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\StockTransferStatus;
 use App\Models\StockTransfer;
 use App\Models\User;
+use App\Services\BranchScope;
 use App\Services\LocationScope;
 
 class StockTransferPolicy
@@ -29,23 +31,46 @@ class StockTransferPolicy
         return $user->can('stock-transfers.manage');
     }
 
-    public function update(User $user, StockTransfer $stockTransfer): bool
+    /**
+     * Request stock from another location: any branch-assigned user may ask.
+     * The requesting location is always the user's own branch.
+     */
+    public function createRequest(User $user): bool
     {
         return $user->can('stock-transfers.manage')
+            && BranchScope::locationId($user) !== null;
+    }
+
+    /**
+     * Stock requests are decided by the source, never edited in place.
+     */
+    public function update(User $user, StockTransfer $stockTransfer): bool
+    {
+        return ! $stockTransfer->is_request
+            && $user->can('stock-transfers.manage')
             && LocationScope::canAccess($user, $stockTransfer->from_location_id);
     }
 
     public function delete(User $user, StockTransfer $stockTransfer): bool
     {
-        return $user->can('stock-transfers.manage')
+        return $stockTransfer->status !== StockTransferStatus::Requested
+            && $user->can('stock-transfers.manage')
             && LocationScope::canAccess($user, $stockTransfer->from_location_id);
     }
 
     /**
-     * Approve (receive) a transfer: only the receiving side may do this.
+     * Approve (receive) a transfer. A plain transfer is received by the
+     * receiving side; a stock request is approved by the source it was made to,
+     * and never by the branch that asked for it.
      */
     public function approve(User $user, StockTransfer $stockTransfer): bool
     {
+        if ($stockTransfer->is_request) {
+            return $user->can('stock-transfers.approve')
+                && LocationScope::canAccess($user, $stockTransfer->from_location_id)
+                && $stockTransfer->created_by !== $user->id;
+        }
+
         return $user->can('stock-transfers.approve')
             && LocationScope::canAccess($user, $stockTransfer->to_location_id);
     }
@@ -56,6 +81,17 @@ class StockTransferPolicy
     public function reject(User $user, StockTransfer $stockTransfer): bool
     {
         return $this->approve($user, $stockTransfer);
+    }
+
+    /**
+     * Withdraw a pending stock request: only the branch that raised it, while
+     * the source has not decided yet.
+     */
+    public function withdraw(User $user, StockTransfer $stockTransfer): bool
+    {
+        return $stockTransfer->is_request
+            && $stockTransfer->status === StockTransferStatus::Requested
+            && $stockTransfer->created_by === $user->id;
     }
 
     /**

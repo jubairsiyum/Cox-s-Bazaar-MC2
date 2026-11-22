@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\StockMovementType;
+use App\Exceptions\InsufficientStockException;
 use App\Services\StockService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -51,6 +52,18 @@ class Unit extends Model
                     'note' => 'Opening stock',
                     'created_by' => $unit->created_by,
                 ]);
+            }
+        });
+
+        // Model-level guard: a direct write may never take stock below zero.
+        // StockService writes quietly and enforces the same rule itself.
+        static::updating(function (Unit $unit) {
+            $new = (int) $unit->quantity;
+
+            if ($unit->isDirty('quantity') && $new < 0 && ! StockService::allowsNegativeStock()) {
+                $old = (int) $unit->getOriginal('quantity');
+
+                throw InsufficientStockException::for($unit->displayName(), $old, $old - $new);
             }
         });
 
