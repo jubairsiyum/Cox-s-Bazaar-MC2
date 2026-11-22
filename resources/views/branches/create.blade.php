@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Add Location — ' . config('app.name', "Cox's Bazaar Mobile Center"))
-@section('page_title', 'Warehouses')
+@section('title', 'Add Branch — ' . config('app.name', "Cox's Bazaar Mobile Center"))
+@section('page_title', 'Branches')
 
 @section('content')
 <div class="space-y-6">
@@ -17,13 +17,13 @@
                 <span class="text-muted/60">/</span>
                 <span class="text-muted">Inventory</span>
                 <span class="text-muted/60">/</span>
-                <a href="{{ route('warehouses.index') }}" class="hover:text-brand-500 transition-colors">Warehouses</a>
+                <a href="{{ route('branches.index') }}" class="hover:text-brand-500 transition-colors">Branches</a>
                 <span class="text-muted/60">/</span>
-                <span class="font-medium text-ink">Add Location</span>
+                <span class="font-medium text-ink">Add Branch</span>
             </nav>
 
             <div class="flex items-center gap-3 flex-wrap">
-                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink">Add Location</h1>
+                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink">Add Branch</h1>
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-xs font-semibold text-brand-500 ring-1 ring-brand-500/20">
                     New Warehouse / Outlet
                 </span>
@@ -31,10 +31,10 @@
             <p class="text-xs sm:text-sm text-muted mt-1">Register a warehouse, brand shop, or SR placement for inventory and stock transfer tracking.</p>
         </div>
 
-        <a href="{{ route('warehouses.index') }}"
+        <a href="{{ route('branches.index') }}"
            class="btn-scale inline-flex items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-2.5 text-xs sm:text-sm font-semibold text-ink shadow-2xs hover:bg-soft hover:text-brand-500 transition-colors shrink-0">
             <x-svg.arrow-left class="size-4" />
-            <span>Back to Warehouses</span>
+            <span>Back to Branches</span>
         </a>
     </div>
 
@@ -62,19 +62,19 @@
                 <x-icon name="warehouse" class="size-5" />
             </div>
             <div>
-                <h2 class="text-base font-bold text-ink">Location Profile</h2>
+                <h2 class="text-base font-bold text-ink">Branch Profile</h2>
                 <p class="text-xs text-muted mt-0.5">Define identifying code, location type, operational status, and contact information.</p>
             </div>
         </div>
 
-        <form method="POST" action="{{ route('warehouses.store') }}" class="space-y-6">
+        <form method="POST" action="{{ route('branches.store') }}" class="space-y-6">
             @csrf
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {{-- Location Name --}}
                 <div>
                     <label for="name" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
-                        Location Name <span class="text-danger">*</span>
+                        Branch Name <span class="text-danger">*</span>
                     </label>
                     <input type="text" id="name" name="name" value="{{ old('name') }}" required
                            placeholder="e.g. Main Warehouse, Brand Shop - Cox's Bazar"
@@ -87,7 +87,7 @@
                 {{-- Location Code --}}
                 <div>
                     <label for="code" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
-                        Location Code
+                        Branch Code
                     </label>
                     <input type="text" id="code" name="code" value="{{ old('code') }}"
                            placeholder="e.g. WH01 (optional, unique)"
@@ -171,14 +171,14 @@
 
             {{-- Form Footer Actions --}}
             <div class="pt-5 border-t border-line flex items-center justify-end gap-3">
-                <a href="{{ route('warehouses.index') }}"
+                <a href="{{ route('branches.index') }}"
                    class="btn-scale rounded-2xl border border-line bg-surface px-5 py-2.5 text-xs sm:text-sm font-semibold text-ink hover:bg-soft transition-colors">
                     Cancel
                 </a>
                 <button type="submit"
                         class="btn-scale inline-flex items-center gap-2 rounded-2xl bg-brand-500 hover:bg-brand-600 px-6 py-2.5 text-xs sm:text-sm font-semibold text-on-brand shadow-sm transition-colors cursor-pointer">
                     <x-icon name="check" class="size-4" />
-                    <span>Save Location</span>
+                    <span>Save Branch</span>
                 </button>
             </div>
         </form>

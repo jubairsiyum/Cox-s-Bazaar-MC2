@@ -1,11 +1,11 @@
 @extends('layouts.app')
 
-@section('title', 'Stock Levels — ' . config('app.name', "Cox's Bazaar Mobile Center"))
-@section('page_title', 'Stock Levels')
+@section('title', 'Stocks — ' . config('app.name', "Cox's Bazaar Mobile Center"))
+@section('page_title', 'Stocks')
 
 @section('content')
 @php
-    $sortLink = fn (string $col) => route('inventory.index', array_filter([
+    $sortLink = fn (string $col) => route('stocks.index', array_filter([
         'search' => request('search'),
         'brand_id' => request('brand_id'),
         'category_id' => request('category_id'),
@@ -17,7 +17,7 @@
         'direction' => $sort === $col && $direction === 'asc' ? 'desc' : 'asc',
     ]));
 
-    $statusFilterLink = fn (?string $status) => route('inventory.index', array_filter([
+    $statusFilterLink = fn (?string $status) => route('stocks.index', array_filter([
         'search' => request('search'),
         'brand_id' => request('brand_id'),
         'category_id' => request('category_id'),
@@ -61,12 +61,12 @@
                 <span class="text-muted/60">/</span>
                 <span class="text-muted">Inventory</span>
                 <span class="text-muted/60">/</span>
-                <span class="font-medium text-ink">Stock Levels</span>
+                <span class="font-medium text-ink">Stocks</span>
             </nav>
 
             {{-- Title & Context Pills --}}
             <div class="flex items-center gap-3 flex-wrap">
-                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink">Stock Levels</h1>
+                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink">Stocks</h1>
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-xs font-semibold text-brand-500 ring-1 ring-brand-500/20 tabular-nums">
                     <span class="size-1.5 rounded-full bg-brand-500"></span>
                     {{ number_format($totalSkus) }} {{ Str::plural('SKU', $totalSkus) }}
@@ -82,7 +82,7 @@
         {{-- Right Quick Actions --}}
         <div class="flex items-center gap-2.5 flex-wrap shrink-0">
             @if($hasActiveFilters || request('sort'))
-                <a href="{{ route('inventory.index') }}"
+                <a href="{{ route('stocks.index') }}"
                    class="btn-scale inline-flex items-center gap-1.5 rounded-2xl border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-muted hover:text-ink hover:bg-soft transition-colors shadow-2xs">
                     <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -249,7 +249,7 @@
             </div>
 
             @if(auth()->user()?->hasRole('Super Admin'))
-                <form method="GET" action="{{ route('inventory.index') }}" class="flex items-center gap-2 shrink-0">
+                <form method="GET" action="{{ route('stocks.index') }}" class="flex items-center gap-2 shrink-0">
                     @if(request('search'))<input type="hidden" name="search" value="{{ request('search') }}">@endif
                     @if(request('brand_id'))<input type="hidden" name="brand_id" value="{{ request('brand_id') }}">@endif
                     @if(request('category_id'))<input type="hidden" name="category_id" value="{{ request('category_id') }}">@endif
@@ -277,7 +277,7 @@
 
         {{-- Filter Command Toolbar --}}
         <div class="px-5 sm:px-6 py-4 border-b border-line bg-canvas/40">
-            <form method="GET" action="{{ route('inventory.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+            <form method="GET" action="{{ route('stocks.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
                 @if(request('sort'))<input type="hidden" name="sort" value="{{ request('sort') }}">@endif
                 @if(request('direction'))<input type="hidden" name="direction" value="{{ request('direction') }}">@endif
                 @if(request('branch'))<input type="hidden" name="branch" value="{{ request('branch') }}">@endif
@@ -514,7 +514,7 @@
                                         @endif
                                     </p>
                                     @if($hasActiveFilters)
-                                        <a href="{{ route('inventory.index') }}"
+                                        <a href="{{ route('stocks.index') }}"
                                            class="mt-4 rounded-xl border border-line bg-surface px-4 py-2 text-xs font-semibold text-ink hover:bg-soft transition-colors shadow-2xs">
                                             Reset Filters
                                         </a>
@@ -721,7 +721,7 @@ function ledgerModal() {
             this.modalOpen = true;
 
             try {
-                const response = await fetch(`/inventory/${unitId}/movements?${new URLSearchParams(window.location.search)}`, {
+                const response = await fetch(`/stocks/${unitId}/movements?${new URLSearchParams(window.location.search)}`, {
                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
                 });
                 const data = await response.json();

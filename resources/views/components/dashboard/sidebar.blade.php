@@ -6,7 +6,7 @@ $sidebarUnreadBadge = $sidebarUnreadCount > 0 ? ($sidebarUnreadCount > 99 ? '99+
 $menuGroups = $isSupplierPortal ? MenuHelper::getSupplierPortalGroups($sidebarUnreadBadge) : MenuHelper::getMenuGroups();
 
 // Realign navigation for intuitive ERP UX:
-// 1. "Inventory" holds operational product & stock items (Products, Stock Levels, Transfers, Adjustments, Warehouses)
+// 1. "Inventory" holds operational product & stock items (Products, Stocks, Transfers, Adjustments, Branches)
 // 2. "Master Data" is a dedicated section for administrative control of core lookups (Brands, Categories, Units)
 // 3. "Notifications" is nested under "Administration"
 // 4. Order sections logically: Operations -> Logistics & Partners -> Finance & Reports -> Master Data & Administration
@@ -22,13 +22,13 @@ foreach ($menuGroups as &$groupRef) {
   // Inventory sub-items
   $invSubMap = collect($itemMap->get('Inventory')['subItems'] ?? [])->keyBy('name');
 
-  // 1. Inventory: Product catalog + physical stock operations & warehouses
+  // 1. Inventory: Product catalog + physical stock operations & branches
   $inventorySubItems = array_values(array_filter([
     $masterSubMap->get('Products'),
-    $invSubMap->get('Stock Levels'),
+    $invSubMap->get('Stocks'),
     $invSubMap->get('Transfers'),
     $invSubMap->get('Adjustments'),
-    $invSubMap->get('Warehouses'),
+    $invSubMap->get('Branches'),
   ]));
 
   $inventoryCanAny = [
@@ -36,7 +36,7 @@ foreach ($menuGroups as &$groupRef) {
     'inventory.view',
     'stock-transfers.manage',
     'stock-adjustments.manage',
-    'warehouses.manage',
+    'branches.manage',
   ];
 
   $alignedInventory = [

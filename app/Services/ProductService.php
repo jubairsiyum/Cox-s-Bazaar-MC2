@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\Location;
 use App\Models\Product;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -22,14 +23,29 @@ class ProductService
      */
     public static function create(array $attributes, int $quantity, string $unitOfMeasure): Product
     {
-        $product = Product::create($attributes);
+        // Every product is assigned to a branch, defaulting to the Main
+        // Warehouse so nothing is ever left "unassigned". The request value
+        // arrives as a string, so coerce it to an int for the stock ledger.
+        $locationId = $attributes['location_id'] ?? Location::mainWarehouse()?->id;
+        $locationId = $locationId !== null ? (int) $locationId : null;
 
-        // Every product gets a single stock row so it shows up in Units and Transfers.
-        $product->stockRow()->create([
-            'quantity' => $quantity,
+        $product = Product::create([
+            ...$attributes,
+            'location_id' => $locationId,
+        ]);
+
+        // Every product gets a single stock row so it shows up in Units and
+        // Transfers. The opening stock lands at the product's own location,
+        // not the central pool.
+        $stockRow = $product->stockRow()->create([
+            'quantity' => 0,
             'unit' => $unitOfMeasure,
             'created_by' => $attributes['created_by'],
         ]);
+
+        if ($quantity > 0) {
+            StockService::restock($stockRow, $quantity, $product, 'Opening stock', $locationId);
+        }
 
         AuditService::created($product, "Product '{$product->name}' ({$product->product_id}) created.");
 

@@ -85,13 +85,14 @@ it('shows the receive action to the requesting branch while in transit', functio
 });
 
 it('receives the product, flips the delivery status to delivered and moves stock to the branch', function () {
+    $warehouse = Location::factory()->warehouse()->create(['name' => 'Main Warehouse']);
     $location = Location::factory()->create(['name' => 'Outlet North']);
     $manager = deliveryBranchManager($location);
     $request = approvedDeliveryRequest($location, $manager, 4);
     $unit = $request->createdProduct->stockRow;
 
     expect(StockService::quantityAt($unit, $location->id))->toBe(0)
-        ->and(StockService::availableAt($unit, null))->toBe(4);
+        ->and(StockService::quantityAt($unit, $warehouse->id))->toBe(4);
 
     $this->actingAs($manager)
         ->patch(route('products.requests.receive', $request))
@@ -103,7 +104,7 @@ it('receives the product, flips the delivery status to delivered and moves stock
         ->and($request->delivered_at)->not->toBeNull()
         ->and($request->received_by)->toBe($manager->id)
         ->and(StockService::quantityAt($unit, $location->id))->toBe(4)
-        ->and(StockService::availableAt($unit, null))->toBe(0);
+        ->and(StockService::quantityAt($unit, $warehouse->id))->toBe(0);
 });
 
 it('notifies the Super Admin when the branch receives the product', function () {

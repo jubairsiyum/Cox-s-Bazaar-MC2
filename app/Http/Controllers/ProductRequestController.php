@@ -10,6 +10,7 @@ use App\Exceptions\InsufficientStockException;
 use App\Http\Requests\Product\SubmitProductRequestRequest;
 use App\Models\Brand;
 use App\Models\Category;
+use App\Models\Location;
 use App\Models\Product;
 use App\Models\ProductRequest;
 use App\Services\AuditService;
@@ -153,7 +154,10 @@ class ProductRequestController extends Controller
             $original = $locked->getOriginal();
 
             $product = ProductService::create(
-                $locked->toProductAttributes() + ['created_by' => Auth::id()],
+                $locked->toProductAttributes() + [
+                    'created_by' => Auth::id(),
+                    'location_id' => Location::mainWarehouse()?->id,
+                ],
                 (int) $locked->quantity,
                 $locked->unit,
             );
@@ -219,7 +223,7 @@ class ProductRequestController extends Controller
     /**
      * The requesting branch receives the approved product: the delivery leg
      * flips to "Delivered" and the product's opening stock moves from the
-     * central pool to the branch's ledger.
+     * Main Warehouse (its assigned branch) to the branch's ledger.
      */
     public function receive(ProductRequest $productRequest): RedirectResponse
     {
@@ -238,6 +242,7 @@ class ProductRequestController extends Controller
                 }
 
                 $unit = $locked->createdProduct?->stockRow;
+                $warehouseId = $locked->createdProduct?->location_id;
                 $branchId = $locked->location_id;
                 $quantity = (int) $locked->quantity;
 
@@ -245,7 +250,7 @@ class ProductRequestController extends Controller
                     StockService::transferBetweenLocations(
                         $unit,
                         $quantity,
-                        null,
+                        $warehouseId,
                         $branchId,
                         $locked,
                         "Product request '{$locked->displayName()}' received at the branch."

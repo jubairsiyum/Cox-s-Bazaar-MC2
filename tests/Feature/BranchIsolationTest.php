@@ -99,7 +99,7 @@ it('shows an unassigned user no operational data at all', function () {
     $this->actingAs($user)->get(route('supplier-payments.index'))
         ->assertOk();
 
-    $this->actingAs($user)->get(route('inventory.index'))
+    $this->actingAs($user)->get(route('stocks.index'))
         ->assertOk()
         ->assertDontSee('Strictly Held Phone');
 
@@ -192,13 +192,13 @@ it('scopes inventory stock levels to their own branch', function () {
 
     $storekeeper = branchUserAt($mine, 'Storekeeper', 'Branch A Storekeeper');
 
-    $this->actingAs($storekeeper)->get(route('inventory.index'))
+    $this->actingAs($storekeeper)->get(route('stocks.index'))
         ->assertOk()
         ->assertSee('My Branch Phone')
         ->assertDontSee('Other Branch Phone');
 
     // Location/branch URL params cannot widen the inventory scope either.
-    $this->actingAs($storekeeper)->get(route('inventory.index', [
+    $this->actingAs($storekeeper)->get(route('stocks.index', [
         'location_id' => $other->id,
         'branch' => $other->branch_id,
     ]))

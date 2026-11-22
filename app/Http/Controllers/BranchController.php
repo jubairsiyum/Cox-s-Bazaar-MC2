@@ -8,12 +8,14 @@ use App\Http\Requests\Location\StoreLocationRequest;
 use App\Http\Requests\Location\UpdateLocationRequest;
 use App\Models\Location;
 use App\Services\AuditService;
+use App\Services\BranchProfileData;
+use App\Services\BranchScope;
 use App\Services\DuplicateCheckService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
-class WarehouseController extends Controller
+class BranchController extends Controller
 {
     /**
      * Columns that the list can be sorted by.
@@ -45,7 +47,7 @@ class WarehouseController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
-        return view('warehouses.index', [
+        return view('branches.index', [
             'locations' => $locations,
             'perPage' => $perPage,
             'sort' => $sort,
@@ -60,7 +62,7 @@ class WarehouseController extends Controller
     {
         $this->authorize('create', Location::class);
 
-        return view('warehouses.create');
+        return view('branches.create');
     }
 
     /**
@@ -83,7 +85,7 @@ class WarehouseController extends Controller
 
             AuditService::created($reusable, "Location '{$reusable->name}' restored and updated.");
 
-            return redirect()->route('warehouses.index')
+            return redirect()->route('branches.index')
                 ->with('success', "Location '{$reusable->name}' restored and updated successfully.");
         }
 
@@ -91,8 +93,25 @@ class WarehouseController extends Controller
 
         AuditService::created($location, "Location '{$location->name}' created.");
 
-        return redirect()->route('warehouses.index')
+        return redirect()->route('branches.index')
             ->with('success', "Location '{$location->name}' created successfully.");
+    }
+
+    /**
+     * Display a branch's operational profile.
+     */
+    public function show(Request $request, Location $location): View
+    {
+        $this->authorize('view', $location);
+
+        // The LocationPolicy grants `branches.manage` to everyone who holds
+        // it, so enforce strict own-branch isolation here for non-Super-Admins.
+        abort_unless(BranchScope::canAccess($request->user(), $location->id), 403);
+
+        return view('branches.show', [
+            'location' => $location,
+            'data' => BranchProfileData::for($location, $request->user()),
+        ]);
     }
 
     /**
@@ -102,7 +121,7 @@ class WarehouseController extends Controller
     {
         $this->authorize('update', $location);
 
-        return view('warehouses.edit', ['location' => $location]);
+        return view('branches.edit', ['location' => $location]);
     }
 
     /**
@@ -119,7 +138,7 @@ class WarehouseController extends Controller
 
         AuditService::updated($location, $original, "Location '{$location->name}' updated.");
 
-        return redirect()->route('warehouses.index')
+        return redirect()->route('branches.index')
             ->with('success', "Location '{$location->name}' updated successfully.");
     }
 
@@ -134,7 +153,7 @@ class WarehouseController extends Controller
 
         AuditService::deleted($location, "Location '{$location->name}' deleted.");
 
-        return redirect()->route('warehouses.index')
+        return redirect()->route('branches.index')
             ->with('success', "Location '{$location->name}' deleted successfully.");
     }
 }

@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Edit Location — ' . config('app.name', "Cox's Bazaar Mobile Center"))
-@section('page_title', 'Warehouses')
+@section('title', 'Edit Branch — ' . config('app.name', "Cox's Bazaar Mobile Center"))
+@section('page_title', 'Branches')
 
 @section('content')
 <div class="space-y-6">
@@ -17,13 +17,13 @@
                 <span class="text-muted/60">/</span>
                 <span class="text-muted">Inventory</span>
                 <span class="text-muted/60">/</span>
-                <a href="{{ route('warehouses.index') }}" class="hover:text-brand-500 transition-colors">Warehouses</a>
+                <a href="{{ route('branches.index') }}" class="hover:text-brand-500 transition-colors">Branches</a>
                 <span class="text-muted/60">/</span>
-                <span class="font-medium text-ink">Edit Location</span>
+                <span class="font-medium text-ink">Edit Branch</span>
             </nav>
 
             <div class="flex items-center gap-3 flex-wrap">
-                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink">Edit Location</h1>
+                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink">Edit Branch</h1>
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-xs font-semibold text-brand-500 ring-1 ring-brand-500/20">
                     {{ $location->name }}
                 </span>
@@ -32,10 +32,10 @@
             <p class="text-xs sm:text-sm text-muted mt-1">Update warehouse or outlet metadata without disrupting existing transfer records.</p>
         </div>
 
-        <a href="{{ route('warehouses.index') }}"
+        <a href="{{ route('branches.index') }}"
            class="btn-scale inline-flex items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-2.5 text-xs sm:text-sm font-semibold text-ink shadow-2xs hover:bg-soft hover:text-brand-500 transition-colors shrink-0">
             <x-svg.arrow-left class="size-4" />
-            <span>Back to Warehouses</span>
+            <span>Back to Branches</span>
         </a>
     </div>
 
@@ -63,12 +63,12 @@
                 <x-svg.pencil class="size-5" />
             </div>
             <div>
-                <h2 class="text-base font-bold text-ink">Location Profile</h2>
-                <p class="text-xs text-muted mt-0.5">Location ID #{{ $location->id }} @if($location->code) · Code {{ $location->code }} @endif</p>
+                <h2 class="text-base font-bold text-ink">Branch Profile</h2>
+                <p class="text-xs text-muted mt-0.5">Branch ID #{{ $location->id }} @if($location->code) · Code {{ $location->code }} @endif</p>
             </div>
         </div>
 
-        <form method="POST" action="{{ route('warehouses.update', $location) }}" class="space-y-6">
+        <form method="POST" action="{{ route('branches.update', $location) }}" class="space-y-6">
             @csrf
             @method('PATCH')
 
@@ -76,7 +76,7 @@
                 {{-- Location Name --}}
                 <div>
                     <label for="name" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
-                        Location Name <span class="text-danger">*</span>
+                        Branch Name <span class="text-danger">*</span>
                     </label>
                     <input type="text" id="name" name="name" value="{{ old('name', $location->name) }}" required
                            placeholder="e.g. Main Warehouse, Brand Shop - Cox's Bazar"
@@ -89,7 +89,7 @@
                 {{-- Location Code --}}
                 <div>
                     <label for="code" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
-                        Location Code
+                        Branch Code
                     </label>
                     <input type="text" id="code" name="code" value="{{ old('code', $location->code) }}"
                            placeholder="e.g. WH01 (optional, unique)"
@@ -173,7 +173,7 @@
 
             {{-- Form Footer Actions --}}
             <div class="pt-5 border-t border-line flex items-center justify-end gap-3">
-                <a href="{{ route('warehouses.index') }}"
+                <a href="{{ route('branches.index') }}"
                    class="btn-scale rounded-2xl border border-line bg-surface px-5 py-2.5 text-xs sm:text-sm font-semibold text-ink hover:bg-soft transition-colors">
                     Cancel
                 </a>

@@ -139,7 +139,7 @@
 
 ### Permissions
 - `brands.manage`, `categories.manage`, `units.manage`, `products.manage/view`,
-  `warehouses.manage`, `settings.manage` (already seeded).
+  `branches.manage`, `settings.manage` (already seeded).
 
 ### Dependencies
 - None — implement right after Module 02 (products are needed by 04, 05, 08, 09, 11).
@@ -166,7 +166,7 @@
 - Derived `current_stock` view/materialized query (product × location).
 
 ### Screens
-- `/inventory` (stock overview), `/inventory/ledger`, `/stock-transfers`, `/stock-adjustments`.
+- `/stocks` (stock overview), `/inventory/ledger`, `/stock-transfers`, `/stock-adjustments`.
 
 ### Permissions
 - `inventory.view`, `stock-adjustments.manage`, `stock-transfers.manage` (already seeded).

@@ -12,13 +12,13 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
+use App\Http\Controllers\BranchController;
 use App\Http\Controllers\BranchStockRequestController;
 use App\Http\Controllers\BranchTargetController;
 use App\Http\Controllers\BrandController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\PlaceholderController;
@@ -34,13 +34,13 @@ use App\Http\Controllers\SalesOrderController;
 use App\Http\Controllers\SalesReportController;
 use App\Http\Controllers\SalesReturnController;
 use App\Http\Controllers\StockAdjustmentController;
+use App\Http\Controllers\StockController;
 use App\Http\Controllers\StockTransferController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SupplierPaymentController;
 use App\Http\Controllers\SupplierProfileController;
 use App\Http\Controllers\TransactionCategoryController;
 use App\Http\Controllers\UnitController;
-use App\Http\Controllers\WarehouseController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
@@ -298,13 +298,14 @@ Route::middleware('auth')->group(function () {
     | Location / Warehouse Management (Inventory)
     |--------------------------------------------------------------------------
     */
-    Route::middleware(['verified', 'permission:warehouses.manage'])->group(function () {
-        Route::get('warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
-        Route::get('warehouses/create', [WarehouseController::class, 'create'])->name('warehouses.create');
-        Route::post('warehouses', [WarehouseController::class, 'store'])->name('warehouses.store');
-        Route::get('warehouses/{location}/edit', [WarehouseController::class, 'edit'])->name('warehouses.edit');
-        Route::patch('warehouses/{location}', [WarehouseController::class, 'update'])->name('warehouses.update');
-        Route::delete('warehouses/{location}', [WarehouseController::class, 'destroy'])->name('warehouses.destroy');
+    Route::middleware(['verified', 'permission:branches.manage'])->group(function () {
+        Route::get('branches', [BranchController::class, 'index'])->name('branches.index');
+        Route::get('branches/create', [BranchController::class, 'create'])->name('branches.create');
+        Route::post('branches', [BranchController::class, 'store'])->name('branches.store');
+        Route::get('branches/{location}/edit', [BranchController::class, 'edit'])->name('branches.edit');
+        Route::get('branches/{location}', [BranchController::class, 'show'])->name('branches.show');
+        Route::patch('branches/{location}', [BranchController::class, 'update'])->name('branches.update');
+        Route::delete('branches/{location}', [BranchController::class, 'destroy'])->name('branches.destroy');
     });
 
     /*
@@ -337,12 +338,12 @@ Route::middleware('auth')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Stock Levels / Inventory overview
+    | Stocks / Inventory overview
     |--------------------------------------------------------------------------
     */
     Route::middleware(['verified', 'permission:inventory.view'])->group(function () {
-        Route::get('inventory', [InventoryController::class, 'index'])->name('inventory.index');
-        Route::get('inventory/{unit}/movements', [InventoryController::class, 'movements'])->name('inventory.movements');
+        Route::get('stocks', [StockController::class, 'index'])->name('stocks.index');
+        Route::get('stocks/{unit}/movements', [StockController::class, 'movements'])->name('stocks.movements');
     });
 
     /*

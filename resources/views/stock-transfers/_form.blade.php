@@ -1,7 +1,7 @@
 @php
     $isEdit = $stockTransfer->exists;
     $dateValue = old('transfer_date', $isEdit ? $stockTransfer->transfer_date->format('Y-m-d\TH:i') : now()->format('Y-m-d\TH:i'));
-    $statusValue = old('status', $isEdit ? $stockTransfer->status->value : '');
+    $statusValue = old('status', $stockTransfer->status?->value ?? '');
 @endphp
 
 <div x-data="transferForm({
@@ -49,7 +49,7 @@
                         class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm font-medium text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all cursor-pointer @error('from_location_id') border-danger @enderror">
                     <option value="">Please Select</option>
                     @foreach($locations as $location)
-                        <option value="{{ $location->id }}" @selected(old('from_location_id', $isEdit ? $stockTransfer->from_location_id : null) == $location->id)>{{ $location->name }}</option>
+                        <option value="{{ $location->id }}" @selected(old('from_location_id', $stockTransfer->from_location_id) == $location->id)>{{ $location->name }}</option>
                     @endforeach
                 </select>
                 @error('from_location_id')
@@ -71,7 +71,7 @@
                         class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm font-medium text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all cursor-pointer @error('to_location_id') border-danger @enderror">
                     <option value="">Please Select</option>
                     @foreach($destinationLocations as $location)
-                        <option value="{{ $location->id }}" @selected(old('to_location_id', $isEdit ? $stockTransfer->to_location_id : null) == $location->id)>{{ $location->name }}</option>
+                        <option value="{{ $location->id }}" @selected(old('to_location_id', $stockTransfer->to_location_id) == $location->id)>{{ $location->name }}</option>
                     @endforeach
                 </select>
                 @error('to_location_id')

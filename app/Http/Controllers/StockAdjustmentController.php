@@ -357,7 +357,7 @@ class StockAdjustmentController extends Controller
 
     /**
      * Line items for the form: old input, a pre-filled stock line (when opened
-     * from Stock Levels) or an empty list.
+     * from Stocks) or an empty list.
      *
      * @return array<int, array<string, mixed>>
      */

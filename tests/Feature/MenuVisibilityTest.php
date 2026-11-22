@@ -40,7 +40,7 @@ it('shows a storekeeper only the sections matching their permissions', function 
 
     expect($sidebar)
         ->toContain('Brands')
-        ->toContain('Stock Levels')
+        ->toContain('Stocks')
         ->toContain('Purchase Invoices')
         ->not->toContain('Purchase Orders')
         ->not->toContain('Sales Orders')

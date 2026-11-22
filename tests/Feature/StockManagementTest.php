@@ -36,9 +36,9 @@ it('lists stock levels with valuation and totals', function () {
 
     stockLineWithCost('iPhone 13', 10, 1000.0);
 
-    $this->get(route('inventory.index'))
+    $this->get(route('stocks.index'))
         ->assertOk()
-        ->assertSee('Stock Levels')
+        ->assertSee('Stocks')
         ->assertSee('iPhone 13')
         ->assertSee('Stock Value')
         ->assertSee('10,000.00');
@@ -51,7 +51,7 @@ it('flags low and out of stock products', function () {
     stockLineWithCost('Gone Item', 0, 100.0);
     stockLineWithCost('Healthy Item', 50, 100.0);
 
-    $this->get(route('inventory.index'))
+    $this->get(route('stocks.index'))
         ->assertOk()
         ->assertSee('Low stock')
         ->assertSee('Out of stock')
@@ -64,7 +64,7 @@ it('filters by stock status', function () {
     stockLineWithCost('Gone Item', 0, 100.0);
     stockLineWithCost('Healthy Item', 50, 100.0);
 
-    $this->get(route('inventory.index', ['stock_status' => 'out']))
+    $this->get(route('stocks.index', ['stock_status' => 'out']))
         ->assertOk()
         ->assertSee('Gone Item')
         ->assertDontSee('Healthy Item');
@@ -77,7 +77,7 @@ it('returns the stock ledger for a product', function () {
 
     StockService::adjust($unit, 7);
 
-    $this->getJson(route('inventory.movements', $unit))
+    $this->getJson(route('stocks.movements', $unit))
         ->assertOk()
         ->assertJsonPath('success', true)
         ->assertJsonPath('product_name', 'iPhone 13')
@@ -92,7 +92,7 @@ it('filters by search term', function () {
     stockLineWithCost('iPhone 13', 10, 1000.0);
     stockLineWithCost('Galaxy Charger', 20, 200.0);
 
-    $this->get(route('inventory.index', ['search' => 'iPhone']))
+    $this->get(route('stocks.index', ['search' => 'iPhone']))
         ->assertOk()
         ->assertSee('iPhone 13')
         ->assertDontSee('Galaxy Charger');
@@ -116,12 +116,12 @@ it('filters by brand and category', function () {
 
     stockLineWithCost('iPhone 13', 10, 1000.0);
 
-    $this->get(route('inventory.index', ['brand_id' => $brand->id]))
+    $this->get(route('stocks.index', ['brand_id' => $brand->id]))
         ->assertOk()
         ->assertSee('Samsung Charger')
         ->assertDontSee('iPhone 13');
 
-    $this->get(route('inventory.index', ['category_id' => $category->id]))
+    $this->get(route('stocks.index', ['category_id' => $category->id]))
         ->assertOk()
         ->assertSee('Samsung Charger')
         ->assertDontSee('iPhone 13');
@@ -132,7 +132,7 @@ it('offers an adjust stock shortcut for every product', function () {
 
     stockLineWithCost('iPhone 13', 10, 1000.0);
 
-    $this->get(route('inventory.index'))
+    $this->get(route('stocks.index'))
         ->assertOk()
         ->assertSee('Adjust Stock');
 });
@@ -140,5 +140,5 @@ it('offers an adjust stock shortcut for every product', function () {
 it('denies access without the inventory.view permission', function () {
     $user = User::factory()->create();
 
-    $this->actingAs($user)->get(route('inventory.index'))->assertForbidden();
+    $this->actingAs($user)->get(route('stocks.index'))->assertForbidden();
 });
