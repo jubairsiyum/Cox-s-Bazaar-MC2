@@ -26,6 +26,7 @@ class Product extends Model
         'photo',
         'brand_id',
         'category_id',
+        'location_id',
         'model',
         'barcode',
         'storage',
@@ -42,6 +43,7 @@ class Product extends Model
         return [
             'purchase_price' => 'decimal:2',
             'sale_price' => 'decimal:2',
+            'location_id' => 'integer',
         ];
     }
 
@@ -64,6 +66,11 @@ class Product extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(Location::class);
     }
 
     public function creator(): BelongsTo

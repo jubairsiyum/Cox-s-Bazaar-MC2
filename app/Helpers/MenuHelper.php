@@ -65,10 +65,10 @@ class MenuHelper
             [
                 'icon' => 'tables',
                 'name' => 'Inventory',
-                'canany' => ['warehouses.manage', 'inventory.view', 'stock-adjustments.manage', 'stock-transfers.manage'],
+                'canany' => ['branches.manage', 'inventory.view', 'stock-adjustments.manage', 'stock-transfers.manage'],
                 'subItems' => [
-                    ['name' => 'Warehouses', 'path' => '/warehouses', 'can' => 'warehouses.manage'],
-                    ['name' => 'Stock Levels', 'path' => '/inventory', 'can' => 'inventory.view'],
+                    ['name' => 'Branches', 'path' => '/branches', 'can' => 'branches.manage'],
+                    ['name' => 'Stocks', 'path' => '/stocks', 'can' => 'inventory.view'],
                     ['name' => 'Adjustments', 'path' => '/stock-adjustments', 'can' => 'stock-adjustments.manage'],
                     ['name' => 'Transfers', 'path' => '/stock-transfers', 'can' => 'stock-transfers.manage'],
                 ],

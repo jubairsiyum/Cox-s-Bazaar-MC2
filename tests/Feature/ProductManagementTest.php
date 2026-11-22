@@ -519,19 +519,26 @@ it('shows cross-branch availability when a searched product is not in stock at t
         ->assertSee('Not available at any branch');
 });
 
-it('keeps the shared catalog for Super Admin and shows nothing to unassigned users', function () {
-    $mine = Location::factory()->create(['name' => 'Branch A Outlet']);
+it('defaults the Super Admin to the Main Warehouse and shows nothing to unassigned users', function () {
+    $warehouse = Location::factory()->warehouse()->create(['name' => 'Main Warehouse']);
     $other = Location::factory()->create(['name' => 'Branch B Outlet']);
 
-    productStockedAt('Away Phone', $other, 7);
+    Product::factory()->create(['name' => 'Warehouse Phone', 'location_id' => $warehouse->id]);
+    Product::factory()->create(['name' => 'Away Phone', 'location_id' => $other->id]);
 
-    // Super Admin sees the whole shared catalog, availability sections aside.
+    // Super Admin sees the Main Warehouse by default and can switch branches.
     actingAsSuperAdmin();
 
     $this->get(route('products.index'))
         ->assertOk()
-        ->assertSee('Away Phone')
+        ->assertSee('Warehouse Phone')
+        ->assertDontSee('Away Phone')
         ->assertDontSee('Not in stock at your branch');
+
+    $this->get(route('products.index', ['location_id' => $other->id]))
+        ->assertOk()
+        ->assertSee('Away Phone')
+        ->assertDontSee('Warehouse Phone');
 
     // A restricted user without a branch sees nothing — not even on search.
     $unassigned = User::factory()->create(['email_verified_at' => now()]);

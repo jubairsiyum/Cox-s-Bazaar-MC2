@@ -52,11 +52,71 @@ class Location extends Model
         return $this->hasMany(BranchTarget::class);
     }
 
+    public function stockMovements(): HasMany
+    {
+        return $this->hasMany(StockMovement::class);
+    }
+
+    public function incomingTransfers(): HasMany
+    {
+        return $this->hasMany(StockTransfer::class, 'to_location_id');
+    }
+
+    public function outgoingTransfers(): HasMany
+    {
+        return $this->hasMany(StockTransfer::class, 'from_location_id');
+    }
+
+    public function salesInvoices(): HasMany
+    {
+        return $this->hasMany(SalesInvoice::class);
+    }
+
+    public function salesReturns(): HasMany
+    {
+        return $this->hasMany(SalesReturn::class);
+    }
+
+    public function purchaseReturns(): HasMany
+    {
+        return $this->hasMany(PurchaseReturn::class);
+    }
+
+    public function users(): HasMany
+    {
+        return $this->hasMany(User::class, 'branch_id');
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────
 
     public function isActive(): bool
     {
         return $this->status === 'active';
+    }
+
+    /**
+     * The default branch a product is assigned to: the Main Warehouse.
+     *
+     * Resolved robustly in order — the location named "Main Warehouse",
+     * then the first warehouse-type location, then the first active location —
+     * so a product is never left unassigned when a warehouse is missing.
+     */
+    public static function mainWarehouse(): ?Location
+    {
+        return static::query()
+            ->where('name', 'Main Warehouse')
+            ->active()
+            ->oldest('id')
+            ->first()
+            ?? static::query()
+                ->where('type', LocationType::Warehouse->value)
+                ->active()
+                ->oldest('id')
+                ->first()
+            ?? static::query()
+                ->active()
+                ->oldest('id')
+                ->first();
     }
 
     // ── Scopes ───────────────────────────────────────────────────────

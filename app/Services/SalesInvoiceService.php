@@ -40,15 +40,18 @@ class SalesInvoiceService
 
         $discount = round((float) $invoice->items->sum('discount'), 2);
         $subtotal = round((float) $invoice->items->sum('subtotal'), 2);
+        $cartDiscount = round((float) $invoice->cart_discount, 2);
         $rate = $taxRate ?? (float) $invoice->tax_rate;
-        $taxAmount = round($subtotal * $rate / 100, 2);
+        $taxableBase = round(max(0, $subtotal - $cartDiscount), 2);
+        $taxAmount = round($taxableBase * $rate / 100, 2);
 
         $invoice->update([
             'subtotal' => $subtotal,
-            'discount_amount' => $discount,
+            'discount_amount' => round($discount + $cartDiscount, 2),
+            'cart_discount' => $cartDiscount,
             'tax_rate' => $rate,
             'tax_amount' => $taxAmount,
-            'grand_total' => round($subtotal + $taxAmount, 2),
+            'grand_total' => round($taxableBase + $taxAmount, 2),
         ]);
     }
 

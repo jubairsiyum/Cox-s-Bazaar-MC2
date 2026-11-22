@@ -29,8 +29,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'suppliers.manage', 'suppliers.view',
             // Customers
             'customers.manage', 'customers.view',
-            // Warehouses & Inventory
-            'warehouses.manage', 'inventory.view',
+            // Branches & Inventory
+            'branches.manage', 'inventory.view',
             'stock-adjustments.manage', 'stock-transfers.manage', 'stock-transfers.approve',
             // Purchasing
             'purchase-orders.manage', 'purchase-invoices.manage',
@@ -74,7 +74,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'brands.manage', 'brands.view', 'categories.manage', 'categories.view', 'units.manage', 'units.view', 'products.manage',
             'suppliers.manage', 'suppliers.view',
             'customers.manage', 'customers.view',
-            'warehouses.manage', 'inventory.view',
+            'branches.manage', 'inventory.view',
             'stock-adjustments.manage', 'stock-transfers.manage', 'stock-transfers.approve',
             'purchase-orders.manage', 'purchase-invoices.manage',
             'purchase-invoices.post', 'purchase-invoices.view', 'purchase-invoices.approve',
@@ -140,7 +140,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'dashboard.view',
             'products.manage', 'products.view',
             'brands.manage', 'brands.view', 'categories.manage', 'categories.view', 'units.manage', 'units.view',
-            'warehouses.manage', 'inventory.view',
+            'branches.manage', 'inventory.view',
             'stock-adjustments.manage', 'stock-transfers.manage',
             'purchase-invoices.view', 'purchase-invoices.post',
             'purchase-returns.manage',

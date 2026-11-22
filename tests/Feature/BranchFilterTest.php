@@ -89,12 +89,12 @@ it('scopes the inventory ledger and movement modal to the selected branch', func
     StockMovement::factory()->create(['unit_id' => $unit->id, 'location_id' => $inBranch->id, 'note' => 'Branch movement marker']);
     StockMovement::factory()->create(['unit_id' => $unit->id, 'location_id' => $outside->id, 'note' => 'Outside movement marker']);
 
-    $this->get(route('inventory.index', ['branch' => $branch->id]))
+    $this->get(route('stocks.index', ['branch' => $branch->id]))
         ->assertOk()
         ->assertSee('Branch movement marker')
         ->assertDontSee('Outside movement marker');
 
-    $this->getJson(route('inventory.movements', [$unit, 'branch' => $branch->id]))
+    $this->getJson(route('stocks.movements', [$unit, 'branch' => $branch->id]))
         ->assertOk()
         ->assertJsonCount(1, 'items')
         ->assertJsonPath('items.0.note', 'Branch movement marker');
@@ -136,7 +136,7 @@ it('filters each list to nothing for a branch without locations', function () {
         ->assertDontSee($adjustment->reference_no)
         ->assertSee('No stock adjustments found.');
 
-    $this->get(route('inventory.index', ['branch' => $emptyBranch->id]))
+    $this->get(route('stocks.index', ['branch' => $emptyBranch->id]))
         ->assertOk()
         ->assertSee('No stock movements recorded for this scope yet.');
 });
@@ -152,7 +152,7 @@ it('offers the branch filter to unrestricted users only', function () {
         ->assertOk()
         ->assertSee('name="branch"', false);
 
-    $this->get(route('inventory.index'))
+    $this->get(route('stocks.index'))
         ->assertOk()
         ->assertSee('name="branch"', false);
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\LocationType;
 use App\Enums\StockTransferStatus;
 use App\Exceptions\InsufficientStockException;
 use App\Exports\StockTransferExport;
@@ -96,11 +97,22 @@ class StockTransferController extends Controller
     /**
      * Show the form for creating a new stock transfer.
      */
-    public function create(): View
+    public function create(Request $request): View
     {
         $this->authorize('create', StockTransfer::class);
 
+        $stockTransfer = new StockTransfer;
+
+        // Branch-card shortcut: pre-fill the destination branch and default
+        // the source to the Main Warehouse, dispatching immediately.
+        if ($request->filled('to_location_id')) {
+            $stockTransfer->to_location_id = (int) $request->integer('to_location_id');
+            $stockTransfer->from_location_id = $this->mainWarehouseId();
+            $stockTransfer->status = StockTransferStatus::InTransit;
+        }
+
         return view('stock-transfers.create', [
+            'stockTransfer' => $stockTransfer,
             'locations' => $this->scopedLocations(),
             'destinationLocations' => Location::query()->active()->orderBy('name')->get(),
             'statuses' => collect(StockTransferStatus::options())
@@ -599,6 +611,28 @@ class StockTransferController extends Controller
     private function oldItems(): array
     {
         return collect(old('items', []))->all();
+    }
+
+    /**
+     * Resolve the Main Warehouse used as the default dispatch source.
+     *
+     * Prefers the shared {@see Location::mainWarehouse()} helper once it is
+     * available and otherwise falls back to the first warehouse (giving the
+     * "Main Warehouse" name precedence).
+     */
+    private function mainWarehouseId(): ?int
+    {
+        if (method_exists(Location::class, 'mainWarehouse')) {
+            return Location::mainWarehouse()?->id;
+        }
+
+        $id = Location::query()
+            ->where('type', LocationType::Warehouse)
+            ->orderByRaw("CASE WHEN name = 'Main Warehouse' THEN 0 ELSE 1 END")
+            ->orderBy('id')
+            ->value('id');
+
+        return $id !== null ? (int) $id : null;
     }
 
     /**

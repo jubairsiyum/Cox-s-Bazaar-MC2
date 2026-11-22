@@ -191,6 +191,23 @@
                             <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>
                         @enderror
                     </div>
+
+                    {{-- Assigned Branch --}}
+                    <div>
+                        <label for="location_id" class="block text-xs font-semibold uppercase tracking-wider text-ink mb-2">
+                            Assigned Branch
+                        </label>
+                        <select id="location_id" name="location_id"
+                                class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all @error('location_id') border-danger @enderror">
+                            <option value="">Select Branch</option>
+                            @foreach($locations as $location)
+                                <option value="{{ $location->id }}" @selected(old('location_id', $product->location_id) == $location->id)>{{ $location->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('location_id')
+                            <p class="mt-1.5 text-xs font-medium text-danger">{{ $message }}</p>
+                        @enderror
+                    </div>
                 </div>
             </div>
 

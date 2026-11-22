@@ -1,11 +1,11 @@
 @extends('layouts.app')
 
-@section('title', 'Warehouses — ' . config('app.name', "Cox's Bazaar Mobile Center"))
-@section('page_title', 'Warehouses')
+@section('title', 'Branches — ' . config('app.name', "Cox's Bazaar Mobile Center"))
+@section('page_title', 'Branches')
 
 @section('content')
 @php
-    $sortLink = fn (string $col) => route('warehouses.index', array_filter([
+    $sortLink = fn (string $col) => route('branches.index', array_filter([
         'search' => request('search'),
         'per_page' => request('per_page'),
         'sort' => $col,
@@ -38,7 +38,7 @@
     $pageActiveCount = $locations->filter(fn ($l) => $l->status === 'active')->count();
 @endphp
 
-<div x-data="warehousesPage()" class="space-y-6">
+<div x-data="branchesPage()" class="space-y-6">
 
     {{-- Top Breadcrumb & Executive Header --}}
     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -52,18 +52,18 @@
                 <span class="text-muted/60">/</span>
                 <span class="text-muted">Inventory</span>
                 <span class="text-muted/60">/</span>
-                <span class="font-medium text-ink">Warehouses</span>
+                <span class="font-medium text-ink">Branches</span>
             </nav>
 
             {{-- Title & Live Count Pill --}}
             <div class="flex items-center gap-3 flex-wrap">
-                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink">Warehouses</h1>
+                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink">Branches</h1>
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-xs font-semibold text-brand-500 ring-1 ring-brand-500/20">
                     <span class="size-1.5 rounded-full bg-brand-500"></span>
                     {{ number_format($totalLocations) }} {{ Str::plural('location', $totalLocations) }}
                 </span>
             </div>
-            <p class="text-xs sm:text-sm text-muted mt-1">Manage business locations (warehouses, brand shops, SR placements) used by stock transfers and outlet operations.</p>
+            <p class="text-xs sm:text-sm text-muted mt-1">Manage your branches (warehouses, brand shops, SR placements) used by stock transfers and outlet operations.</p>
         </div>
 
         {{-- Right Actions: View Switcher + Reset + Add Location --}}
@@ -98,7 +98,7 @@
             </div>
 
             @if(request('search') || request('sort'))
-                <a href="{{ route('warehouses.index') }}"
+                <a href="{{ route('branches.index') }}"
                    class="btn-scale inline-flex items-center gap-1.5 rounded-2xl border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-muted hover:text-ink hover:bg-soft transition-colors shadow-2xs"
                    title="Reset filters">
                     <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -109,10 +109,10 @@
             @endif
 
             @can('create', App\Models\Location::class)
-                <a href="{{ route('warehouses.create') }}"
+                <a href="{{ route('branches.create') }}"
                    class="btn-scale inline-flex items-center gap-2 rounded-2xl bg-brand-500 px-4 py-2.5 text-xs sm:text-sm font-semibold text-on-brand shadow-sm hover:bg-brand-600 transition-colors">
                     <x-icon name="plus" class="size-4" />
-                    <span>Add Location</span>
+                    <span>Add Branch</span>
                 </a>
             @endcan
         </div>
@@ -210,9 +210,9 @@
         {{-- Shell Header & Quick Type Filter Pills --}}
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-line px-5 sm:px-6 py-4 sm:py-5 bg-surface">
             <div>
-                <h2 class="text-base sm:text-lg font-bold text-ink">All your locations</h2>
+                <h2 class="text-base sm:text-lg font-bold text-ink">All your branches</h2>
                 <p class="text-xs text-muted mt-0.5">
-                    Showing {{ $locations->count() }} of {{ number_format($locations->total()) }} locations · Sorted by <span class="font-semibold text-ink">{{ ucfirst($sort) }}</span> ({{ strtoupper($direction) }})
+                    Showing {{ $locations->count() }} of {{ number_format($locations->total()) }} branches · Sorted by <span class="font-semibold text-ink">{{ ucfirst($sort) }}</span> ({{ strtoupper($direction) }})
                 </p>
             </div>
 
@@ -266,7 +266,7 @@
             <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3.5">
                 <div class="flex flex-col sm:flex-row sm:items-center gap-3 flex-1 min-w-0">
                     {{-- Per Page Selector --}}
-                    <form method="GET" action="{{ route('warehouses.index') }}" class="flex items-center gap-2 shrink-0">
+                    <form method="GET" action="{{ route('branches.index') }}" class="flex items-center gap-2 shrink-0">
                         @if(request('search'))<input type="hidden" name="search" value="{{ request('search') }}">@endif
                         @if(request('sort'))<input type="hidden" name="sort" value="{{ request('sort') }}">@endif
                         @if(request('direction'))<input type="hidden" name="direction" value="{{ request('direction') }}">@endif
@@ -284,7 +284,7 @@
                     </form>
 
                     {{-- Search Form --}}
-                    <form method="GET" action="{{ route('warehouses.index') }}" class="relative flex-1 max-w-md">
+                    <form method="GET" action="{{ route('branches.index') }}" class="relative flex-1 max-w-md">
                         @if(request('per_page'))<input type="hidden" name="per_page" value="{{ request('per_page') }}">@endif
                         @if(request('sort'))<input type="hidden" name="sort" value="{{ request('sort') }}">@endif
                         @if(request('direction'))<input type="hidden" name="direction" value="{{ request('direction') }}">@endif
@@ -297,7 +297,7 @@
                                    placeholder="Search locations by name, code, address, or phone..."
                                    class="w-full rounded-xl border border-line bg-surface pl-10 pr-9 py-2 text-xs font-normal text-ink placeholder:text-muted shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 transition-colors">
                             @if(request('search'))
-                                <a href="{{ route('warehouses.index', array_filter(['per_page' => request('per_page'), 'sort' => request('sort'), 'direction' => request('direction')])) }}"
+                                <a href="{{ route('branches.index', array_filter(['per_page' => request('per_page'), 'sort' => request('sort'), 'direction' => request('direction')])) }}"
                                    class="absolute inset-y-0 right-0 pr-3 flex items-center text-muted hover:text-ink cursor-pointer"
                                    title="Clear search">
                                     <x-svg.x class="size-3.5" />
@@ -358,7 +358,7 @@
                                         </div>
                                         <div class="min-w-0">
                                             <h3 class="text-base font-bold text-ink truncate group-hover:text-brand-500 transition-colors" title="{{ $location->name }}">
-                                                {{ $location->name }}
+                                                <a href="{{ route('branches.show', $location) }}">{{ $location->name }}</a>
                                             </h3>
                                             <div class="flex items-center gap-2 mt-1 flex-wrap">
                                                 <span class="inline-flex items-center rounded-md bg-soft px-2 py-0.5 text-[11px] font-bold text-ink border border-line tabular-nums">
@@ -400,15 +400,23 @@
                             </div>
 
                             {{-- Card Footer: Quick Edit / Delete --}}
-                            @can('warehouses.manage')
+                            @can('branches.manage')
                                 <div class="mt-4 pt-3.5 border-t border-line/80 flex items-center justify-between gap-2">
                                     <span class="text-[11px] text-muted">
                                         ID #{{ $location->id }}
                                     </span>
 
                                     <div class="flex items-center gap-2">
+                                        @if(auth()->user()?->isSuperAdmin())
+                                            <a href="{{ route('stock-transfers.create', ['to_location_id' => $location->id]) }}"
+                                               class="btn-scale inline-flex items-center gap-1.5 rounded-xl bg-brand-500 px-3 py-1.5 text-xs font-semibold text-on-brand shadow-2xs hover:bg-brand-600 transition-colors">
+                                                <x-icon name="plus" class="size-3.5" />
+                                                <span>Add Products</span>
+                                            </a>
+                                        @endif
+
                                         @can('update', $location)
-                                            <a href="{{ route('warehouses.edit', $location) }}"
+                                            <a href="{{ route('branches.edit', $location) }}"
                                                class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs hover:border-brand-500 hover:text-brand-500 hover:bg-soft transition-colors">
                                                 <x-svg.pencil class="size-3.5 text-muted" />
                                                 <span>Edit</span>
@@ -417,7 +425,7 @@
 
                                         @can('delete', $location)
                                             <button type="button"
-                                                    @click="confirmDelete(@js(route('warehouses.destroy', $location)), @js($location->name))"
+                                                    @click="confirmDelete(@js(route('branches.destroy', $location)), @js($location->name))"
                                                     class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-danger/30 bg-danger/10 px-3 py-1.5 text-xs font-semibold text-danger hover:bg-danger hover:text-on-brand transition-colors cursor-pointer">
                                                 <x-svg.trash-bin class="size-3.5" />
                                                 <span>Delete</span>
@@ -434,10 +442,10 @@
                 <div x-show="(typeFilter === 'warehouse' && {{ $pageWarehouseCount }} === 0) || (typeFilter === 'outlet' && {{ $pageOutletCount }} === 0) || (typeFilter === 'active' && {{ $pageActiveCount }} === 0)"
                      x-cloak
                      class="py-10 px-6 text-center">
-                    <p class="text-sm font-semibold text-ink">No locations match this filter on the current page.</p>
+                    <p class="text-sm font-semibold text-ink">No branches match this filter on the current page.</p>
                     <button type="button" @click="typeFilter = 'all'"
                             class="mt-3 rounded-xl border border-line bg-surface px-4 py-2 text-xs font-semibold text-brand-500 hover:bg-soft transition-colors cursor-pointer">
-                        Show all locations on page
+                        Show all branches on page
                     </button>
                 </div>
             @else
@@ -446,25 +454,25 @@
                         <div class="flex size-16 items-center justify-center rounded-3xl bg-soft text-brand-500 ring-1 ring-line mb-4">
                             <x-icon name="warehouse" class="size-8" />
                         </div>
-                        <h3 class="text-base font-bold text-ink">No locations found</h3>
+                        <h3 class="text-base font-bold text-ink">No branches found</h3>
                         <p class="text-xs text-muted mt-1.5 leading-relaxed">
                             @if(request('search'))
-                                No warehouse or outlet matches your search term <strong class="text-ink">"{{ request('search') }}"</strong>.
+                                No branch matches your search term <strong class="text-ink">"{{ request('search') }}"</strong>.
                             @else
-                                Add your first warehouse, brand shop, or SR placement to track stock movements across locations.
+                                Add your first branch (warehouse, brand shop, or SR placement) to track stock movements across locations.
                             @endif
                         </p>
                         <div class="mt-5 flex items-center gap-2.5">
                             @if(request('search'))
-                                <a href="{{ route('warehouses.index') }}"
+                                <a href="{{ route('branches.index') }}"
                                    class="rounded-xl border border-line bg-surface px-4 py-2 text-xs font-semibold text-ink hover:bg-soft transition-colors shadow-2xs">
                                     Clear Search
                                 </a>
                             @endif
                             @can('create', App\Models\Location::class)
-                                <a href="{{ route('warehouses.create') }}"
+                                <a href="{{ route('branches.create') }}"
                                    class="rounded-xl bg-brand-500 hover:bg-brand-600 text-on-brand px-4 py-2 text-xs font-semibold shadow-sm transition-colors">
-                                    + Add Location
+                                    + Add Branch
                                 </a>
                             @endcan
                         </div>
@@ -477,7 +485,7 @@
              VIEW 2: COMPACT DATA TABLE VIEW
         =================================================================== --}}
         <div x-show="viewMode === 'table'" x-cloak class="table-wrap max-w-full overflow-x-auto border-0 rounded-none">
-            <table class="data-table w-full text-left border-collapse" id="warehouses-table">
+            <table class="data-table w-full text-left border-collapse" id="branches-table">
                 <thead>
                     <tr class="border-b border-line bg-canvas/40 text-xs font-semibold text-muted tracking-wider uppercase">
                         <th scope="col" class="py-3.5 px-5 text-start">
@@ -506,7 +514,7 @@
                         </th>
                         <th scope="col" class="py-3.5 px-5 text-start text-xs font-bold text-ink">Address</th>
                         <th scope="col" class="py-3.5 px-5 text-start text-xs font-bold text-ink">Phone</th>
-                        @can('warehouses.manage')
+                        @can('branches.manage')
                             <th scope="col" class="py-3.5 px-5 text-end text-xs font-bold text-ink">Action</th>
                         @endcan
                     </tr>
@@ -530,7 +538,7 @@
                                         <x-icon :name="$typeIcon" class="size-4" />
                                     </div>
                                     <div>
-                                        <span class="block text-sm font-semibold text-ink group-hover:text-brand-500 transition-colors">{{ $location->name }}</span>
+                                        <a href="{{ route('branches.show', $location) }}" class="block text-sm font-semibold text-ink group-hover:text-brand-500 transition-colors">{{ $location->name }}</a>
                                         @if($location->note)
                                             <span class="block text-xs text-muted max-w-xs truncate">{{ $location->note }}</span>
                                         @endif
@@ -556,11 +564,18 @@
                             </td>
                             <td class="py-4 px-5 text-start text-sm text-muted max-w-xs truncate">{{ $location->address ?: '—' }}</td>
                             <td class="py-4 px-5 text-start text-sm text-muted tabular-nums whitespace-nowrap">{{ $location->phone ?: '—' }}</td>
-                            @can('warehouses.manage')
+                            @can('branches.manage')
                                 <td class="py-4 px-5 text-end whitespace-nowrap">
                                     <div class="inline-flex items-center justify-end gap-2">
+                                        @if(auth()->user()?->isSuperAdmin())
+                                            <a href="{{ route('stock-transfers.create', ['to_location_id' => $location->id]) }}"
+                                               class="btn-scale inline-flex items-center gap-1.5 rounded-xl bg-brand-500 px-3 py-1.5 text-xs font-semibold text-on-brand shadow-2xs hover:bg-brand-600 transition-colors">
+                                                <x-icon name="plus" class="size-3.5" />
+                                                <span>Add Products</span>
+                                            </a>
+                                        @endif
                                         @can('update', $location)
-                                            <a href="{{ route('warehouses.edit', $location) }}"
+                                            <a href="{{ route('branches.edit', $location) }}"
                                                class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs hover:border-brand-500 hover:text-brand-500 hover:bg-soft transition-colors">
                                                 <x-svg.pencil class="size-3.5 text-muted" />
                                                 <span>Edit</span>
@@ -568,7 +583,7 @@
                                         @endcan
                                         @can('delete', $location)
                                             <button type="button"
-                                                    @click="confirmDelete(@js(route('warehouses.destroy', $location)), @js($location->name))"
+                                                    @click="confirmDelete(@js(route('branches.destroy', $location)), @js($location->name))"
                                                     class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-danger/30 bg-danger/10 px-3 py-1.5 text-xs font-semibold text-danger hover:bg-danger hover:text-on-brand transition-colors cursor-pointer">
                                                 <x-svg.trash-bin class="size-3.5" />
                                                 <span>Delete</span>
@@ -581,7 +596,7 @@
                     @empty
                         <tr>
                             <td colspan="7" class="py-12 px-6 text-center text-sm font-medium text-muted">
-                                No locations found.
+                                No branches found.
                             </td>
                         </tr>
                     @endforelse
@@ -605,9 +620,9 @@
                     <x-icon name="alert-triangle" class="size-5" />
                 </div>
                 <div class="min-w-0 flex-1">
-                    <h3 class="text-base font-bold text-ink">Delete location?</h3>
+                    <h3 class="text-base font-bold text-ink">Delete branch?</h3>
                     <p class="mt-1.5 text-xs text-muted leading-relaxed">
-                        Are you sure you want to delete <strong class="text-ink" x-text="deleteName"></strong>? This location will be archived and removed from active transfer lists.
+                        Are you sure you want to delete <strong class="text-ink" x-text="deleteName"></strong>? This branch will be archived and removed from active transfer lists.
                     </p>
                 </div>
             </div>
@@ -622,7 +637,7 @@
                     <button type="submit"
                             class="btn-scale inline-flex items-center gap-1.5 rounded-xl bg-danger px-4 py-2 text-xs font-semibold text-on-brand shadow-sm hover:opacity-95 transition-opacity cursor-pointer">
                         <x-svg.trash-bin class="size-3.5" />
-                        <span>Delete Location</span>
+                        <span>Delete Branch</span>
                     </button>
                 </form>
             </div>
@@ -632,9 +647,9 @@
 </div>
 
 <script>
-    function warehousesPage() {
+    function branchesPage() {
         return {
-            viewMode: localStorage.getItem('warehouses_view_mode') || 'grid',
+            viewMode: localStorage.getItem('branches_view_mode') || 'grid',
             typeFilter: 'all',
             deleteModalOpen: false,
             deleteAction: '',
@@ -643,7 +658,7 @@
             setViewMode(mode) {
                 this.viewMode = mode;
                 try {
-                    localStorage.setItem('warehouses_view_mode', mode);
+                    localStorage.setItem('branches_view_mode', mode);
                 } catch (e) {}
             },
 

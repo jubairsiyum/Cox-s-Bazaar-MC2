@@ -24,6 +24,7 @@ class StorePosSaleRequest extends FormRequest
             'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
             'location_id' => ['required', 'integer', 'exists:locations,id'],
             'tax_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'cart_discount' => ['nullable', 'numeric', 'min:0'],
             'paid_amount' => ['required', 'numeric', 'min:0'],
             'note' => ['nullable', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
@@ -42,6 +43,7 @@ class StorePosSaleRequest extends FormRequest
         return [
             'customer_id' => 'Customer',
             'location_id' => 'Business Location',
+            'cart_discount' => 'Discount',
             'paid_amount' => 'Amount Paid',
             'items' => 'Cart',
             'items.*.unit_id' => 'Product',

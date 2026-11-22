@@ -8,6 +8,7 @@ use App\Http\Requests\Product\StoreProductRequest;
 use App\Http\Requests\Product\UpdateProductRequest;
 use App\Models\Brand;
 use App\Models\Category;
+use App\Models\Location;
 use App\Models\Product;
 use App\Models\Unit;
 use App\Services\AuditService;
@@ -46,19 +47,30 @@ class ProductController extends Controller
         }
 
         $catalogQuery = Product::query()
-            ->with(['brand', 'category'])
+            ->with(['brand', 'category', 'location'])
             ->when($request->filled('search'), fn ($q) => $q->search($request->string('search')->toString()))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')->toString()))
             ->when($request->filled('brand_id'), fn ($q) => $q->where('brand_id', $request->integer('brand_id')))
             ->when($request->filled('category_id'), fn ($q) => $q->where('category_id', $request->integer('category_id')));
 
-        // Super Admin: the full catalog, unfiltered by availability.
+        // Super Admin: the catalog, defaulting to the Main Warehouse branch,
+        // with a branch filter to switch between branches.
         if (BranchScope::isUnrestricted($user)) {
+            $selectedLocationId = $request->filled('location_id')
+                ? $request->integer('location_id')
+                : Location::mainWarehouse()?->id;
+
             return view('products.index', [
-                'products' => (clone $catalogQuery)->latest('id')->paginate($perPage)->withQueryString(),
+                'products' => (clone $catalogQuery)
+                    ->when($selectedLocationId !== null, fn ($q) => $q->where('location_id', $selectedLocationId))
+                    ->latest('id')
+                    ->paginate($perPage)
+                    ->withQueryString(),
                 'perPage' => $perPage,
                 'brands' => Brand::orderBy('name')->get(),
                 'categories' => Category::orderBy('name')->get(),
+                'locations' => Location::active()->orderBy('name')->get(),
+                'selectedLocationId' => $selectedLocationId,
                 'catalogScopeIds' => null,
                 'branchQtyByProduct' => [],
                 'crossBranchResults' => collect(),
@@ -121,6 +133,8 @@ class ProductController extends Controller
             'perPage' => $perPage,
             'brands' => Brand::orderBy('name')->get(),
             'categories' => Category::orderBy('name')->get(),
+            'locations' => collect(),
+            'selectedLocationId' => null,
             'catalogScopeIds' => $availableProductIds,
             'branchQtyByProduct' => $branchQtyByProduct,
             'crossBranchResults' => $crossBranchResults,
@@ -138,6 +152,8 @@ class ProductController extends Controller
             'product' => new Product,
             'brands' => Brand::orderBy('name')->get(),
             'categories' => Category::orderBy('name')->get(),
+            'locations' => Location::active()->orderBy('name')->get(),
+            'mainWarehouseId' => Location::mainWarehouse()?->id,
         ]);
     }
 
@@ -170,6 +186,7 @@ class ProductController extends Controller
             'product' => $product,
             'brands' => Brand::orderBy('name')->get(),
             'categories' => Category::orderBy('name')->get(),
+            'locations' => Location::active()->orderBy('name')->get(),
         ]);
     }
 

@@ -19,7 +19,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
-class InventoryController extends Controller
+class StockController extends Controller
 {
     /**
      * Columns that the stock list can be sorted by.
@@ -117,7 +117,7 @@ class InventoryController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
-        return view('inventory.index', [
+        return view('stocks.index', [
             'stockLevels' => $stockLevels,
             'summary' => $summary,
             'threshold' => $threshold,

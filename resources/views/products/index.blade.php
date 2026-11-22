@@ -34,7 +34,8 @@
     $isFiltered = request()->filled('search')
         || request()->filled('status')
         || request()->filled('brand_id')
-        || request()->filled('category_id');
+        || request()->filled('category_id')
+        || request()->filled('location_id');
 
     $pendingProductRequestsCount = \App\Models\ProductRequest::query()
         ->visibleTo(auth()->user())
@@ -50,6 +51,7 @@
         'per_page' => request('per_page'),
         'brand_id' => request('brand_id'),
         'category_id' => request('category_id'),
+        'location_id' => request('location_id'),
         'status' => $status,
     ]));
 @endphp
@@ -334,6 +336,23 @@
 
                 {{-- Right: Brand Filter + Category Filter + Column Visibility --}}
                 <div class="flex items-center gap-2.5 flex-wrap shrink-0">
+                    {{-- Branch Filter (Super Admin only) --}}
+                    @if($catalogScopeIds === null)
+                        <form method="GET" action="{{ route('products.index') }}" class="shrink-0">
+                            @if(request('per_page'))<input type="hidden" name="per_page" value="{{ request('per_page') }}">@endif
+                            @if(request('search'))<input type="hidden" name="search" value="{{ request('search') }}">@endif
+                            @if(request('status'))<input type="hidden" name="status" value="{{ request('status') }}">@endif
+                            @if(request('brand_id'))<input type="hidden" name="brand_id" value="{{ request('brand_id') }}">@endif
+                            @if(request('category_id'))<input type="hidden" name="category_id" value="{{ request('category_id') }}">@endif
+                            <select name="location_id" onchange="this.form.submit()" aria-label="Filter by branch"
+                                    class="rounded-xl border border-line bg-surface py-2 px-3 text-xs font-medium text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 cursor-pointer">
+                                @foreach($locations as $location)
+                                    <option value="{{ $location->id }}" @selected(($selectedLocationId ?? null) == $location->id)>{{ $location->name }}</option>
+                                @endforeach
+                            </select>
+                        </form>
+                    @endif
+
                     {{-- Brand Filter --}}
                     <form method="GET" action="{{ route('products.index') }}" class="shrink-0">
                         @if(request('per_page'))<input type="hidden" name="per_page" value="{{ request('per_page') }}">@endif
@@ -474,6 +493,14 @@
                                         <div class="text-[11px] text-muted mt-0.5">
                                             {{ $product->brand?->name ?? 'Unbranded' }} · {{ $product->category?->name ?? 'Uncategorized' }}
                                         </div>
+                                        @if($catalogScopeIds === null)
+                                            <div class="mt-1.5">
+                                                <span class="inline-flex items-center gap-1 rounded-md bg-brand-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-brand-500 ring-1 ring-brand-500/20">
+                                                    <x-icon name="warehouse" class="size-3" />
+                                                    {{ $product->location?->name ?? 'Unassigned' }}
+                                                </span>
+                                            </div>
+                                        @endif
                                     </div>
                                 </div>
                             </td>

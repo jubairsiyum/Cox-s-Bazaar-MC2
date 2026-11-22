@@ -26,6 +26,7 @@ class UpdateProductRequest extends FormRequest
             'photo' => ['nullable', 'image:allow_svg', 'mimes:jpg,jpeg,png,webp,svg', 'max:2048'],
             'brand_id' => ['nullable', 'integer', 'exists:brands,id'],
             'category_id' => ['nullable', 'integer', 'exists:categories,id'],
+            'location_id' => ['nullable', 'integer', 'exists:locations,id'],
             'model' => ['nullable', 'string', 'max:100'],
             'barcode' => [
                 'nullable',
@@ -54,6 +55,7 @@ class UpdateProductRequest extends FormRequest
             'photo' => 'Photo',
             'brand_id' => 'Brand',
             'category_id' => 'Category',
+            'location_id' => 'Assigned Branch',
             'barcode' => 'Barcode / IMEI',
             'purchase_price' => 'Purchase Price',
             'sale_price' => 'Sale Price',
