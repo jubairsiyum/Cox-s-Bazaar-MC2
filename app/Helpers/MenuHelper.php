@@ -93,6 +93,7 @@ class MenuHelper
                     ['name' => 'Sales Invoices', 'path' => '/sales-invoices', 'canany' => ['sales-invoices.view', 'sales-invoices.manage', 'sales-invoices.post']],
                     ['name' => 'Sales Returns', 'path' => '/sales-returns', 'can' => 'sales-returns.manage'],
                     ['name' => 'Collections', 'path' => '/collections', 'canany' => ['sales-invoices.view', 'sales-invoices.manage', 'customer-collections.manage']],
+                    ['name' => 'Monthly Targets', 'path' => '/branch-targets', 'canany' => ['sales-invoices.view', 'dashboard.view']],
                 ],
             ],
             [

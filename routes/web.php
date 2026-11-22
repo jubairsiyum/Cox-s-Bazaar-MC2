@@ -13,6 +13,7 @@ use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\BranchStockRequestController;
+use App\Http\Controllers\BranchTargetController;
 use App\Http\Controllers\BrandController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
@@ -730,4 +731,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('reports/sales', [$salesReportController, 'sales'])
         ->middleware('permission:reports.view|reports.export')
         ->name('reports.sales');
+
+    /*
+    | Monthly Sales Targets — Super Admin sets per branch, branch managers track pacing & DoD
+    */
+    Route::get('branch-targets', [BranchTargetController::class, 'index'])
+        ->middleware('verified')
+        ->name('branch-targets.index');
+    Route::post('branch-targets', [BranchTargetController::class, 'store'])
+        ->middleware('verified')
+        ->name('branch-targets.store');
+    Route::delete('branch-targets/{branchTarget}', [BranchTargetController::class, 'destroy'])
+        ->middleware('verified')
+        ->name('branch-targets.destroy');
 });

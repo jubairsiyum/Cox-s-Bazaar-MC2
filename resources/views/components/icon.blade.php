@@ -111,6 +111,10 @@ $icons = [
 'taka' => '
 <circle cx="16.5" cy="15.5" r="1" />
 <path d="M7 7a2 2 0 1 1 4 0v9a3 3 0 0 0 6 0v-.5M8 11h6" />',
+'target' => '
+<circle cx="12" cy="12" r="10" />
+<circle cx="12" cy="12" r="6" />
+<circle cx="12" cy="12" r="2" />',
 'currency-taka' => '
 <circle cx="16.5" cy="15.5" r="1" />
 <path d="M7 7a2 2 0 1 1 4 0v9a3 3 0 0 0 6 0v-.5M8 11h6" />',

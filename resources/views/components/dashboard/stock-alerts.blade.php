@@ -63,7 +63,7 @@
     </div>
 
     {{-- Alert List --}}
-    <div class="mt-5 space-y-3" data-stagger>
+    <div class="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5" data-stagger>
       @forelse ($items as $item)
         <div style="--item-i: {{ $loop->index }}" class="flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-3.5 transition-colors hover:border-line/80 hover:bg-soft/20">
           <div class="flex items-center gap-3 min-w-0 flex-1">
@@ -96,7 +96,7 @@
           </div>
         </div>
       @empty
-        <div class="rounded-2xl border border-line bg-surface/50 p-6 text-center">
+        <div class="col-span-full rounded-2xl border border-line bg-surface/50 p-6 text-center">
           <p class="text-sm font-semibold text-ink">All handset stocks are healthy!</p>
           <p class="text-xs text-muted mt-1">No items currently below reorder thresholds.</p>
         </div>

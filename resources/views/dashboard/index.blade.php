@@ -520,6 +520,20 @@
       $dynamicBrandShares = [];
   }
 
+  // 2.10 Monthly Target & Day-over-Day Pacing Resolution
+  try {
+      $targetLocationForPacing = $targetLocationId;
+      $branchTargetPerformance = $targetLocationForPacing !== null
+          ? \App\Services\TargetService::getBranchPerformance((int) $targetLocationForPacing)
+          : null;
+      $networkTargetOverview = (! $targetLocationForPacing && $isSuperAdmin)
+          ? \App\Services\TargetService::getNetworkOverview()
+          : null;
+  } catch (\Throwable $e) {
+      $branchTargetPerformance = null;
+      $networkTargetOverview = null;
+  }
+
   $hour = (int) now()->format('H');
   $greeting = $hour < 12 ? 'Good morning' : ($hour < 17 ? 'Good afternoon' : 'Good evening');
   $userName = auth()->user()?->name ?? 'Admin';
@@ -794,14 +808,16 @@
       </div>
     </div>
 
-    {{-- ── 3. Third Row: Low Stock Alerts (50%) + Brand Sales Share (50%) ── --}}
+    {{-- ── 3. Third Row: Target Pie Chart (50%) + Brand Sales Share (50%) ── --}}
     <div class="grid gap-5 lg:grid-cols-2 items-stretch">
       <div class="flex flex-col">
-        <x-dashboard.stock-alerts 
+        <x-dashboard.target-chart 
           class="rv" 
           style="--i:2; --d:40ms" 
-          :title="$activeScopeLocation ? 'Low Stock Alerts (' . $activeScopeLocation->name . ')' : 'Low Stock & Reorder Alerts'"
-          :items="$dynamicAlertItems" 
+          :isSuperAdmin="$isSuperAdmin && !$targetLocationId"
+          :branchPerformance="$branchTargetPerformance"
+          :networkOverview="$networkTargetOverview"
+          :branchName="$activeScopeLocation ? $activeScopeLocation->name : null"
         />
       </div>
       <div class="flex flex-col">
@@ -828,7 +844,17 @@
       </div>
     </div>
 
-    {{-- ── 4. Bottom Row: Recent Invoices & Orders (Scoped) ── --}}
+    {{-- ── 4. Fourth Row: Low Stock & Reorder Alerts (Full Width) ── --}}
+    <div class="w-full">
+      <x-dashboard.stock-alerts 
+        class="rv w-full" 
+        style="--i:2; --d:40ms" 
+        :title="$activeScopeLocation ? 'Low Stock Alerts (' . $activeScopeLocation->name . ')' : 'Low Stock & Reorder Alerts'"
+        :items="$dynamicAlertItems" 
+      />
+    </div>
+
+    {{-- ── 5. Bottom Row: Recent Invoices & Orders (Scoped) ── --}}
     <div>
       <x-dashboard.recent-invoices 
         class="rv" 
