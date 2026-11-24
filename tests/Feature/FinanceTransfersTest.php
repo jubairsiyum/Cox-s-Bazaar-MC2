@@ -6,6 +6,7 @@ use App\Enums\AccountEntryStatus;
 use App\Models\Account;
 use App\Models\AccountTransfer;
 use App\Models\Location;
+use App\Models\SalesInvoice;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\SettingsSeeder;
@@ -289,4 +290,91 @@ it('blocks a branch manager from transferring to an arbitrary third branch accou
     ])->assertSessionHas('error');
 
     expect(AccountTransfer::query()->count())->toBe(0);
+});
+
+it('shows remaining branch payable to HQ and pre-fills amount on transfer create form', function () {
+    $branch = Location::factory()->brandShop()->create(['name' => 'Branch CTG']);
+
+    $manager = User::factory()->create([
+        'status' => 'active',
+        'branch_id' => $branch->id,
+    ]);
+    $manager->givePermissionTo(['finance.manage', 'account-transfers.manage']);
+
+    Account::factory()->cash()->withBalance(200000)->create([
+        'location_id' => $branch->id,
+        'name' => 'Till CTG',
+    ]);
+
+    // Live sales of 90,000 today
+    SalesInvoice::factory()->posted()->create([
+        'location_id' => $branch->id,
+        'grand_total' => 90000,
+        'paid_amount' => 90000,
+        'due_amount' => 0,
+        'invoice_date' => now()->toDateString(),
+    ]);
+
+    $this->actingAs($manager)
+        ->get(route('account-transfers.create'))
+        ->assertOk()
+        ->assertSeeText('Remaining Payable to Central HQ')
+        ->assertSee('90,000.00')
+        ->assertSee('value="90000.00"', false);
+});
+
+it('sends in-app notifications to Central HQ and creator on cash remittance lifecycle', function () {
+    $branch = Location::factory()->brandShop()->create(['name' => 'Branch CTG']);
+
+    $admin = User::factory()->create(['status' => 'active']);
+    $admin->assignRole('Super Admin');
+
+    $manager = User::factory()->create([
+        'status' => 'active',
+        'branch_id' => $branch->id,
+    ]);
+    $manager->givePermissionTo(['finance.manage', 'account-transfers.manage']);
+
+    $branchCash = Account::factory()->cash()->withBalance(50000)->create([
+        'location_id' => $branch->id,
+        'name' => 'Till CTG',
+    ]);
+    $hqBank = Account::factory()->bank()->withBalance(100000)->create([
+        'location_id' => null,
+        'name' => 'Central Bank',
+    ]);
+
+    // 1. Manager submits cash remittance of 30,000
+    $this->actingAs($manager)->post(route('account-transfers.store'), [
+        'from_account_id' => $branchCash->id,
+        'to_account_id' => $hqBank->id,
+        'amount' => '30000',
+        'transfer_date' => now()->toDateString(),
+    ])->assertRedirect(route('account-transfers.index'));
+
+    $transfer = AccountTransfer::query()->latest('id')->firstOrFail();
+
+    // Admin received notification awaiting approval
+    $adminNotif = $admin->notifications()->latest()->first();
+    expect($adminNotif)->not->toBeNull()
+        ->and($adminNotif->data['title'])->toContain('Cash Remittance Awaits Approval')
+        ->and($adminNotif->data['body'])->toContain('30,000');
+
+    // Manager received confirmation
+    $managerNotif = $manager->notifications()->latest()->first();
+    expect($managerNotif)->not->toBeNull()
+        ->and($managerNotif->data['title'])->toContain('Cash Remittance Submitted')
+        ->and($managerNotif->data['body'])->toContain('30,000');
+
+    // 2. Admin approves the remittance
+    $this->actingAs($admin)
+        ->patch(route('account-transfers.approve', $transfer))
+        ->assertSessionHas('success');
+
+    $approvedNotif = $manager->notifications()
+        ->where('data->title', 'like', '%Cash Remittance Approved%')
+        ->first();
+    expect($approvedNotif)->not->toBeNull()
+        ->and($approvedNotif->data['title'])->toContain('Cash Remittance Approved')
+        ->and($approvedNotif->data['body'])->toContain('30,000');
 });

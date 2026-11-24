@@ -54,8 +54,8 @@
         @endif
     </div>
 
-    @if(isset($compliance) && ($isSuperAdmin || !empty($compliance['branches'])))
-        {{-- Today's Branch Closing Compliance Tracker --}}
+    @if($isSuperAdmin && isset($compliance) && !empty($compliance['branches']))
+        {{-- Super Admin: Network-wide Branch Closing Compliance Tracker --}}
         <div class="rounded-3xl border border-line bg-surface p-5 sm:p-6 shadow-card space-y-4">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-line pb-4">
                 <div>
@@ -119,15 +119,133 @@
                             @else
                                 <span class="text-amber-700 dark:text-amber-400 font-medium">Shift open</span>
                                 @can('create', App\Models\DayClosing::class)
-                                    <a href="{{ route('day-closings.create', ['location_id' => $b['location_id']]) }}"
-                                       class="font-semibold text-brand-500 hover:underline">
-                                        Close Now →
-                                    </a>
+                                    @if(App\Services\BranchScope::canAccess(auth()->user(), $b['location_id']))
+                                        <a href="{{ route('day-closings.create', ['location_id' => $b['location_id']]) }}"
+                                           class="font-semibold text-brand-500 hover:underline">
+                                            Close Now →
+                                        </a>
+                                    @endif
                                 @endcan
                             @endif
                         </div>
                     </div>
                 @endforeach
+            </div>
+        </div>
+    @elseif(! $isSuperAdmin && isset($branchSummary))
+        {{-- Branch Manager: Dedicated Single Branch Daily Cash & Closing Dashboard --}}
+        <div class="rounded-3xl border border-line bg-surface p-6 shadow-card space-y-6">
+            {{-- Branch Header Strip --}}
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-line pb-5">
+                <div class="flex items-center gap-3.5">
+                    <div class="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-500 ring-1 ring-brand-500/20">
+                        <x-icon name="warehouse" class="size-6" />
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h2 class="text-lg sm:text-xl font-bold text-ink">{{ $branchSummary['location']?->name ?? 'My Branch' }}</h2>
+                            <span class="rounded-md bg-soft px-2 py-0.5 text-2xs font-bold text-muted uppercase tracking-wider">
+                                {{ $branchSummary['location']?->code ?? 'Outlet' }}
+                            </span>
+                        </div>
+                        <p class="text-xs text-muted mt-0.5">Business Day: <strong class="text-ink">{{ now()->format('d M Y') }}</strong> · Shift reconciliation &amp; period lock</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-3 shrink-0">
+                    @if($branchSummary['is_closed'])
+                        <div class="inline-flex items-center gap-2 rounded-2xl bg-emerald-500/10 px-4 py-2 text-xs font-semibold text-emerald-600 ring-1 ring-emerald-500/20">
+                            <x-svg.check class="size-4" />
+                            <span>Business Day Closed &amp; Locked</span>
+                        </div>
+                    @else
+                        <div class="inline-flex items-center gap-2 rounded-2xl bg-warning/15 px-4 py-2 text-xs font-semibold text-amber-700 dark:text-amber-400 ring-1 ring-warning/30">
+                            <span class="size-2 rounded-full bg-warning animate-pulse"></span>
+                            <span>Shift Open · Closing Pending</span>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            {{-- 4 Branch KPI Stat Boxes --}}
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {{-- 1. Today's Cash Sales --}}
+                <div class="rounded-2xl border border-line bg-canvas/40 p-4 space-y-1">
+                    <span class="text-2xs font-semibold uppercase tracking-wider text-muted block">Today's Cash Sales</span>
+                    <p class="text-xl sm:text-2xl font-bold text-ink tabular-nums">৳{{ number_format($branchSummary['today_sales'], 2) }}</p>
+                    <p class="text-2xs text-muted">Cash collected on today's invoices</p>
+                </div>
+
+                {{-- 2. Remitted to HQ --}}
+                <div class="rounded-2xl border border-line bg-canvas/40 p-4 space-y-1">
+                    <span class="text-2xs font-semibold uppercase tracking-wider text-muted block">Remitted to HQ</span>
+                    <p class="text-xl sm:text-2xl font-bold text-emerald-600 tabular-nums">৳{{ number_format($branchSummary['remitted_amount'], 2) }}</p>
+                    <p class="text-2xs text-muted">Cash transfers sent to Central HQ</p>
+                </div>
+
+                {{-- 3. Remaining Payable to HQ --}}
+                <div class="rounded-2xl border p-4 space-y-1 {{ $branchSummary['remaining_payable'] > 0 ? 'border-brand-500/30 bg-brand-500/5' : 'border-line bg-canvas/40' }}">
+                    <span class="text-2xs font-semibold uppercase tracking-wider {{ $branchSummary['remaining_payable'] > 0 ? 'text-brand-600 font-bold' : 'text-muted' }} block">Remaining Payable to HQ</span>
+                    <p class="text-xl sm:text-2xl font-bold tabular-nums {{ $branchSummary['remaining_payable'] > 0 ? 'text-brand-600' : 'text-ink' }}">
+                        ৳{{ number_format($branchSummary['remaining_payable'], 2) }}
+                    </p>
+                    <p class="text-2xs {{ $branchSummary['remaining_payable'] > 0 ? 'text-brand-600/80' : 'text-muted' }}">
+                        {{ $branchSummary['remaining_payable'] <= 0 ? 'All clear · Fully remitted' : 'Cash due to be transferred to HQ' }}
+                    </p>
+                </div>
+
+                {{-- 4. Till / Drawer Balance --}}
+                <div class="rounded-2xl border border-line bg-canvas/40 p-4 space-y-1">
+                    <span class="text-2xs font-semibold uppercase tracking-wider text-muted block">
+                        {{ $branchSummary['is_closed'] ? 'Counted Cash (Till)' : 'Expected Cash in Till' }}
+                    </span>
+                    <p class="text-xl sm:text-2xl font-bold text-ink tabular-nums">
+                        ৳{{ number_format($branchSummary['is_closed'] ? $branchSummary['counted_cash'] : $branchSummary['system_cash'], 2) }}
+                    </p>
+                    <p class="text-2xs text-muted">
+                        @if($branchSummary['is_closed'])
+                            Variance: <strong class="{{ $branchSummary['variance'] == 0 ? 'text-emerald-600' : 'text-danger' }}">৳{{ number_format($branchSummary['variance'], 2) }}</strong>
+                        @else
+                            System calculated cash balance
+                        @endif
+                    </p>
+                </div>
+            </div>
+
+            {{-- Branch Action / Reconciliation Footer --}}
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-4 border-t border-line">
+                <div class="text-xs text-muted">
+                    @if($branchSummary['is_closed'])
+                        <span>🔒 Closed by <strong class="text-ink">{{ $branchSummary['closing']?->closedBy?->name ?? 'Staff' }}</strong> at {{ $branchSummary['closing']?->created_at?->format('h:i A, d M Y') }}. Backdated entries for today are locked.</span>
+                    @else
+                        <span>⚠️ Shift must be closed at shift end to reconcile counted banknotes and lock today's business period.</span>
+                    @endif
+                </div>
+
+                <div class="flex items-center gap-3 shrink-0 flex-wrap">
+                    @if(! $branchSummary['is_closed'])
+                        @if($branchSummary['remaining_payable'] > 0)
+                            <a href="{{ route('account-transfers.create') }}"
+                               class="btn-scale inline-flex items-center gap-1.5 rounded-2xl border border-line bg-surface px-4 py-2.5 text-xs font-semibold text-ink shadow-2xs hover:bg-soft transition-colors">
+                                <x-icon name="arrow-up-right" class="size-4 text-emerald-600" />
+                                <span>Remit Cash to HQ (৳{{ number_format($branchSummary['remaining_payable']) }})</span>
+                            </a>
+                        @endif
+
+                        @can('create', App\Models\DayClosing::class)
+                            <a href="{{ route('day-closings.create') }}"
+                               class="btn-scale inline-flex items-center gap-2 rounded-2xl bg-brand-500 px-5 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-sm hover:bg-brand-600 transition-colors">
+                                <x-icon name="lock" class="size-4" />
+                                <span>Close Today's Cash Now →</span>
+                            </a>
+                        @endcan
+                    @else
+                        <div class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+                            <x-svg.check class="size-4" />
+                            <span>Today's Cash Reconciled &amp; Locked</span>
+                        </div>
+                    @endif
+                </div>
             </div>
         </div>
     @endif

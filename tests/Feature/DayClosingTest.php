@@ -295,3 +295,112 @@ it('displays cash sales and remittances on day closings index table instead of o
         ->assertSee('Details')
         ->assertSee('Reopen');
 });
+
+it('scopes compliance status to own branch for branch managers and hides other branches', function () {
+    $branchA = Location::factory()->brandShop()->create(['name' => 'Cox Sadar Branch']);
+    $branchB = Location::factory()->brandShop()->create(['name' => 'CTG Vivo Outlet']);
+
+    $managerA = User::factory()->create([
+        'branch_id' => $branchA->id,
+        'status' => 'active',
+    ]);
+    $managerA->givePermissionTo(['finance.view', 'finance.manage', 'dashboard.view']);
+
+    // Visit index as Manager of Branch A
+    $response = $this->actingAs($managerA)
+        ->get(route('day-closings.index'))
+        ->assertOk();
+
+    // Must see own branch
+    $response->assertSee('Cox Sadar Branch')
+        ->assertSee('Remaining Payable to HQ')
+        ->assertSee('Shift Open · Closing Pending');
+
+    // Must NOT see other branch or Super Admin compliance tracker
+    $response->assertDontSee('CTG Vivo Outlet')
+        ->assertDontSee("Today's Branch Closing Status");
+});
+
+it('blocks branch manager from accessing day close form for another branch', function () {
+    $branchA = Location::factory()->brandShop()->create(['name' => 'Cox Sadar Branch']);
+    $branchB = Location::factory()->brandShop()->create(['name' => 'CTG Vivo Outlet']);
+
+    $managerA = User::factory()->create([
+        'branch_id' => $branchA->id,
+        'status' => 'active',
+    ]);
+    $managerA->givePermissionTo(['finance.manage', 'dashboard.view']);
+
+    // Attempt to access create form with branch B id
+    $this->actingAs($managerA)
+        ->get(route('day-closings.create', ['location_id' => $branchB->id]))
+        ->assertForbidden();
+});
+
+it('sends in-app notifications to Super Admins and branch managers when a day is closed', function () {
+    $branch = Location::factory()->brandShop()->create(['name' => 'Cox Sadar Branch']);
+
+    $admin = User::factory()->create(['status' => 'active']);
+    $admin->assignRole('Super Admin');
+
+    $manager = User::factory()->create([
+        'branch_id' => $branch->id,
+        'status' => 'active',
+    ]);
+    $manager->givePermissionTo(['finance.manage', 'dashboard.view']);
+
+    $today = now()->toDateString();
+
+    // Manager closes the day
+    $this->actingAs($manager)
+        ->post(route('day-closings.store'), [
+            'location_id' => $branch->id,
+            'closing_date' => $today,
+            'counted_cash' => '15000.00',
+            'note' => 'Shift ended',
+        ])
+        ->assertRedirect(route('day-closings.index'));
+
+    // Admin should have received a notification
+    $adminNotification = $admin->notifications()->latest()->first();
+    expect($adminNotification)->not->toBeNull()
+        ->and($adminNotification->data['title'])->toContain('Cox Sadar Branch')
+        ->and($adminNotification->data['body'])->toContain('15,000.00');
+
+    // Manager should have received a notification
+    $managerNotification = $manager->notifications()->latest()->first();
+    expect($managerNotification)->not->toBeNull()
+        ->and($managerNotification->data['title'])->toContain('Cox Sadar Branch')
+        ->and($managerNotification->data['body'])->toContain('15,000.00');
+});
+
+it('sends in-app notification to branch managers when a day is reopened by Super Admin', function () {
+    $branch = Location::factory()->brandShop()->create(['name' => 'Cox Sadar Branch']);
+
+    $admin = User::factory()->create(['status' => 'active']);
+    $admin->assignRole('Super Admin');
+
+    $manager = User::factory()->create([
+        'branch_id' => $branch->id,
+        'status' => 'active',
+    ]);
+    $manager->givePermissionTo(['finance.manage', 'dashboard.view']);
+
+    $today = now()->toDateString();
+    $closing = DayClosingService::closeDay($branch->id, $today, '10000', $manager);
+
+    // Clear notifications from closing
+    $manager->notifications()->delete();
+
+    // Super Admin reopens the day
+    $this->actingAs($admin)
+        ->patch(route('day-closings.reopen', $closing), [
+            'reopen_reason' => 'Audit correction requested',
+        ])
+        ->assertRedirect(route('day-closings.index'));
+
+    $reopenNotification = $manager->notifications()->latest()->first();
+    expect($reopenNotification)->not->toBeNull()
+        ->and($reopenNotification->data['title'])->toContain('Day Reopened')
+        ->and($reopenNotification->data['body'])->toContain('Audit correction requested');
+});

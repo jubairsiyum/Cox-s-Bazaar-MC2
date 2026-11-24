@@ -17,6 +17,8 @@ use App\Models\PaymentMethod;
 use App\Services\AccountBalanceService;
 use App\Services\AuditService;
 use App\Services\BranchScope;
+use App\Services\DayClosingService;
+use App\Services\RemittanceNotifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -140,11 +142,26 @@ class AccountTransferController extends Controller
         }
         $toAccounts = $toAccountsQuery->orderBy('name')->get(['id', 'name', 'type', 'current_balance']);
 
+        $branchId = BranchScope::locationId($user);
+        $payableSummary = null;
+        $remainingPayable = 0.0;
+
+        if ($branchId !== null) {
+            $payableSummary = DayClosingService::getPayableToHqSummary($branchId);
+            $remainingPayable = (float) $payableSummary['left_amount'];
+        } elseif (BranchScope::isUnrestricted($user) && $request->filled('location_id')) {
+            $locId = (int) $request->input('location_id');
+            $payableSummary = DayClosingService::getPayableToHqSummary($locId);
+            $remainingPayable = (float) $payableSummary['left_amount'];
+        }
+
         return view('account-transfers.create', [
             'accounts' => $toAccounts,
             'fromAccounts' => $fromAccounts,
             'toAccounts' => $toAccounts,
             'methods' => PaymentMethod::options(),
+            'payableSummary' => $payableSummary,
+            'remainingPayable' => $remainingPayable,
         ]);
     }
 
@@ -181,6 +198,8 @@ class AccountTransferController extends Controller
         $validated['location_id'] = $fromAccount->location_id;
 
         $transfer = AccountTransfer::create($validated);
+
+        RemittanceNotifier::submitted($transfer);
 
         AuditService::created($transfer, sprintf(
             'Transfer of %s from %s to %s recorded, awaiting approval.',
@@ -363,6 +382,8 @@ class AccountTransferController extends Controller
             $accountTransfer->toAccount?->name ?? ''
         ));
 
+        RemittanceNotifier::approved($accountTransfer, $request->user());
+
         return back()->with('success', 'Transfer completed and both balances updated.');
     }
 
@@ -384,6 +405,8 @@ class AccountTransferController extends Controller
         ]);
 
         AuditService::log('rejected', $accountTransfer, [], $accountTransfer->toArray(), sprintf('Rejected transfer %s.', $accountTransfer->reference_no));
+
+        RemittanceNotifier::rejected($accountTransfer, $request->user());
 
         return back()->with('success', 'Transfer cancelled.');
     }

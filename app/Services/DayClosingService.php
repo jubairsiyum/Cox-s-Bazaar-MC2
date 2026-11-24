@@ -138,7 +138,7 @@ class DayClosingService
             default => 'significant',
         };
 
-        return DB::transaction(function () use (
+        $closing = DB::transaction(function () use (
             $locationId,
             $dateString,
             $summary,
@@ -172,6 +172,10 @@ class DayClosingService
                 ]
             );
         });
+
+        DayClosingNotifier::closed($closing);
+
+        return $closing;
     }
 
     /**
@@ -185,6 +189,8 @@ class DayClosingService
             'reopened_at' => now(),
             'reopen_reason' => $reason,
         ]);
+
+        DayClosingNotifier::reopened($closing, $user, $reason);
     }
 
     /**
@@ -490,8 +496,11 @@ class DayClosingService
 
     /**
      * Get branch daily closing compliance report for a specific date (defaults to today).
-     * Lists every active retail branch with their status (Closed vs Pending Closing),
+     * Lists active retail branches with their status (Closed vs Pending Closing),
      * today's cash sales, counted cash, and remitted amount.
+     *
+     * When a restricted user is passed, only that user's assigned branch is returned,
+     * maintaining strict branch isolation across outlets.
      *
      * @return array{
      *     date: string,
@@ -514,14 +523,24 @@ class DayClosingService
      *     }>
      * }
      */
-    public static function getTodayBranchCompliance(?string $date = null): array
+    public static function getTodayBranchCompliance(?string $date = null, ?User $user = null): array
     {
         $date = $date ?? now()->toDateString();
-        $branches = Location::query()
+        $query = Location::query()
             ->where('status', 'active')
             ->where('type', '!=', LocationType::Warehouse)
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+
+        if ($user !== null && BranchScope::isRestricted($user)) {
+            $branchId = BranchScope::locationId($user);
+            if ($branchId !== null) {
+                $query->where('id', $branchId);
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
+        $branches = $query->get();
 
         $records = [];
         $closedCount = 0;

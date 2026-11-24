@@ -41,13 +41,41 @@ class DayClosingController extends Controller
         }
 
         $isTodayClosed = $todayClosingQuery->exists();
+        $todayClosing = (clone $todayClosingQuery)->with(['closedBy', 'location'])->first();
 
-        $compliance = DayClosingService::getTodayBranchCompliance($today);
+        $compliance = DayClosingService::getTodayBranchCompliance($today, $user);
+
+        // For branch managers: compute rich single-branch daily summary
+        $branchSummary = null;
+        if (BranchScope::isRestricted($user)) {
+            $branchId = BranchScope::locationId($user);
+            if ($branchId !== null) {
+                $payable = DayClosingService::getPayableToHqSummary($branchId);
+                $calcSummary = DayClosingService::calculateSummary($branchId, $today);
+                $location = Location::query()->find($branchId);
+
+                $branchSummary = [
+                    'location' => $location,
+                    'is_closed' => $isTodayClosed,
+                    'closing' => $todayClosing,
+                    'today_sales' => (float) $calcSummary['cash_sales'],
+                    'remitted_amount' => (float) $payable['transferred_to_hq'],
+                    'remaining_payable' => (float) $payable['left_amount'],
+                    'system_cash' => (float) $calcSummary['system_cash'],
+                    'counted_cash' => $todayClosing ? (float) $todayClosing->counted_cash : 0.0,
+                    'variance' => $todayClosing ? (float) $todayClosing->variance : 0.0,
+                    'variance_status' => $todayClosing ? $todayClosing->variance_status : null,
+                    'caption' => $payable['caption'],
+                ];
+            }
+        }
 
         return view('day-closings.index', [
             'closings' => $closings,
             'isSuperAdmin' => $user->isSuperAdmin(),
             'isTodayClosed' => $isTodayClosed,
+            'todayClosing' => $todayClosing,
+            'branchSummary' => $branchSummary,
             'compliance' => $compliance,
         ]);
     }
@@ -57,6 +85,11 @@ class DayClosingController extends Controller
         $this->authorize('create', DayClosing::class);
 
         $user = $request->user();
+
+        if ($request->filled('location_id') && ! BranchScope::canAccess($user, $request->input('location_id'))) {
+            abort(403, 'You can only close the day for your own branch.');
+        }
+
         $locationId = BranchScope::locationId($user);
 
         if ($locationId === null && BranchScope::isUnrestricted($user)) {
