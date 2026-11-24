@@ -133,6 +133,36 @@ it('alerts the warehouse managers and acknowledges the requester when a request 
         ->and(collect(notificationTitles($requester))->contains(fn (string $title): bool => str_contains($title, 'submitted')))->toBeTrue();
 });
 
+it('accepts form string ids and still notifies the source managers', function () {
+    $branch = Location::factory()->create();
+    $warehouse = Location::factory()->warehouse()->create();
+    $unit = Unit::factory()->create(['quantity' => 0]);
+    restockAtLocation($unit, $warehouse, 50);
+
+    $warehouseManager = requestManager($warehouse);
+    $requester = requestManager($branch);
+
+    // The browser submits url-encoded strings, not typed integers.
+    $payload = requestPayload($warehouse, $unit, 20);
+    $payload['from_location_id'] = (string) $payload['from_location_id'];
+    $payload['items'][0]['unit_id'] = (string) $payload['items'][0]['unit_id'];
+    $payload['items'][0]['quantity'] = (string) $payload['items'][0]['quantity'];
+
+    $this->actingAs($requester)
+        ->post(route('stock-transfers.requests.store'), $payload)
+        ->assertRedirect();
+
+    $transfer = StockTransfer::query()->sole();
+
+    expect($transfer->from_location_id)->toBe($warehouse->id)
+        ->and($transfer->to_location_id)->toBe($branch->id);
+
+    $approvalAlert = $warehouseManager->fresh()->notifications->firstWhere('data.type', 'warning');
+
+    expect($approvalAlert)->not->toBeNull()
+        ->and($approvalAlert->data['location_id'])->toBe($warehouse->id);
+});
+
 it('also alerts the Super Admin of a new request', function () {
     $branch = Location::factory()->create();
     $warehouse = Location::factory()->warehouse()->create();

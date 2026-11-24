@@ -37,6 +37,8 @@ class StockTransfer extends Model
     protected function casts(): array
     {
         return [
+            'from_location_id' => 'integer',
+            'to_location_id' => 'integer',
             'transfer_date' => 'datetime',
             'status' => StockTransferStatus::class,
             'shipping_charges' => 'decimal:2',
