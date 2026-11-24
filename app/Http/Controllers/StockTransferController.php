@@ -284,6 +284,61 @@ class StockTransferController extends Controller
     }
 
     /**
+     * Dispatch a stock transfer or stock request: the source location packs
+     * and ships the items. Status moves to InTransit and stock is deducted
+     * from the source location, but has not arrived at the destination yet.
+     */
+    public function dispatch(StockTransfer $stockTransfer): RedirectResponse
+    {
+        $this->authorize('dispatch', $stockTransfer);
+
+        if (! in_array($stockTransfer->status, [StockTransferStatus::Draft, StockTransferStatus::Requested], true)) {
+            return back()->with('error', "Stock transfer '{$stockTransfer->reference_no}' cannot be dispatched.");
+        }
+
+        $original = $stockTransfer->getOriginal();
+        $fromStatus = StockTransferStatus::from((string) $stockTransfer->getRawOriginal('status'));
+
+        try {
+            DB::transaction(function () use ($stockTransfer, $fromStatus) {
+                StockTransferService::assertAvailableAtSource(
+                    (int) $stockTransfer->from_location_id,
+                    $stockTransfer->items()->orderBy('id')->get()
+                        ->map(fn ($item) => ['unit_id' => $item->unit_id, 'quantity' => $item->quantity])
+                        ->values()
+                        ->all()
+                );
+
+                $stockTransfer->update([
+                    'status' => StockTransferStatus::InTransit,
+                ]);
+
+                StockTransferService::applyStatusChange($stockTransfer, $fromStatus, StockTransferStatus::InTransit);
+            });
+        } catch (InsufficientStockException|ValidationException $e) {
+            return back()->with('error', $e instanceof ValidationException
+                ? collect($e->errors())->flatten()->first()
+                : $e->getMessage());
+        }
+
+        AuditService::updated($stockTransfer, $original, "Stock transfer '{$stockTransfer->reference_no}' dispatched (In Transit).");
+
+        $this->notifyCreator(
+            $stockTransfer,
+            "Stock transfer '{$stockTransfer->reference_no}' dispatched.",
+            sprintf(
+                'Items from %s are now in transit to %s.',
+                $stockTransfer->fromLocation?->name ?? 'Source location',
+                $stockTransfer->toLocation?->name ?? 'Destination location'
+            ),
+            'info'
+        );
+
+        return redirect()->route('stock-transfers.index')
+            ->with('success', "Stock transfer '{$stockTransfer->reference_no}' has been dispatched and is now In Transit.");
+    }
+
+    /**
      * Approve (accept / receive) an incoming transfer: the receiving manager
      * reviews and signs off. Works both on a submitted request (draft) and on
      * a dispatched transfer. Afterwards the transfer reads "Received" for the

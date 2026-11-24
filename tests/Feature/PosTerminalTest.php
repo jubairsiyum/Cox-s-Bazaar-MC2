@@ -242,3 +242,28 @@ it('shows branch availability to the super admin in the POS search', function ()
         ->assertJsonPath('units.0.branches.1.name', 'Branch B')
         ->assertJsonPath('units.0.branches.1.quantity', 2);
 });
+
+it('blocks a restricted branch user from spoofing location_id to sell from another branch', function () {
+    $branchA = Location::factory()->create(['name' => 'Branch A']);
+    $branchB = Location::factory()->create(['name' => 'Branch B']);
+
+    $cashier = User::factory()->create([
+        'email_verified_at' => now(),
+        'branch_id' => $branchA->id,
+    ]);
+    $cashier->givePermissionTo(['pos.access', 'sales-invoices.manage']);
+
+    $unit = Unit::factory()->create(['quantity' => 10]);
+    stockAtLocation($unit, 5, $branchB->id);
+
+    // Cashier from Branch A attempts to sell from Branch B
+    $payload = posSalePayload($unit, 1000, [
+        'location_id' => $branchB->id,
+    ]);
+
+    $this->actingAs($cashier)
+        ->post(route('pos.store'), $payload)
+        ->assertSessionHas('error', 'You can only sell from your own branch/location.');
+
+    expect(SalesInvoice::count())->toBe(0);
+});

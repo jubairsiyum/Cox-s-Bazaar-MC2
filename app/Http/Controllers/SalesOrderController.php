@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Enums\LocationType;
 use App\Enums\SalesInvoiceStatus;
 use App\Enums\SalesOrderStatus;
+use App\Exceptions\DayClosedException;
 use App\Exceptions\InsufficientStockException;
 use App\Http\Requests\SalesOrder\ConfirmSalesOrderPaymentRequest;
 use App\Http\Requests\SalesOrder\StoreSalesOrderRequest;
@@ -276,7 +277,7 @@ class SalesOrderController extends Controller
 
                 return [$salesOrder, $invoice];
             });
-        } catch (InsufficientStockException $e) {
+        } catch (InsufficientStockException|DayClosedException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
 

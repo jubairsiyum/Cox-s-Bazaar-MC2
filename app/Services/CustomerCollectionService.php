@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\AccountType;
+use App\Models\Account;
 use App\Models\CustomerCollection;
 use App\Models\CustomerCollectionAllocation;
 use App\Models\SalesInvoice;
@@ -26,6 +28,15 @@ class CustomerCollectionService
         foreach ($collection->allocations as $allocation) {
             self::shiftPaid($allocation, 1);
         }
+
+        if ($collection->location_id !== null && (float) $collection->amount > 0) {
+            $branchTill = Account::where('location_id', $collection->location_id)
+                ->where('type', AccountType::Cash)
+                ->first();
+            if ($branchTill) {
+                $branchTill->increment('current_balance', (float) $collection->amount);
+            }
+        }
     }
 
     /**
@@ -36,6 +47,15 @@ class CustomerCollectionService
         foreach ($collection->allocations as $allocation) {
             self::shiftPaid($allocation, -1);
         }
+
+        if ($collection->location_id !== null && (float) $collection->amount > 0) {
+            $branchTill = Account::where('location_id', $collection->location_id)
+                ->where('type', AccountType::Cash)
+                ->first();
+            if ($branchTill) {
+                $branchTill->decrement('current_balance', min((float) $branchTill->current_balance, (float) $collection->amount));
+            }
+        }
     }
 
     /**
@@ -44,14 +64,23 @@ class CustomerCollectionService
     private static function shiftPaid(CustomerCollectionAllocation $allocation, int $direction): void
     {
         /** @var SalesInvoice|null $invoice */
-        $invoice = SalesInvoice::query()->find($allocation->sales_invoice_id);
+        $invoice = SalesInvoice::query()->whereKey($allocation->sales_invoice_id)->lockForUpdate()->first();
 
         if ($invoice === null) {
             return;
         }
 
+        $currentPaid = MoneyMath::clean((string) $invoice->paid_amount);
+        $amount = MoneyMath::clean((string) $allocation->amount);
+
+        if ($direction > 0) {
+            $newPaid = MoneyMath::add($currentPaid, $amount);
+        } else {
+            $newPaid = MoneyMath::max('0.00', MoneyMath::sub($currentPaid, $amount));
+        }
+
         $invoice->update([
-            'paid_amount' => round(max(0, (float) $invoice->paid_amount + $direction * (float) $allocation->amount), 2),
+            'paid_amount' => $newPaid,
         ]);
     }
 }

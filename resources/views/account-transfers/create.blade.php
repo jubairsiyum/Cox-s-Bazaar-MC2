@@ -24,12 +24,12 @@
             </nav>
 
             <div class="flex items-center gap-3 flex-wrap">
-                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink">New Account Transfer</h1>
+                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink">Cash Remittance / Account Transfer</h1>
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-xs font-semibold text-brand-500 ring-1 ring-brand-500/20">
-                    Cash &amp; Bank Movement
+                    Cash Remittance
                 </span>
             </div>
-            <p class="text-xs sm:text-sm text-muted mt-1">Saved as pending — once approved, money leaves the source account and lands in the destination atomically.</p>
+            <p class="text-xs sm:text-sm text-muted mt-1">Move cash or bank funds between branch cash boxes and Central HQ / bank accounts. Saved as pending — once approved, money moves atomically.</p>
         </div>
 
         <a href="{{ route('account-transfers.index') }}"
@@ -80,8 +80,8 @@
                     <select id="from_account_id" name="from_account_id" required
                             class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all cursor-pointer @error('from_account_id') border-danger @enderror">
                         <option value="">Please Select</option>
-                        @foreach($accounts as $account)
-                            <option value="{{ $account->id }}" @selected(old('from_account_id') == $account->id)>
+                        @foreach(($fromAccounts ?? $accounts) as $account)
+                            <option value="{{ $account->id }}" @selected(old('from_account_id', count($fromAccounts ?? []) === 1 ? ($fromAccounts->first()->id ?? null) : null) == $account->id)>
                                 {{ $account->name }} ({{ $account->type->label() }} — {{ \App\Helpers\Money::format($account->current_balance) }})
                             </option>
                         @endforeach
@@ -99,7 +99,7 @@
                     <select id="to_account_id" name="to_account_id" required
                             class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all cursor-pointer @error('to_account_id') border-danger @enderror">
                         <option value="">Please Select</option>
-                        @foreach($accounts as $account)
+                        @foreach(($toAccounts ?? $accounts) as $account)
                             <option value="{{ $account->id }}" @selected(old('to_account_id') == $account->id)>
                                 {{ $account->name }} ({{ $account->type->label() }} — {{ \App\Helpers\Money::format($account->current_balance) }})
                             </option>

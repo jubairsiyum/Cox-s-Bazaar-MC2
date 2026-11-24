@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Enums\AccountType;
+use App\Enums\LocationType;
 use App\Models\Account;
+use App\Models\Location;
 use Illuminate\Database\Seeder;
 
 class AccountSeeder extends Seeder
@@ -54,6 +56,27 @@ class AccountSeeder extends Seeder
             if ($account->trashed()) {
                 $account->restore();
             }
+        }
+
+        // Seed dedicated cash till accounts for each branch/outlet location
+        $locations = Location::where('type', '!=', LocationType::Warehouse)->get();
+        foreach ($locations as $location) {
+            Account::withTrashed()->firstOrCreate(
+                [
+                    'location_id' => $location->id,
+                    'type' => AccountType::Cash,
+                ],
+                [
+                    'name' => 'Cash Till - '.$location->name,
+                    'account_number' => null,
+                    'bank_name' => null,
+                    'bank_branch' => null,
+                    'opening_balance' => 0,
+                    'current_balance' => 0,
+                    'status' => 'active',
+                    'note' => 'Primary cash till for '.$location->name,
+                ]
+            );
         }
     }
 }

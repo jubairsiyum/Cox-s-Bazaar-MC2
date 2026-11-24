@@ -19,6 +19,7 @@ use App\Http\Controllers\BrandController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DayClosingController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\PlaceholderController;
@@ -332,6 +333,7 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware(['verified', 'permission:stock-transfers.manage|stock-transfers.approve'])->group(function () {
+        Route::patch('stock-transfers/{stockTransfer}/dispatch', [StockTransferController::class, 'dispatch'])->name('stock-transfers.dispatch');
         Route::patch('stock-transfers/{stockTransfer}/approve', [StockTransferController::class, 'approve'])->name('stock-transfers.approve');
         Route::patch('stock-transfers/{stockTransfer}/reject', [StockTransferController::class, 'reject'])->name('stock-transfers.reject');
     });
@@ -605,6 +607,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('account-transfers/{accountTransfer}', [AccountTransferController::class, 'destroy'])->name('account-transfers.destroy');
         Route::patch('account-transfers/{accountTransfer}/approve', [AccountTransferController::class, 'approve'])->name('account-transfers.approve');
         Route::patch('account-transfers/{accountTransfer}/reject', [AccountTransferController::class, 'reject'])->name('account-transfers.reject');
+    });
+
+    Route::middleware('permission:finance.view|finance.manage|dashboard.view')->group(function () {
+        Route::get('day-closings', [DayClosingController::class, 'index'])->name('day-closings.index');
+        Route::get('day-closings/create', [DayClosingController::class, 'create'])->name('day-closings.create');
+        Route::post('day-closings', [DayClosingController::class, 'store'])->name('day-closings.store');
+        Route::patch('day-closings/{dayClosing}/reopen', [DayClosingController::class, 'reopen'])->name('day-closings.reopen');
     });
 
     /*

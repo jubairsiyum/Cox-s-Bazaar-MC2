@@ -11,6 +11,10 @@
 'bn' => false,
 'currency' => '৳',
 'icon' => null,
+'progress' => false,
+'gaugeLabel' => null,
+'progressColor' => null,
+'href' => null,
 ])
 
 @php
@@ -18,26 +22,40 @@ $changeNum = (float) $change;
 $isNegative = $changeNum < 0;
 $isZero = $changeNum == 0.0;
 $up = $changeNum > 0;
-$pct = min(abs($changeNum), 100);
+$pct = min(max(abs($changeNum), 0), 100);
 
 $fmt = number_format((float) $amount);
 if ($bn) {
 $fmt = strtr($fmt, ['0'=>'০','1'=>'১','2'=>'২','3'=>'৩','4'=>'৪','5'=>'৫','6'=>'৬','7'=>'৭','8'=>'৮','9'=>'৯']);
 }
 
-// When % is minus value: vibrant red bar & label (text-danger / text-red-500)
-// When % is positive: brand color (text-brand-500)
-// When % is zero: neutral muted color (text-muted)
-if ($isNegative) {
-    $color = 'text-danger text-red-500';
-} elseif ($up) {
-    $color = 'text-brand-500';
+if ($progress) {
+    if ($progressColor) {
+        $color = $progressColor;
+    } elseif ($pct >= 100) {
+        $color = 'text-emerald-500';
+    } elseif ($pct > 0) {
+        $color = 'text-brand-500';
+    } else {
+        $color = 'text-muted';
+    }
 } else {
-    $color = 'text-muted';
+    // When % is minus value: vibrant red bar & label (text-danger / text-red-500)
+    // When % is positive: brand color (text-brand-500)
+    // When % is zero: neutral muted color (text-muted)
+    if ($isNegative) {
+        $color = 'text-danger text-red-500';
+    } elseif ($up) {
+        $color = 'text-brand-500';
+    } else {
+        $color = 'text-muted';
+    }
 }
+
+$tag = $href ? 'a' : 'div';
 @endphp
 
-<div {{ $attributes->merge(['class' => 'relative overflow-hidden rounded-3xl bg-surface p-6 shadow-card h-full flex flex-col justify-between']) }} x-data>
+<{{ $tag }} @if($href) href="{{ $href }}" @endif {{ $attributes->merge(['class' => 'relative overflow-hidden rounded-3xl bg-surface p-6 shadow-card h-full flex flex-col justify-between' . ($href ? ' transition-all hover:ring-2 hover:ring-brand-500/20 cursor-pointer' : '')]) }} x-data>
   <div class="flex items-center justify-between">
     <h3 class="text-sm sm:text-base font-semibold text-ink/80">{{ $title }}</h3>
     @if ($icon)
@@ -73,7 +91,11 @@ if ($isNegative) {
           stroke-dasharray="{{ $pct }} 100" />
       </svg>
       <span class="gauge-label absolute inset-x-0 bottom-0 text-center text-[11px] font-semibold {{ $color }}">
-        @if ($isNegative)
+        @if ($gaugeLabel !== null)
+          {{ $gaugeLabel }}
+        @elseif ($progress)
+          {{ (int) round($pct) }}%
+        @elseif ($isNegative)
           {{ $change }}% ↓
         @elseif ($up)
           +{{ $change }}% ↑
@@ -83,4 +105,4 @@ if ($isNegative) {
       </span>
     </div>
   </div>
-</div>
+</{{ $tag }}>

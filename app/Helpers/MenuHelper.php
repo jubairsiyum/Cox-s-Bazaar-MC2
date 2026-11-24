@@ -118,6 +118,7 @@ class MenuHelper
                     ['name' => 'Transaction Category', 'path' => '/transaction-categories', 'canany' => ['finance.view', 'finance.manage', 'income-transactions.manage', 'expense-transactions.manage']],
                     ['name' => 'Method', 'path' => '/payment-methods', 'canany' => ['finance.view', 'finance.manage', 'income-transactions.manage', 'expense-transactions.manage']],
                     ['name' => 'Transfer', 'path' => '/account-transfers', 'canany' => ['finance.view', 'finance.manage', 'account-transfers.manage']],
+                    ['name' => 'Daily Cash Close', 'path' => '/day-closings', 'canany' => ['finance.view', 'finance.manage', 'dashboard.view']],
                     ['name' => 'Supplier Payment', 'path' => '/supplier-payments', 'canany' => ['finance.view', 'finance.manage', 'supplier-payments.view', 'supplier-payments.manage']],
                 ],
             ],
@@ -236,16 +237,22 @@ class MenuHelper
      */
     public static function getMenuGroups(): array
     {
-        return [
+        $groups = [
             [
                 'title' => 'Menu',
                 'items' => self::getMainNavItems(),
             ],
-            [
+        ];
+
+        // TailAdmin showcase / component demos are developer utilities, only visible to Super Admin
+        if (auth()->user()?->isSuperAdmin()) {
+            $groups[] = [
                 'title' => 'TailAdmin Components',
                 'items' => self::getShowcaseItems(),
-            ],
-        ];
+            ];
+        }
+
+        return $groups;
     }
 
     public static function isActive(string $path): bool

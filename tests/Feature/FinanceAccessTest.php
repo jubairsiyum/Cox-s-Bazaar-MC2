@@ -107,7 +107,7 @@ it('verifies the finance menu gates in MenuHelper', function () {
 
     $subItemNames = collect($financeNav['subItems'])->pluck('name')->all();
 
-    expect($subItemNames)->toBe(['Cash Accounts', 'Bank Accounts', 'Transaction', 'Transaction Category', 'Method', 'Transfer', 'Supplier Payment']);
+    expect($subItemNames)->toBe(['Cash Accounts', 'Bank Accounts', 'Transaction', 'Transaction Category', 'Method', 'Transfer', 'Daily Cash Close', 'Supplier Payment']);
 
     foreach ($financeNav['subItems'] as $subItem) {
         expect($subItem)->toHaveKey('canany');

@@ -6,6 +6,7 @@ use App\Models\Location;
 use App\Models\StockTransfer;
 use App\Models\Unit;
 use App\Models\User;
+use App\Services\StockService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\SettingsSeeder;
 
@@ -411,4 +412,56 @@ it('blocks an outlet manager from dispatching stock of another location', functi
         ->assertSessionHasErrors('from_location_id');
 
     $this->assertDatabaseCount('stock_transfers', 0);
+});
+
+it('implements the proper in-transit lifecycle: dispatch takes stock from source and receipt brings stock to destination', function () {
+    $from = Location::factory()->create(['name' => 'HQ Warehouse']);
+    $to = Location::factory()->create(['name' => 'Branch Shop']);
+
+    $unit = Unit::factory()->create(['quantity' => 20]);
+    stockAtLocation($unit, 20, $from->id);
+
+    $hqManager = transferManagerAt($from);
+    $branchManager = transferManagerAt($to);
+
+    // Create a draft transfer from HQ to Branch
+    $transfer = StockTransfer::factory()->create([
+        'status' => 'draft',
+        'from_location_id' => $from->id,
+        'to_location_id' => $to->id,
+    ]);
+    $transfer->items()->create([
+        'unit_id' => $unit->id,
+        'quantity' => 10,
+        'unit_price' => 100,
+        'subtotal' => 1000,
+    ]);
+
+    // Initial state: HQ has 20, Branch has 0
+    expect(StockService::quantityAt($unit, $from->id))->toBe(20)
+        ->and(StockService::quantityAt($unit, $to->id))->toBe(0);
+
+    // 1. HQ dispatches the transfer (In-Transit)
+    $this->actingAs($hqManager)
+        ->patch(route('stock-transfers.dispatch', $transfer))
+        ->assertRedirect(route('stock-transfers.index'));
+
+    $transfer->refresh();
+
+    // After dispatch: goods left HQ (now 10), but have NOT arrived at Branch (still 0)
+    expect($transfer->status->value)->toBe('in-transit')
+        ->and(StockService::quantityAt($unit, $from->id))->toBe(10)
+        ->and(StockService::quantityAt($unit, $to->id))->toBe(0);
+
+    // 2. Branch manager receives the shipment
+    $this->actingAs($branchManager)
+        ->patch(route('stock-transfers.approve', $transfer))
+        ->assertRedirect(route('stock-transfers.index'));
+
+    $transfer->refresh();
+
+    // After receipt: goods arrived at Branch (now 10)
+    expect($transfer->status->value)->toBe('received')
+        ->and(StockService::quantityAt($unit, $from->id))->toBe(10)
+        ->and(StockService::quantityAt($unit, $to->id))->toBe(10);
 });

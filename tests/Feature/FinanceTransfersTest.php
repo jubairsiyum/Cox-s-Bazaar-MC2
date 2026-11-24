@@ -201,3 +201,92 @@ it('gates transfer management by permission', function () {
         ])
         ->assertForbidden();
 });
+
+it('allows a branch manager to remit cash to a central HQ account and requires HQ approval', function () {
+    $branchLocation = Location::factory()->create();
+
+    $branchManager = User::factory()->create([
+        'status' => 'active',
+        'branch_id' => $branchLocation->id,
+    ]);
+    $branchManager->givePermissionTo(['finance.view', 'finance.manage', 'account-transfers.manage']);
+
+    $branchCash = Account::factory()->cash()->withBalance(10000)->create([
+        'location_id' => $branchLocation->id,
+        'name' => 'Branch Till',
+    ]);
+
+    // Central HQ Account (no location_id, company-wide bank)
+    $hqBank = Account::factory()->bank()->withBalance(50000)->create([
+        'location_id' => null,
+        'name' => 'HQ Central Bank',
+    ]);
+
+    // Branch manager records remittance
+    $this->actingAs($branchManager)->post(route('account-transfers.store'), [
+        'from_account_id' => $branchCash->id,
+        'to_account_id' => $hqBank->id,
+        'amount' => '5000',
+        'transfer_date' => now()->toDateString(),
+        'method' => 'cash',
+        'note' => 'Daily branch cash remittance to HQ',
+    ])->assertRedirect(route('account-transfers.index'));
+
+    $transfer = AccountTransfer::query()->latest('id')->firstOrFail();
+
+    expect($transfer->status)->toBe(AccountEntryStatus::Pending)
+        ->and((float) $branchCash->fresh()->current_balance)->toBe(10000.0)
+        ->and((float) $hqBank->fresh()->current_balance)->toBe(50000.0);
+
+    // Branch manager CANNOT approve their own remittance to HQ
+    $this->actingAs($branchManager)
+        ->patch(route('account-transfers.approve', $transfer))
+        ->assertForbidden();
+
+    // Super Admin / HQ Accountant approves remittance
+    $admin = User::factory()->create(['status' => 'active']);
+    $admin->assignRole('Super Admin');
+
+    $this->actingAs($admin)
+        ->patch(route('account-transfers.approve', $transfer))
+        ->assertSessionHas('success');
+
+    expect($transfer->fresh()->status)->toBe(AccountEntryStatus::Completed)
+        ->and((float) $branchCash->fresh()->current_balance)->toBe(5000.0)
+        ->and((float) $hqBank->fresh()->current_balance)->toBe(55000.0);
+
+    // Once completed, Super Admin viewing index should NOT see Approve or Reject buttons
+    $this->actingAs($admin)
+        ->get(route('account-transfers.index'))
+        ->assertOk()
+        ->assertSee('Completed')
+        ->assertDontSeeText('Approve')
+        ->assertDontSeeText('Reject');
+});
+
+it('blocks a branch manager from transferring to an arbitrary third branch account', function () {
+    $branchLocationA = Location::factory()->brandShop()->create();
+    $branchLocationB = Location::factory()->brandShop()->create();
+
+    $managerA = User::factory()->create([
+        'status' => 'active',
+        'branch_id' => $branchLocationA->id,
+    ]);
+    $managerA->givePermissionTo(['finance.manage', 'account-transfers.manage']);
+
+    $cashA = Account::factory()->cash()->withBalance(5000)->create([
+        'location_id' => $branchLocationA->id,
+    ]);
+    $cashB = Account::factory()->cash()->withBalance(5000)->create([
+        'location_id' => $branchLocationB->id,
+    ]);
+
+    $this->actingAs($managerA)->post(route('account-transfers.store'), [
+        'from_account_id' => $cashA->id,
+        'to_account_id' => $cashB->id,
+        'amount' => '1000',
+        'transfer_date' => now()->toDateString(),
+    ])->assertSessionHas('error');
+
+    expect(AccountTransfer::query()->count())->toBe(0);
+});

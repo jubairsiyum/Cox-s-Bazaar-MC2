@@ -45,12 +45,29 @@ class AccountTransferPolicy
 
     public function delete(User $user, AccountTransfer $accountTransfer): bool
     {
-        return $this->create($user)
-            && BranchScope::canAccess($user, $accountTransfer->location_id);
+        // Branch managers cannot delete transfer records — deletion is restricted to Super Admin
+        return $user->isSuperAdmin();
     }
 
     public function approve(User $user, AccountTransfer $accountTransfer): bool
     {
+        if ($accountTransfer->status !== AccountEntryStatus::Pending) {
+            return false;
+        }
+
+        $accountTransfer->loadMissing(['fromAccount', 'toAccount']);
+        $fromLocationId = $accountTransfer->fromAccount?->location_id;
+        $toLocationId = $accountTransfer->toAccount?->location_id;
+        $isRemittance = $fromLocationId !== $toLocationId;
+
+        if ($isRemittance) {
+            // Remittance to HQ: Destination (HQ / Super Admin) confirms receipt.
+            // Branch manager (creator) CANNOT approve their own remittance.
+            return (BranchScope::canAccess($user, $toLocationId) || BranchScope::isUnrestricted($user))
+                && (int) $user->id !== (int) $accountTransfer->created_by
+                && $user->hasAnyPermission(self::approverPermissions());
+        }
+
         return BranchScope::canAccess($user, $accountTransfer->location_id)
             && FinanceApprovals::canDecide(
                 $user,

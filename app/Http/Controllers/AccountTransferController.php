@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\AccountEntryStatus;
+use App\Enums\AccountType;
+use App\Enums\LocationType;
 use App\Exceptions\InsufficientAccountBalanceException;
 use App\Helpers\Money;
 use App\Http\Requests\AccountTransfer\StoreAccountTransferRequest;
@@ -41,7 +43,18 @@ class AccountTransferController extends Controller
             $perPage = 10;
         }
 
-        $transfers = BranchScope::scopeQuery(AccountTransfer::query(), $user)
+        $transfersQuery = AccountTransfer::query();
+        if (BranchScope::isRestricted($user)) {
+            $branchId = BranchScope::locationId($user);
+            $transfersQuery->where(function ($q) use ($branchId) {
+                if ($branchId !== null) {
+                    $q->where('location_id', $branchId)
+                        ->orWhereHas('toAccount', fn ($tq) => $tq->where('location_id', $branchId));
+                }
+            });
+        }
+
+        $transfers = $transfersQuery
             ->with(['fromAccount', 'toAccount', 'creator', 'approver'])
             ->search($request->string('search')->toString())
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')->toString()))
@@ -56,7 +69,18 @@ class AccountTransferController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
-        $monthTotals = BranchScope::scopeQuery(AccountTransfer::query(), $user)
+        $monthTotalsQuery = AccountTransfer::query();
+        if (BranchScope::isRestricted($user)) {
+            $branchId = BranchScope::locationId($user);
+            $monthTotalsQuery->where(function ($q) use ($branchId) {
+                if ($branchId !== null) {
+                    $q->where('location_id', $branchId)
+                        ->orWhereHas('toAccount', fn ($tq) => $tq->where('location_id', $branchId));
+                }
+            });
+        }
+
+        $monthTotals = $monthTotalsQuery
             ->selectRaw("
                 COUNT(*) as transfer_count,
                 COALESCE(SUM(CASE WHEN status = 'completed' THEN amount ELSE 0 END), 0) as completed_total,
@@ -68,7 +92,7 @@ class AccountTransferController extends Controller
         return view('account-transfers.index', [
             'transfers' => $transfers,
             'perPage' => $perPage,
-            'accounts' => BranchScope::scopeQuery(Account::query(), $user)->active()->orderBy('name')->get(['id', 'name', 'type']),
+            'accounts' => BranchScope::scopeQueryWithShared(Account::query(), $user)->active()->orderBy('name')->get(['id', 'name', 'type']),
             'monthCount' => (int) ($monthTotals->transfer_count ?? 0),
             'monthCompleted' => (float) ($monthTotals->completed_total ?? 0),
             'pendingCount' => (int) ($monthTotals->pending_count ?? 0),
@@ -82,8 +106,44 @@ class AccountTransferController extends Controller
     {
         $this->authorize('create', AccountTransfer::class);
 
+        $user = $request->user();
+
+        // Ensure the branch has a dedicated cash till account if user is assigned to a branch
+        if ($user && $user->branch_id !== null) {
+            Account::firstOrCreate(
+                [
+                    'location_id' => $user->branch_id,
+                    'type' => AccountType::Cash,
+                ],
+                [
+                    'name' => 'Cash Till - '.($user->branch?->name ?? 'Branch '.$user->branch_id),
+                    'opening_balance' => 0,
+                    'current_balance' => 0,
+                    'status' => 'active',
+                    'note' => 'Primary cash till for '.($user->branch?->name ?? 'Branch'),
+                ]
+            );
+        }
+
+        $fromAccounts = BranchScope::scopeQuery(Account::query(), $user)->active()->orderBy('name')->get(['id', 'name', 'type', 'current_balance']);
+
+        $toAccountsQuery = Account::query()->active();
+        if (BranchScope::isRestricted($user)) {
+            $branchId = BranchScope::locationId($user);
+            $toAccountsQuery->where(function ($q) use ($branchId) {
+                if ($branchId !== null) {
+                    $q->where('location_id', $branchId);
+                }
+                $q->orWhereNull('location_id')
+                    ->orWhereHas('location', fn ($l) => $l->where('type', LocationType::Warehouse));
+            });
+        }
+        $toAccounts = $toAccountsQuery->orderBy('name')->get(['id', 'name', 'type', 'current_balance']);
+
         return view('account-transfers.create', [
-            'accounts' => BranchScope::scopeQuery(Account::query(), $request->user())->active()->orderBy('name')->get(['id', 'name', 'type', 'current_balance']),
+            'accounts' => $toAccounts,
+            'fromAccounts' => $fromAccounts,
+            'toAccounts' => $toAccounts,
             'methods' => PaymentMethod::options(),
         ]);
     }
@@ -98,15 +158,27 @@ class AccountTransferController extends Controller
         $validated['status'] = AccountEntryStatus::Pending->value;
         $validated['created_by'] = $request->user()?->id;
 
-        // Strict branch isolation: transfers move money between the user's own
-        // branch's accounts only (shared/head-office accounts are Super Admin).
-        foreach (['from_account_id', 'to_account_id'] as $accountKey) {
-            $account = Account::query()->find((int) $validated[$accountKey]);
+        $fromAccount = Account::query()->with('location')->find((int) $validated['from_account_id']);
+        $toAccount = Account::query()->with('location')->find((int) $validated['to_account_id']);
 
-            if (! BranchScope::canAccess($request->user(), $account?->location_id)) {
-                return back()->withInput()->with('error', 'You can only transfer between accounts of your own branch.');
-            }
+        if (! $fromAccount || ! $toAccount) {
+            return back()->withInput()->with('error', 'Selected accounts could not be found.');
         }
+
+        // The sending account must belong to the user's accessible branch.
+        if (! BranchScope::canAccess($request->user(), $fromAccount->location_id)) {
+            return back()->withInput()->with('error', 'You can only transfer from accounts of your own branch.');
+        }
+
+        // The receiving account may belong to the same branch or be a Central HQ/shared account (Remittance).
+        $isDestinationBranch = BranchScope::canAccess($request->user(), $toAccount->location_id);
+        $isDestinationHq = $toAccount->location_id === null || $toAccount->location?->type === LocationType::Warehouse;
+
+        if (! $isDestinationBranch && ! $isDestinationHq) {
+            return back()->withInput()->with('error', 'You can only transfer to your own branch accounts or Central HQ accounts.');
+        }
+
+        $validated['location_id'] = $fromAccount->location_id;
 
         $transfer = AccountTransfer::create($validated);
 
@@ -128,9 +200,45 @@ class AccountTransferController extends Controller
     {
         $this->authorize('update', $accountTransfer);
 
+        $user = $request->user();
+
+        // Ensure the branch has a dedicated cash till account if user is assigned to a branch
+        if ($user && $user->branch_id !== null) {
+            Account::firstOrCreate(
+                [
+                    'location_id' => $user->branch_id,
+                    'type' => AccountType::Cash,
+                ],
+                [
+                    'name' => 'Cash Till - '.($user->branch?->name ?? 'Branch '.$user->branch_id),
+                    'opening_balance' => 0,
+                    'current_balance' => 0,
+                    'status' => 'active',
+                    'note' => 'Primary cash till for '.($user->branch?->name ?? 'Branch'),
+                ]
+            );
+        }
+
+        $fromAccounts = BranchScope::scopeQuery(Account::query(), $user)->active()->orderBy('name')->get(['id', 'name', 'type', 'current_balance']);
+
+        $toAccountsQuery = Account::query()->active();
+        if (BranchScope::isRestricted($user)) {
+            $branchId = BranchScope::locationId($user);
+            $toAccountsQuery->where(function ($q) use ($branchId) {
+                if ($branchId !== null) {
+                    $q->where('location_id', $branchId);
+                }
+                $q->orWhereNull('location_id')
+                    ->orWhereHas('location', fn ($l) => $l->where('type', LocationType::Warehouse));
+            });
+        }
+        $toAccounts = $toAccountsQuery->orderBy('name')->get(['id', 'name', 'type', 'current_balance']);
+
         return view('account-transfers.edit', [
             'transfer' => $accountTransfer,
-            'accounts' => BranchScope::scopeQuery(Account::query(), $request->user())->active()->orderBy('name')->get(['id', 'name', 'type', 'current_balance']),
+            'accounts' => $toAccounts,
+            'fromAccounts' => $fromAccounts,
+            'toAccounts' => $toAccounts,
             'methods' => PaymentMethod::options(),
         ]);
     }
@@ -152,14 +260,25 @@ class AccountTransferController extends Controller
 
         $wasCompleted = $accountTransfer->status === AccountEntryStatus::Completed;
 
-        // Strict branch isolation: transfers stay between the user's own
-        // branch's accounts (crafted requests may not re-point them elsewhere).
-        foreach (['from_account_id', 'to_account_id'] as $accountKey) {
-            $account = Account::query()->find((int) ($validated[$accountKey] ?? $accountTransfer->{$accountKey}));
+        $fromAccountId = (int) ($validated['from_account_id'] ?? $accountTransfer->from_account_id);
+        $toAccountId = (int) ($validated['to_account_id'] ?? $accountTransfer->to_account_id);
 
-            if (! BranchScope::canAccess($request->user(), $account?->location_id)) {
-                return back()->withInput()->with('error', 'You can only transfer between accounts of your own branch.');
-            }
+        $fromAccount = Account::query()->with('location')->find($fromAccountId);
+        $toAccount = Account::query()->with('location')->find($toAccountId);
+
+        if (! $fromAccount || ! $toAccount) {
+            return back()->withInput()->with('error', 'Selected accounts could not be found.');
+        }
+
+        if (! BranchScope::canAccess($request->user(), $fromAccount->location_id)) {
+            return back()->withInput()->with('error', 'You can only transfer from accounts of your own branch.');
+        }
+
+        $isDestinationBranch = BranchScope::canAccess($request->user(), $toAccount->location_id);
+        $isDestinationHq = $toAccount->location_id === null || $toAccount->location?->type === LocationType::Warehouse;
+
+        if (! $isDestinationBranch && ! $isDestinationHq) {
+            return back()->withInput()->with('error', 'You can only transfer to your own branch accounts or Central HQ accounts.');
         }
 
         try {

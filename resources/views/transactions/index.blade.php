@@ -45,6 +45,14 @@
                 </a>
             @endif
 
+            @can('create', App\Models\AccountTransfer::class)
+                <a href="{{ route('account-transfers.create') }}"
+                   class="btn-scale inline-flex items-center gap-2 rounded-2xl border border-brand-500/30 bg-brand-500/10 px-4 py-2.5 text-xs sm:text-sm font-semibold text-brand-600 hover:bg-brand-500 hover:text-on-brand transition-colors">
+                    <x-icon name="trips" class="size-4" />
+                    <span>New Transfer</span>
+                </a>
+            @endcan
+
             @can('create', [App\Models\AccountTransaction::class, null])
                 <a href="{{ route('transactions.create', ['type' => 'income']) }}"
                    class="btn-scale inline-flex items-center gap-2 rounded-2xl border border-success/30 bg-success/10 px-4 py-2.5 text-xs sm:text-sm font-semibold text-success hover:bg-success hover:text-on-brand transition-colors">
@@ -153,6 +161,7 @@
                         @foreach(\App\Enums\AccountTransactionType::options() as $value => $label)
                             <option value="{{ $value }}" @selected(request('type') === $value)>{{ $label }}</option>
                         @endforeach
+                        <option value="transfer" @selected(request('type') === 'transfer')>Transfer</option>
                     </select>
                 </div>
 
@@ -226,70 +235,138 @@
                 </thead>
                 <tbody class="divide-y divide-line bg-surface">
                     @forelse($transactions as $transaction)
+                        @php
+                            $isTransfer = $transaction instanceof \App\Models\AccountTransfer;
+                        @endphp
                         <tr class="hover:bg-soft/40 transition-colors duration-150 group">
-                            <td class="py-4 px-5 text-start text-sm text-ink tabular-nums whitespace-nowrap">{{ $transaction->transaction_date->format('d M Y') }}</td>
+                            <td class="py-4 px-5 text-start text-sm text-ink tabular-nums whitespace-nowrap">
+                                {{ ($isTransfer ? $transaction->transfer_date : $transaction->transaction_date)?->format('d M Y') }}
+                            </td>
                             <td class="py-4 px-5 text-start">
                                 <span class="text-sm font-semibold text-ink">{{ $transaction->reference_no ?: '—' }}</span>
                                 @if($transaction->note)
                                     <span class="block text-xs text-muted max-w-[180px] truncate" title="{{ $transaction->note }}">{{ $transaction->note }}</span>
                                 @endif
                             </td>
-                            <td class="py-4 px-5 text-start text-sm text-muted">{{ $transaction->account?->name ?? '—' }}</td>
-                            <td class="py-4 px-5 text-start">
-                                <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold {{ $transaction->isIncome() ? 'bg-success/10 text-success ring-1 ring-success/20' : 'bg-danger/10 text-danger ring-1 ring-danger/20' }}">
-                                    <x-icon :name="$transaction->isIncome() ? 'trend-up' : 'cart'" class="size-3.5" />
-                                    {{ $transaction->type->label() }}
-                                </span>
+                            <td class="py-4 px-5 text-start text-sm text-muted">
+                                @if($isTransfer)
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <span class="font-medium text-ink">{{ $transaction->fromAccount?->name ?? '—' }}</span>
+                                        <x-svg.arrow-right class="size-3 text-muted shrink-0" />
+                                        <span class="font-medium text-ink">{{ $transaction->toAccount?->name ?? '—' }}</span>
+                                    </div>
+                                @else
+                                    {{ $transaction->account?->name ?? '—' }}
+                                @endif
                             </td>
-                            <td class="py-4 px-5 text-start text-sm text-muted">{{ $transaction->category }}</td>
-                            <td class="py-4 px-5 text-end text-sm font-bold tabular-nums whitespace-nowrap {{ $transaction->isIncome() ? 'text-success' : 'text-danger' }}">
-                                {{ $transaction->isIncome() ? '+' : '−' }}{{ \App\Helpers\Money::format($transaction->amount) }}
+                            <td class="py-4 px-5 text-start">
+                                @if($isTransfer)
+                                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold bg-brand-500/10 text-brand-600 dark:text-brand-400 ring-1 ring-brand-500/20">
+                                        <x-icon name="trips" class="size-3.5" />
+                                        Transfer
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold {{ $transaction->isIncome() ? 'bg-success/10 text-success ring-1 ring-success/20' : 'bg-danger/10 text-danger ring-1 ring-danger/20' }}">
+                                        <x-icon :name="$transaction->isIncome() ? 'trend-up' : 'cart'" class="size-3.5" />
+                                        {{ $transaction->type->label() }}
+                                    </span>
+                                @endif
+                            </td>
+                            <td class="py-4 px-5 text-start text-sm text-muted">
+                                @if($isTransfer)
+                                    <span class="inline-flex items-center gap-1 text-xs font-medium text-muted">
+                                        Branch Remittance
+                                    </span>
+                                @else
+                                    {{ $transaction->category }}
+                                @endif
+                            </td>
+                            <td class="py-4 px-5 text-end text-sm font-bold tabular-nums whitespace-nowrap {{ $isTransfer ? 'text-ink' : ($transaction->isIncome() ? 'text-success' : 'text-danger') }}">
+                                {{ $isTransfer ? '' : ($transaction->isIncome() ? '+' : '−') }}{{ \App\Helpers\Money::format($transaction->amount) }}
                             </td>
                             <td class="py-4 px-5 text-center">
                                 <x-status-badge :status="$transaction->status->value" :label="$transaction->status->label()" />
                             </td>
                             <td class="py-4 px-5 text-end whitespace-nowrap">
                                 <div class="inline-flex items-center justify-end gap-2">
-                                    @can('approve', $transaction)
-                                        <form method="POST" action="{{ route('transactions.approve', $transaction) }}">
-                                            @csrf
-                                            @method('PATCH')
-                                            <button type="submit"
-                                                    class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-success/30 bg-success/10 px-3 py-1.5 text-xs font-semibold text-success hover:bg-success hover:text-on-brand transition-colors cursor-pointer">
-                                                <x-svg.check class="size-3.5" />
-                                                <span>Approve</span>
-                                            </button>
-                                        </form>
-                                        <form method="POST" action="{{ route('transactions.reject', $transaction) }}">
-                                            @csrf
-                                            @method('PATCH')
-                                            <button type="submit"
-                                                    class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs hover:border-danger hover:text-danger transition-colors cursor-pointer">
-                                                <span>Reject</span>
-                                            </button>
-                                        </form>
-                                    @endcan
-                                    @can('update', $transaction)
-                                        <a href="{{ route('transactions.edit', $transaction) }}"
-                                           class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs hover:border-brand-500 hover:text-brand-500 hover:bg-soft transition-colors">
-                                            <x-svg.pencil class="size-3.5 text-muted" />
-                                            <span>Edit</span>
-                                        </a>
-                                    @endcan
-                                    @can('delete', $transaction)
-                                        <x-confirm-delete
-                                            :action="route('transactions.destroy', $transaction)"
-                                            :message="'Delete entry ' . ($transaction->reference_no ?: '#' . $transaction->id) . '? Completed entries restore their balance effect.'"
-                                            confirm-text="Delete Entry"
-                                            label="Delete" />
-                                    @endcan
+                                    @if($isTransfer)
+                                        @if($transaction->status === \App\Enums\AccountEntryStatus::Pending)
+                                            @can('approve', $transaction)
+                                                <form method="POST" action="{{ route('account-transfers.approve', $transaction) }}">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <button type="submit"
+                                                            class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-success/30 bg-success/10 px-3 py-1.5 text-xs font-semibold text-success hover:bg-success hover:text-on-brand transition-colors cursor-pointer">
+                                                        <x-svg.check class="size-3.5" />
+                                                        <span>Approve</span>
+                                                    </button>
+                                                </form>
+                                                <form method="POST" action="{{ route('account-transfers.reject', $transaction) }}">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <button type="submit"
+                                                            class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs hover:border-danger hover:text-danger transition-colors cursor-pointer">
+                                                        <span>Reject</span>
+                                                    </button>
+                                                </form>
+                                            @endcan
+                                        @endif
+                                        @can('update', $transaction)
+                                            <a href="{{ route('account-transfers.edit', $transaction) }}"
+                                               class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs hover:border-brand-500 hover:text-brand-500 hover:bg-soft transition-colors">
+                                                <x-svg.pencil class="size-3.5 text-muted" />
+                                                <span>Edit</span>
+                                            </a>
+                                        @endcan
+                                        @can('delete', $transaction)
+                                            <x-confirm-delete
+                                                :action="route('account-transfers.destroy', $transaction)"
+                                                :message="'Delete transfer ' . ($transaction->reference_no ?: '#' . $transaction->id) . '? Completed transfers restore both balances.'"
+                                                confirm-text="Delete Transfer"
+                                                label="Delete" />
+                                        @endcan
+                                    @else
+                                        @can('approve', $transaction)
+                                            <form method="POST" action="{{ route('transactions.approve', $transaction) }}">
+                                                @csrf
+                                                @method('PATCH')
+                                                <button type="submit"
+                                                        class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-success/30 bg-success/10 px-3 py-1.5 text-xs font-semibold text-success hover:bg-success hover:text-on-brand transition-colors cursor-pointer">
+                                                    <x-svg.check class="size-3.5" />
+                                                    <span>Approve</span>
+                                                </button>
+                                            </form>
+                                            <form method="POST" action="{{ route('transactions.reject', $transaction) }}">
+                                                @csrf
+                                                @method('PATCH')
+                                                <button type="submit"
+                                                        class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs hover:border-danger hover:text-danger transition-colors cursor-pointer">
+                                                    <span>Reject</span>
+                                                </button>
+                                            </form>
+                                        @endcan
+                                        @can('update', $transaction)
+                                            <a href="{{ route('transactions.edit', $transaction) }}"
+                                               class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs hover:border-brand-500 hover:text-brand-500 hover:bg-soft transition-colors">
+                                                <x-svg.pencil class="size-3.5 text-muted" />
+                                                <span>Edit</span>
+                                            </a>
+                                        @endcan
+                                        @can('delete', $transaction)
+                                            <x-confirm-delete
+                                                :action="route('transactions.destroy', $transaction)"
+                                                :message="'Delete entry ' . ($transaction->reference_no ?: '#' . $transaction->id) . '? Completed entries restore their balance effect.'"
+                                                confirm-text="Delete Entry"
+                                                label="Delete" />
+                                        @endcan
+                                    @endif
                                 </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
                             <td colspan="8" class="py-8 px-6 text-center">
-                                <x-empty-state message="No income or expense entries found." />
+                                <x-empty-state message="No transaction or transfer entries found." />
                             </td>
                         </tr>
                     @endforelse

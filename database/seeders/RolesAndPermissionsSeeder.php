@@ -32,6 +32,7 @@ class RolesAndPermissionsSeeder extends Seeder
             // Branches & Inventory
             'branches.manage', 'inventory.view',
             'stock-adjustments.manage', 'stock-transfers.manage', 'stock-transfers.approve',
+            'account-transfers.manage',
             // Purchasing
             'purchase-orders.manage', 'purchase-invoices.manage',
             'purchase-invoices.post', 'purchase-invoices.view', 'purchase-invoices.approve',
@@ -76,6 +77,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'customers.manage', 'customers.view',
             'branches.manage', 'inventory.view',
             'stock-adjustments.manage', 'stock-transfers.manage', 'stock-transfers.approve',
+            'account-transfers.manage',
             'purchase-orders.manage', 'purchase-invoices.manage',
             'purchase-invoices.post', 'purchase-invoices.view', 'purchase-invoices.approve',
             'purchase-returns.manage', 'purchase-returns.approve', 'supplier-payments.manage',
@@ -124,6 +126,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'products.view', 'brands.view', 'categories.view', 'units.view',
             'suppliers.view', 'customers.view', 'inventory.view',
             'stock-adjustments.manage', 'stock-transfers.manage', 'stock-transfers.approve',
+            'account-transfers.manage',
             'purchase-orders.manage', 'purchase-invoices.manage',
             'purchase-invoices.post', 'purchase-invoices.view', 'purchase-invoices.approve',
             'purchase-returns.manage', 'purchase-returns.approve',
@@ -149,6 +152,6 @@ class RolesAndPermissionsSeeder extends Seeder
         // ── Supplier (portal login; sees only the supplier profile linked to it) ──
         Role::firstOrCreate(['name' => 'Supplier', 'guard_name' => 'web']);
 
-        $this->command->info('Roles and permissions seeded.');
+        $this->command?->info('Roles and permissions seeded.');
     }
 }

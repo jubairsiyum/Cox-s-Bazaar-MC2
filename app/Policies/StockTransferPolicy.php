@@ -58,6 +58,13 @@ class StockTransferPolicy
             && LocationScope::canAccess($user, $stockTransfer->from_location_id);
     }
 
+    public function dispatch(User $user, StockTransfer $stockTransfer): bool
+    {
+        return in_array($stockTransfer->status, [StockTransferStatus::Draft, StockTransferStatus::Requested], true)
+            && $user->can('stock-transfers.manage')
+            && LocationScope::canAccess($user, $stockTransfer->from_location_id);
+    }
+
     /**
      * Approve (receive) a transfer. A plain transfer is received by the
      * receiving side; a stock request is approved by the source it was made to,
@@ -65,6 +72,11 @@ class StockTransferPolicy
      */
     public function approve(User $user, StockTransfer $stockTransfer): bool
     {
+        if ($stockTransfer->status === StockTransferStatus::InTransit) {
+            return $user->can('stock-transfers.approve')
+                && LocationScope::canAccess($user, $stockTransfer->to_location_id);
+        }
+
         if ($stockTransfer->is_request) {
             return $user->can('stock-transfers.approve')
                 && LocationScope::canAccess($user, $stockTransfer->from_location_id)

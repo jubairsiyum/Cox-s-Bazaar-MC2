@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\DayClosedException;
 use App\Http\Middleware\BrowserAuth;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
@@ -33,4 +34,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        $exceptions->render(function (DayClosedException $e, Request $request) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+
+            return back()->withInput()->with('error', $e->getMessage());
+        });
     })->create();

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\SalesInvoiceStatus;
+use App\Exceptions\DayClosedException;
 use App\Exceptions\InsufficientStockException;
 use App\Exports\SalesInvoiceExport;
 use App\Http\Requests\SalesInvoice\StoreSalesInvoiceRequest;
@@ -282,7 +283,7 @@ class SalesInvoiceController extends Controller
 
         try {
             SalesInvoiceService::post($salesInvoice);
-        } catch (InsufficientStockException $e) {
+        } catch (InsufficientStockException|DayClosedException $e) {
             return back()->with('error', $e->getMessage());
         }
 

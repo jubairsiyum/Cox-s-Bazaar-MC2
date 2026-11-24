@@ -132,6 +132,11 @@ class PurchaseOrderController extends Controller
     public function store(StorePurchaseOrderRequest $request): RedirectResponse
     {
         $validated = $request->validated();
+
+        if (! LocationScope::canAccess($request->user(), $validated['location_id'])) {
+            return back()->withInput()->with('error', 'You cannot place a purchase order for a location you cannot access.');
+        }
+
         $items = $validated['items'];
         $purchaseStatus = PurchaseStatus::from($validated['purchase_status']);
 
@@ -225,6 +230,11 @@ class PurchaseOrderController extends Controller
         $original = $purchaseOrder->getOriginal();
         $wasCancelled = $purchaseOrder->purchase_status === PurchaseStatus::Cancelled;
         $validated = $request->validated();
+
+        if (isset($validated['location_id']) && ! LocationScope::canAccess($request->user(), $validated['location_id'])) {
+            return back()->withInput()->with('error', 'You cannot move a purchase order to a location you cannot access.');
+        }
+
         $itemsEditable = ! $purchaseOrder->purchase_status->hasReceived();
         $items = $itemsEditable ? $validated['items'] : [];
 

@@ -57,6 +57,11 @@
       : [];
 
   // Scoped query helper
+  // When restricted (Outlet Manager / Branch Staff): strictly scoped to assigned branch.
+  // When Super Admin scopes to a specific location: strictly scoped to that location.
+  // When Super Admin views "All Outlets / Network" ($targetLocationId === null):
+  // Rule: "all network jokhon select hobe. sob branch er sale show hobe total."
+  // Retail branch network scope: aggregates all retail branches (excludes central warehouse wholesale).
   $scoped = function ($query) use ($viewer, $isRestricted, $targetLocationId) {
       if ($isRestricted) {
           return $viewer !== null ? \App\Services\BranchScope::scopeQuery($query, $viewer) : $query->whereRaw('1 = 0');
@@ -64,7 +69,7 @@
       if ($targetLocationId !== null) {
           return $query->where('location_id', $targetLocationId);
       }
-      return $query;
+      return $query->whereHas('location', fn ($l) => $l->where('type', '!=', \App\Enums\LocationType::Warehouse));
   };
 
   // ── 2. Safe Dynamic Data Resolution ────────────────────────────────────────
@@ -78,7 +83,7 @@
           ->where('status', \App\Enums\SalesInvoiceStatus::Posted))
           ->sum('grand_total');
 
-      $salesChangePct = $yesterdaySales > 0
+      $salesChangePct = ($todaySales > 0 && $yesterdaySales > 0)
           ? (int) round((($todaySales - $yesterdaySales) / $yesterdaySales) * 100)
           : ($todaySales > 0 ? 100 : 0);
 
@@ -93,7 +98,7 @@
       $yesterdayCollection = (float) $scoped(\App\Models\SalesInvoice::query()->whereDate('invoice_date', today()->subDay()))
           ->sum('paid_amount');
 
-      $collectionChangePct = $yesterdayCollection > 0
+      $collectionChangePct = ($todayCollection > 0 && $yesterdayCollection > 0)
           ? (int) round((($todayCollection - $yesterdayCollection) / $yesterdayCollection) * 100)
           : ($todayCollection > 0 ? 100 : 0);
 
@@ -110,6 +115,21 @@
       $activeRetailersCount = $targetLocationId !== null
           ? (int) $scoped(\App\Models\SalesInvoice::query())->whereNotNull('customer_id')->distinct('customer_id')->count('customer_id')
           : (int) \App\Models\Customer::where('status', 'active')->count();
+
+      // 2.3.1 Payable to HQ Resolution (for Outlet Managers & branch outlet views)
+      // Outlet managers manage daily cash close & remittance to Central HQ
+      $isOutletScope = $viewer?->hasRole('Outlet Manager') || $isRestricted || ($targetLocationId !== null && ! $isWarehouseOrAllBranches);
+      $payableLocationId = $targetLocationId ?? ($isRestricted ? \App\Services\BranchScope::locationId($viewer) : null);
+      $payableSummary = \App\Services\DayClosingService::getPayableToHqSummary($payableLocationId);
+      $isTodayClosed = $payableLocationId !== null && \App\Services\DayClosingService::isDayClosed((int) $payableLocationId, today());
+      $clearDayUrl = $isTodayClosed ? route('day-closings.index') : route('day-closings.create');
+      $clearDayCaption = $payableSummary['caption'] . ($isTodayClosed ? ' · Cash locked' : ' · Clear Day →');
+
+      // 2.3.2 Super Admin All Network (Consolidated) Payable/Receivable Resolution
+      // All branches' closing amounts vs remittances sent by branch managers to HQ
+      $networkPayable = (! $isOutletScope && $isSuperAdmin)
+          ? \App\Services\DayClosingService::getNetworkPayableSummary()
+          : null;
 
       // 2.4 Stock Valuation & Inventory Units
       if ($isWarehouseOrAllBranches) {
@@ -501,6 +521,29 @@
       $totalReceivableDue = 0;
       $overdueReceivable = 0;
       $activeRetailersCount = 0;
+      $payableSummary = [
+          'cash_close_amount' => 0.0,
+          'transferred_to_hq' => 0.0,
+          'pending_transferred' => 0.0,
+          'left_amount' => 0.0,
+          'progress_pct' => 100,
+          'is_all_clear' => true,
+          'closing_date' => null,
+          'caption' => 'All clear · ৳0 payable to HQ',
+      ];
+      $clearDayUrl = route('day-closings.index');
+      $clearDayCaption = 'All clear · ৳0 payable to HQ';
+      $networkPayable = [
+          'total_closings' => 0.0,
+          'total_sent_to_hq' => 0.0,
+          'total_receivable' => 0.0,
+          'progress_pct' => 100,
+          'is_all_clear' => true,
+          'branches_count' => 0,
+          'today_sent_to_hq' => 0.0,
+          'caption' => 'All clear · ৳0 receivable from branches',
+      ];
+      $isOutletScope = false;
       $totalStockUnits = 0;
       $totalStockValue = 0;
       $stockValueChangePct = 0;
@@ -734,6 +777,35 @@
       </div>
     @endif
 
+    @if ($isSuperAdmin && !$targetLocationId && ($networkPayable['unclosed_branches_count'] ?? 0) > 0)
+      <div 
+        x-data="{ dismissed: false }"
+        x-show="!dismissed"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100 scale-100"
+        x-transition:leave-end="opacity-0 scale-95"
+        class="rounded-2xl border border-warning/30 bg-warning/10 p-3.5 sm:p-4 text-xs sm:text-sm text-ink flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs">
+        <div class="flex items-center gap-2.5">
+          <x-icon name="alert-triangle" class="size-4 sm:size-5 shrink-0 text-warning" />
+          <span><strong>Daily Closing Notice:</strong> {{ $networkPayable['unclosed_branches_count'] }} of {{ $networkPayable['branches_count'] }} {{ \Illuminate\Support\Str::plural('branch', $networkPayable['branches_count']) }} {{ $networkPayable['unclosed_branches_count'] === 1 ? 'has' : 'have' }} not completed daily cash close today.</span>
+        </div>
+        <div class="flex items-center gap-2 shrink-0 self-end sm:self-center">
+          <a href="{{ route('day-closings.index') }}" class="btn-scale inline-flex items-center gap-1.5 rounded-xl bg-warning/20 border border-warning/40 px-3 py-1.5 text-xs font-semibold text-ink hover:bg-warning/30 transition-colors">
+            <span>View Branch Status</span>
+            <x-svg.arrow-right class="size-3" />
+          </a>
+          <button 
+            type="button" 
+            @click="dismissed = true" 
+            class="p-1 rounded-xl text-ink/60 hover:text-ink hover:bg-warning/25 transition-colors cursor-pointer"
+            title="Dismiss notice"
+            aria-label="Dismiss notice">
+            <x-svg.x class="size-4" />
+          </button>
+        </div>
+      </div>
+    @endif
+
     {{-- ── 1. Top 4 Metric KPI Stat Cards (Scoped) ── --}}
     <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-4 items-stretch">
       <div class="flex flex-col">
@@ -749,25 +821,42 @@
       </div>
       <div class="flex flex-col">
         <x-dashboard.stat-card 
-          title="Today's Collection" 
+          :title="$branchScoped ? 'Today\'s Collection' : 'Daily Collection'" 
           :amount="$todayCollection" 
           :change="$collectionChangePct" 
           :caption="$todayCollectionCaption" 
+          :href="route('collections.index')"
           icon="wallet"
           class="rv mv-blur lift"
           style="--i:2; --stagger:160ms; --d:80ms"
         />
       </div>
       <div class="flex flex-col">
-        <x-dashboard.stat-card 
-          title="Retailer Dues (Receivable)" 
-          :amount="$totalReceivableDue" 
-          :change="0" 
-          :caption="$retailerDuesCaption" 
-          icon="store"
-          class="rv mv-blur lift"
-          style="--i:3; --stagger:160ms; --d:80ms"
-        />
+        @if ($isOutletScope)
+          <x-dashboard.stat-card 
+            title="Payable to HQ" 
+            :amount="$payableSummary['left_amount']" 
+            :change="$payableSummary['progress_pct']" 
+            :progress="true"
+            :caption="$clearDayCaption" 
+            :href="$clearDayUrl"
+            icon="warehouse"
+            class="rv mv-blur lift"
+            style="--i:3; --stagger:160ms; --d:80ms"
+          />
+        @else
+          <x-dashboard.stat-card 
+            title="Branch Closings (Receivable)" 
+            :amount="(float) ($networkPayable['total_receivable'] ?? 0)" 
+            :change="(int) ($networkPayable['progress_pct'] ?? 100)" 
+            :progress="true"
+            :caption="$networkPayable['caption'] ?? 'All clear · All branch closings received'" 
+            :href="route('day-closings.index')"
+            icon="warehouse"
+            class="rv mv-blur lift"
+            style="--i:3; --stagger:160ms; --d:80ms"
+          />
+        @endif
       </div>
       <div class="flex flex-col">
         <x-dashboard.stat-card 

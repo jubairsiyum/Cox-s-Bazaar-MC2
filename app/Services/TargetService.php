@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\LocationType;
 use App\Enums\SalesInvoiceStatus;
 use App\Models\BranchTarget;
 use App\Models\Location;
@@ -121,6 +122,7 @@ class TargetService
 
         $locations = Location::query()
             ->where('status', 'active')
+            ->where('type', '!=', LocationType::Warehouse)
             ->orderBy('name')
             ->get();
 
@@ -187,6 +189,8 @@ class TargetService
 
         if ($locationId !== null) {
             $query->where('location_id', $locationId);
+        } else {
+            $query->whereHas('location', fn ($l) => $l->where('type', '!=', LocationType::Warehouse));
         }
 
         $invoices = $query->get(['invoice_date', 'grand_total']);

@@ -11,6 +11,7 @@ use App\Http\Requests\AccountTransaction\StoreAccountTransactionRequest;
 use App\Http\Requests\AccountTransaction\UpdateAccountTransactionRequest;
 use App\Models\Account;
 use App\Models\AccountTransaction;
+use App\Models\AccountTransfer;
 use App\Models\PaymentMethod;
 use App\Models\TransactionCategory;
 use App\Services\AccountBalanceService;
@@ -18,6 +19,7 @@ use App\Services\AuditService;
 use App\Services\BranchScope;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -43,19 +45,67 @@ class AccountTransactionController extends Controller
             $perPage = 10;
         }
 
-        $transactions = BranchScope::scopeQuery(AccountTransaction::query(), $user)
+        $type = $request->string('type')->toString();
+
+        $txQuery = BranchScope::scopeQuery(AccountTransaction::query(), $user)
             ->with(['account', 'creator', 'approver'])
             ->search($request->string('search')->toString())
-            ->when($request->filled('type'), fn ($q) => $q->where('type', $request->string('type')->toString()))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')->toString()))
             ->when($request->filled('account_id'), fn ($q) => $q->where('account_id', (int) $request->input('account_id')))
             ->when($request->filled('category'), fn ($q) => $q->where('category', $request->string('category')->toString()))
             ->when($request->filled('date_from'), fn ($q) => $q->whereDate('transaction_date', '>=', $request->input('date_from')))
-            ->when($request->filled('date_to'), fn ($q) => $q->whereDate('transaction_date', '<=', $request->input('date_to')))
-            ->orderByDesc('transaction_date')
-            ->orderByDesc('id')
-            ->paginate($perPage)
-            ->withQueryString();
+            ->when($request->filled('date_to'), fn ($q) => $q->whereDate('transaction_date', '<=', $request->input('date_to')));
+
+        $trQuery = AccountTransfer::query()
+            ->with(['fromAccount', 'toAccount', 'creator', 'approver'])
+            ->search($request->string('search')->toString())
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')->toString()))
+            ->when($request->filled('account_id'), function ($q) use ($request) {
+                $accId = (int) $request->input('account_id');
+                $q->where(fn ($qq) => $qq->where('from_account_id', $accId)->orWhere('to_account_id', $accId));
+            })
+            ->when($request->filled('date_from'), fn ($q) => $q->whereDate('transfer_date', '>=', $request->input('date_from')))
+            ->when($request->filled('date_to'), fn ($q) => $q->whereDate('transfer_date', '<=', $request->input('date_to')));
+
+        if (BranchScope::isRestricted($user)) {
+            $branchId = BranchScope::locationId($user);
+            $trQuery->where(function ($q) use ($branchId) {
+                if ($branchId !== null) {
+                    $q->where('location_id', $branchId)
+                        ->orWhereHas('toAccount', fn ($tq) => $tq->where('location_id', $branchId));
+                }
+            });
+        }
+
+        if ($type === 'transfer') {
+            $transactions = $trQuery->orderByDesc('transfer_date')->orderByDesc('id')->paginate($perPage)->withQueryString();
+        } elseif ($type === 'income' || $type === 'expense') {
+            $transactions = $txQuery->where('type', $type)->orderByDesc('transaction_date')->orderByDesc('id')->paginate($perPage)->withQueryString();
+        } else {
+            // Unified feed: all transactions (income, expense, and transfers)
+            $page = (int) $request->input('page', 1);
+            $totalCount = $txQuery->count() + $trQuery->count();
+
+            $fetchLimit = max(100, $page * $perPage + $perPage);
+            $txList = $txQuery->latest('transaction_date')->latest('id')->take($fetchLimit)->get();
+            $trList = $trQuery->latest('transfer_date')->latest('id')->take($fetchLimit)->get();
+
+            $combined = $txList->concat($trList)->sortByDesc(function ($item) {
+                $date = $item instanceof AccountTransfer ? $item->transfer_date : $item->transaction_date;
+
+                return ($date ? $date->toDateString() : '').'_'.str_pad((string) $item->id, 10, '0', STR_PAD_LEFT);
+            })->values();
+
+            $pagedItems = $combined->slice(($page - 1) * $perPage, $perPage)->values();
+
+            $transactions = new LengthAwarePaginator(
+                $pagedItems,
+                $totalCount,
+                $perPage,
+                $page,
+                ['path' => route('transactions.index'), 'query' => $request->query()]
+            );
+        }
 
         $monthTotals = BranchScope::scopeQuery(AccountTransaction::query(), $user)
             ->selectRaw("
@@ -66,7 +116,14 @@ class AccountTransactionController extends Controller
             ->whereBetween('transaction_date', [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()])
             ->first();
 
-        $pendingCount = BranchScope::scopeQuery(AccountTransaction::query(), $user)->where('status', 'pending')->count();
+        $monthTransfers = (float) (clone $trQuery)
+            ->where('status', 'completed')
+            ->whereBetween('transfer_date', [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()])
+            ->sum('amount');
+
+        $pendingTxCount = BranchScope::scopeQuery(AccountTransaction::query(), $user)->where('status', 'pending')->count();
+        $pendingTrCount = (clone $trQuery)->where('status', 'pending')->count();
+        $pendingCount = $pendingTxCount + $pendingTrCount;
 
         return view('transactions.index', [
             'transactions' => $transactions,
@@ -75,6 +132,7 @@ class AccountTransactionController extends Controller
             'categories' => TransactionCategory::options(),
             'monthIncome' => (float) ($monthTotals->income_total ?? 0),
             'monthExpense' => (float) ($monthTotals->expense_total ?? 0),
+            'monthTransfers' => $monthTransfers,
             'pendingCount' => $pendingCount,
         ]);
     }

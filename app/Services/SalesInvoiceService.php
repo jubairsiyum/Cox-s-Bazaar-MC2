@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\AccountType;
 use App\Enums\SalesInvoiceStatus;
 use App\Enums\SalesOrderStatus;
 use App\Exceptions\InsufficientStockException;
+use App\Models\Account;
 use App\Models\SalesInvoice;
 use App\Models\SalesOrder;
 use App\Models\Unit;
@@ -38,20 +40,28 @@ class SalesInvoiceService
     {
         $invoice->load('items');
 
-        $discount = round((float) $invoice->items->sum('discount'), 2);
-        $subtotal = round((float) $invoice->items->sum('subtotal'), 2);
-        $cartDiscount = round((float) $invoice->cart_discount, 2);
-        $rate = $taxRate ?? (float) $invoice->tax_rate;
-        $taxableBase = round(max(0, $subtotal - $cartDiscount), 2);
-        $taxAmount = round($taxableBase * $rate / 100, 2);
+        $discount = '0.00';
+        $subtotal = '0.00';
+
+        foreach ($invoice->items as $item) {
+            $discount = MoneyMath::add($discount, (string) ($item->discount ?? '0.00'));
+            $subtotal = MoneyMath::add($subtotal, (string) ($item->subtotal ?? '0.00'));
+        }
+
+        $cartDiscount = MoneyMath::clean((string) ($invoice->cart_discount ?? '0.00'));
+        $rate = $taxRate !== null ? (string) $taxRate : MoneyMath::clean((string) ($invoice->tax_rate ?? '0.00'));
+        $taxableBase = MoneyMath::max('0.00', MoneyMath::sub($subtotal, $cartDiscount));
+        $taxAmount = MoneyMath::percent($taxableBase, $rate);
+        $grandTotal = MoneyMath::add($taxableBase, $taxAmount);
+        $totalDiscount = MoneyMath::add($discount, $cartDiscount);
 
         $invoice->update([
             'subtotal' => $subtotal,
-            'discount_amount' => round($discount + $cartDiscount, 2),
+            'discount_amount' => $totalDiscount,
             'cart_discount' => $cartDiscount,
             'tax_rate' => $rate,
             'tax_amount' => $taxAmount,
-            'grand_total' => round($taxableBase + $taxAmount, 2),
+            'grand_total' => $grandTotal,
         ]);
     }
 
@@ -110,27 +120,74 @@ class SalesInvoiceService
     public static function post(SalesInvoice $invoice): void
     {
         DB::transaction(function () use ($invoice) {
-            $invoice->load('items.unit');
+            // Concurrency & idempotency: lock invoice and prevent double posting
+            $locked = SalesInvoice::query()->whereKey($invoice->getKey())->lockForUpdate()->firstOrFail();
+            if ($locked->status === SalesInvoiceStatus::Posted) {
+                return;
+            }
 
-            foreach ($invoice->items as $item) {
+            if ($locked->location_id !== null && $locked->invoice_date !== null) {
+                DayClosingService::assertDayNotClosed((int) $locked->location_id, $locked->invoice_date);
+            }
+
+            $locked->load('items.unit');
+
+            // Sort units by ID to ensure deadlock-free consistent locking
+            $sortedItems = $locked->items->sortBy('unit_id');
+
+            foreach ($sortedItems as $item) {
                 /** @var Unit $unit */
                 $unit = $item->unit;
 
                 StockService::sell(
                     $unit,
                     (int) $item->quantity,
-                    $invoice,
-                    "Sales invoice {$invoice->invoice_no} posted.",
-                    $invoice->location_id !== null ? (int) $invoice->location_id : null
+                    $locked,
+                    "Sales invoice {$locked->invoice_no} posted.",
+                    $locked->location_id !== null ? (int) $locked->location_id : null
                 );
             }
 
-            $invoice->update([
+            $locked->update([
                 'status' => SalesInvoiceStatus::Posted,
                 'posted_at' => now(),
             ]);
 
-            self::syncLinkedOrder($invoice);
+            // Credit the branch cash till when cash is paid for the sale
+            if ($locked->location_id !== null && (float) $locked->paid_amount > 0) {
+                $branchTill = Account::firstOrCreate(
+                    [
+                        'location_id' => $locked->location_id,
+                        'type' => AccountType::Cash,
+                    ],
+                    [
+                        'name' => 'Cash Till - '.($locked->location?->name ?? 'Branch '.$locked->location_id),
+                        'opening_balance' => 0,
+                        'current_balance' => 0,
+                        'status' => 'active',
+                    ]
+                );
+                $branchTill->increment('current_balance', (float) $locked->paid_amount);
+            }
+
+            // Credit the branch cash till when cash is paid for the sale
+            if ($locked->location_id !== null && (float) $locked->paid_amount > 0) {
+                $branchTill = Account::firstOrCreate(
+                    [
+                        'location_id' => $locked->location_id,
+                        'type' => AccountType::Cash,
+                    ],
+                    [
+                        'name' => 'Cash Till - '.($locked->location?->name ?? 'Branch '.$locked->location_id),
+                        'opening_balance' => 0,
+                        'current_balance' => 0,
+                        'status' => 'active',
+                    ]
+                );
+                $branchTill->increment('current_balance', (float) $locked->paid_amount);
+            }
+
+            self::syncLinkedOrder($locked);
         });
     }
 
@@ -164,6 +221,16 @@ class SalesInvoiceService
                 'void_reason' => $reason,
                 'due_amount' => 0,
             ]);
+
+            // Reverse cash from branch cash till if previously collected
+            if ($invoice->location_id !== null && (float) $invoice->paid_amount > 0) {
+                $branchTill = Account::where('location_id', $invoice->location_id)
+                    ->where('type', AccountType::Cash)
+                    ->first();
+                if ($branchTill) {
+                    $branchTill->decrement('current_balance', min((float) $branchTill->current_balance, (float) $invoice->paid_amount));
+                }
+            }
 
             self::syncLinkedOrder($invoice);
         });

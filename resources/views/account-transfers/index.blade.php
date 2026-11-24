@@ -25,13 +25,16 @@
             </nav>
 
             <div class="flex items-center gap-3 flex-wrap">
-                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink">Account Transfers</h1>
-                <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-xs font-semibold text-brand-500 ring-1 ring-brand-500/20 tabular-nums">
+                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink">Cash Remittance &amp; Transfers</h1>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-xs font-semibold text-brand-500 ring-1 ring-brand-500/20">
+                    Cash Remittance
+                </span>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-soft px-3 py-1 text-xs font-semibold text-muted ring-1 ring-line tabular-nums">
                     <span class="size-1.5 rounded-full bg-brand-500"></span>
                     {{ number_format($transfers->total()) }} {{ Str::plural('transfer', $transfers->total()) }}
                 </span>
             </div>
-            <p class="text-xs sm:text-sm text-muted mt-1">Move money between your own cash boxes and bank accounts. Transfers are queued as pending and move both balances once approved.</p>
+            <p class="text-xs sm:text-sm text-muted mt-1">Cash remittances from branch outlets to Central HQ and bank account movements. Transfers are queued as pending and move balances once approved.</p>
         </div>
 
         <div class="flex items-center gap-2.5 flex-wrap shrink-0">
@@ -213,25 +216,27 @@
                             </td>
                             <td class="py-4 px-5 text-end whitespace-nowrap">
                                 <div class="inline-flex items-center justify-end gap-2">
-                                    @can('approve', $transfer)
-                                        <form method="POST" action="{{ route('account-transfers.approve', $transfer) }}">
-                                            @csrf
-                                            @method('PATCH')
-                                            <button type="submit"
-                                                    class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-success/30 bg-success/10 px-3 py-1.5 text-xs font-semibold text-success hover:bg-success hover:text-on-brand transition-colors cursor-pointer">
-                                                <x-svg.check class="size-3.5" />
-                                                <span>Approve</span>
-                                            </button>
-                                        </form>
-                                        <form method="POST" action="{{ route('account-transfers.reject', $transfer) }}">
-                                            @csrf
-                                            @method('PATCH')
-                                            <button type="submit"
-                                                    class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs hover:border-danger hover:text-danger transition-colors cursor-pointer">
-                                                <span>Reject</span>
-                                            </button>
-                                        </form>
-                                    @endcan
+                                    @if($transfer->status === \App\Enums\AccountEntryStatus::Pending)
+                                        @can('approve', $transfer)
+                                            <form method="POST" action="{{ route('account-transfers.approve', $transfer) }}">
+                                                @csrf
+                                                @method('PATCH')
+                                                <button type="submit"
+                                                        class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-success/30 bg-success/10 px-3 py-1.5 text-xs font-semibold text-success hover:bg-success hover:text-on-brand transition-colors cursor-pointer">
+                                                    <x-svg.check class="size-3.5" />
+                                                    <span>Approve</span>
+                                                </button>
+                                            </form>
+                                            <form method="POST" action="{{ route('account-transfers.reject', $transfer) }}">
+                                                @csrf
+                                                @method('PATCH')
+                                                <button type="submit"
+                                                        class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs hover:border-danger hover:text-danger transition-colors cursor-pointer">
+                                                    <span>Reject</span>
+                                                </button>
+                                            </form>
+                                        @endcan
+                                    @endif
                                     @can('update', $transfer)
                                         <a href="{{ route('account-transfers.edit', $transfer) }}"
                                            class="btn-scale inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs hover:border-brand-500 hover:text-brand-500 hover:bg-soft transition-colors">

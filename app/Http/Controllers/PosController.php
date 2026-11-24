@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\SalesInvoiceStatus;
+use App\Exceptions\DayClosedException;
 use App\Exceptions\InsufficientStockException;
 use App\Helpers\Money;
 use App\Http\Requests\Pos\StorePosSaleRequest;
@@ -15,6 +16,8 @@ use App\Models\SalesInvoice;
 use App\Models\Unit;
 use App\Services\AuditService;
 use App\Services\BranchScope;
+use App\Services\DayClosingService;
+use App\Services\MoneyMath;
 use App\Services\SalesInvoiceService;
 use App\Services\SalesScope;
 use App\Services\StockService;
@@ -52,48 +55,76 @@ class PosController extends Controller
     {
         $validated = $request->validated();
 
-        if (! SalesScope::canAccess($request->user(), $validated['location_id'])) {
-            return back()->withInput()->with('error', 'You can only sell from your own branch/location.');
+        $user = $request->user();
+
+        if (BranchScope::isRestricted($user)) {
+            $assignedLocationId = BranchScope::locationId($user);
+            if ($assignedLocationId === null || (int) $validated['location_id'] !== $assignedLocationId) {
+                return back()->withInput()->with('error', 'You can only sell from your own branch/location.');
+            }
+            $locationId = $assignedLocationId;
+        } else {
+            $locationId = (int) $validated['location_id'];
+            if (! SalesScope::canAccess($user, $locationId)) {
+                return back()->withInput()->with('error', 'You can only sell from your own branch/location.');
+            }
         }
 
         try {
-            [$invoice, $change] = DB::transaction(function () use ($request, $validated) {
+            DayClosingService::assertDayNotClosed($locationId, now());
+        } catch (DayClosedException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        try {
+            [$invoice, $change] = DB::transaction(function () use ($request, $validated, $locationId) {
+
+                // Concurrency: sort unit IDs and lock rows in consistent order to prevent deadlocks & race conditions
+                $unitIds = collect($validated['items'])->pluck('unit_id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+                Unit::query()->whereIn('id', $unitIds)->orderBy('id')->lockForUpdate()->get();
+
+                $cartDiscount = MoneyMath::clean((string) ($validated['cart_discount'] ?? '0.00'));
+                $taxRate = MoneyMath::clean((string) ($validated['tax_rate'] ?? '0.00'));
+
                 $invoice = SalesInvoice::create([
                     'invoice_date' => now(),
                     'customer_id' => $validated['customer_id'] ?? null,
-                    'location_id' => $validated['location_id'],
+                    'location_id' => $locationId,
                     // The creator's branch: the branch of their assigned outlet.
                     'branch_id' => $request->user()?->branch?->branch_id,
                     'status' => SalesInvoiceStatus::Draft,
-                    'tax_rate' => (float) ($validated['tax_rate'] ?? 0),
-                    'cart_discount' => round((float) ($validated['cart_discount'] ?? 0), 2),
+                    'tax_rate' => $taxRate,
+                    'cart_discount' => $cartDiscount,
                     'note' => $validated['note'] ?? 'POS sale',
                     'created_by' => $request->user()?->id,
                 ]);
 
                 foreach ($validated['items'] as $item) {
                     $quantity = (int) $item['quantity'];
-                    $unitPrice = round((float) $item['unit_price'], 2);
-                    $discount = round((float) ($item['discount'] ?? 0), 2);
+                    $unitPrice = MoneyMath::clean((string) $item['unit_price']);
+                    $itemDiscount = MoneyMath::clean((string) ($item['discount'] ?? '0.00'));
+                    $itemSubtotal = MoneyMath::max('0.00', MoneyMath::sub(MoneyMath::mul($quantity, $unitPrice), $itemDiscount));
 
                     $invoice->items()->create([
                         'unit_id' => (int) $item['unit_id'],
                         'quantity' => $quantity,
                         'unit_price' => $unitPrice,
-                        'discount' => $discount,
-                        'subtotal' => round(max(0, $quantity * $unitPrice - $discount), 2),
+                        'discount' => $itemDiscount,
+                        'subtotal' => $itemSubtotal,
                     ]);
                 }
 
-                SalesInvoiceService::recalculate($invoice, (float) ($validated['tax_rate'] ?? 0));
+                SalesInvoiceService::recalculate($invoice, (float) $taxRate);
 
                 // POS sales are cash-settled: change is handed back on the spot
                 // and never tracked as a customer advance.
-                $tendered = round((float) $validated['paid_amount'], 2);
-                $change = round(max(0, $tendered - (float) $invoice->grand_total), 2);
+                $tendered = MoneyMath::clean((string) $validated['paid_amount']);
+                $grandTotal = MoneyMath::clean((string) $invoice->grand_total);
+                $change = MoneyMath::max('0.00', MoneyMath::sub($tendered, $grandTotal));
+                $paid = MoneyMath::min($tendered, $grandTotal);
 
                 $invoice->update([
-                    'paid_amount' => round(min($tendered, (float) $invoice->grand_total), 2),
+                    'paid_amount' => $paid,
                 ]);
 
                 SalesInvoiceService::post($invoice);
@@ -109,7 +140,7 @@ class PosController extends Controller
 
         return redirect()->route('pos.index')
             ->with('success', "Sale {$invoice->invoice_no} completed"
-                .($change > 0 ? ' · Change returned: '.Money::format($change) : '')
+                .((float) $change > 0 ? ' · Change returned: '.Money::format($change) : '')
                 .'.');
     }
 

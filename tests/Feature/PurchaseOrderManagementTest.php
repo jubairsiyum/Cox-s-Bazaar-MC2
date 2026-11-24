@@ -169,6 +169,20 @@ it("makes the creating manager's own purchase effective right away with no self-
         ->assertDontSee('Confirm Reject', false);
 });
 
+it('blocks a manager from placing a purchase order for another branch location', function () {
+    $myLocation = Location::factory()->create();
+    $otherLocation = Location::factory()->create();
+
+    $manager = purchaseOrderTeamUser('Manager', ['branch_id' => $myLocation->id]);
+    $unit = Unit::factory()->create(['quantity' => 10]);
+
+    $this->actingAs($manager)
+        ->post(route('purchase-orders.store'), purchaseOrderPayload($unit, ['location_id' => $otherLocation->id]))
+        ->assertSessionHasErrors(['location_id' => 'You may only record purchases for your own branch.']);
+
+    expect(PurchaseOrder::query()->count())->toBe(0);
+});
+
 it('validates the purchase order form', function () {
     actingAsSuperAdmin();
 

@@ -94,20 +94,75 @@ foreach ($menuGroups as &$groupRef) {
     'subItems' => $adminSubItems,
   ];
 
-  // Ordered items exactly as specified:
-  // Dashboard > Master data > Parties > Inventory > Purchasing > Sales > POS > Finance > Reports > Administration
-  $alignedItems = array_values(array_filter([
-    $itemMap->get('Dashboard'),
-    $alignedMasterData,
-    $itemMap->get('Parties'),
-    $alignedInventory,
-    $itemMap->get('Purchasing'),
-    $itemMap->get('Sales'),
-    $itemMap->get('POS Terminal'),
-    $itemMap->get('Finance'),
-    $itemMap->get('Reports'),
-    $alignedAdmin,
-  ]));
+  $user = auth()->user();
+  $isBranchOutlet = $user && ($user->hasRole('Outlet Manager') || $user->hasRole('Sales Staff'));
+
+  $partiesItem = $itemMap->get('Parties');
+  if ($isBranchOutlet && $partiesItem) {
+    // Branch Outlets only interact with Customers; Suppliers are centrally managed by HQ
+    $partiesItem['subItems'] = array_values(array_filter(
+      $partiesItem['subItems'] ?? [],
+      fn ($s) => ($s['name'] ?? '') === 'Customers'
+    ));
+  }
+
+  $financeItem = $itemMap->get('Finance');
+  if ($isBranchOutlet && $financeItem) {
+    // Branch Outlets only perform Cash Remittance to HQ and Daily Cash Close
+    $financeItem['subItems'] = array_values(array_map(
+      function ($s) {
+        if (($s['name'] ?? '') === 'Transfer') {
+          $s['name'] = 'Cash Remittance';
+        }
+        return $s;
+      },
+      array_filter(
+        $financeItem['subItems'] ?? [],
+        fn ($s) => in_array($s['name'] ?? '', ['Transfer', 'Daily Cash Close', 'Cash Remittance'], true)
+      )
+    ));
+  }
+
+  // Master Data & Purchasing are HQ/Warehouse only — hide for branch outlets
+  $masterDataItem = $isBranchOutlet ? null : $alignedMasterData;
+  $purchasingItem = $isBranchOutlet ? null : $itemMap->get('Purchasing');
+
+  // Ordered items:
+  // For branch outlet: Dashboard > POS > Sales > Inventory > Parties (Customers) > Finance (Remittance & Close) > Reports > Notifications
+  // For HQ/Super Admin: Dashboard > Master data > Parties > Inventory > Purchasing > Sales > POS > Finance > Reports > Administration
+  if ($isBranchOutlet) {
+    $notificationItem = [
+      'icon' => 'bell',
+      'name' => 'Notifications',
+      'path' => '/notifications',
+      'can' => 'dashboard.view',
+      'badge' => $sidebarUnreadCount > 0 ? ($sidebarUnreadCount > 99 ? '99+' : (string) $sidebarUnreadCount) : null,
+    ];
+
+    $alignedItems = array_values(array_filter([
+      $itemMap->get('Dashboard'),
+      $itemMap->get('POS Terminal'),
+      $itemMap->get('Sales'),
+      $alignedInventory,
+      $partiesItem,
+      $financeItem,
+      $itemMap->get('Reports'),
+      $notificationItem,
+    ]));
+  } else {
+    $alignedItems = array_values(array_filter([
+      $itemMap->get('Dashboard'),
+      $masterDataItem,
+      $partiesItem,
+      $alignedInventory,
+      $purchasingItem,
+      $itemMap->get('Sales'),
+      $itemMap->get('POS Terminal'),
+      $financeItem,
+      $itemMap->get('Reports'),
+      $alignedAdmin,
+    ]));
+  }
 
   $groupRef['items'] = $alignedItems;
 }
