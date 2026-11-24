@@ -234,6 +234,11 @@
           ? 'Collected today at ' . ($activeScopeLocation ? $activeScopeLocation->name : 'outlets')
           : 'No collections today';
 
+      $hqCollectionToday = (float) ($networkPayable['today_sent_to_hq'] ?? 0);
+      $hqCollectionCaption = $hqCollectionToday > 0
+          ? '৳' . number_format($hqCollectionToday) . ' remitted to Central HQ today'
+          : 'No remittances collected at HQ today';
+
       $retailerDuesCaption = $overdueReceivable > 0
           ? 'Overdue ৳' . number_format($overdueReceivable) . ' · ' . $activeRetailersCount . ' Retailers'
           : ($activeRetailersCount . ' Active ' . \Illuminate\Support\Str::plural('Retailer', $activeRetailersCount));
@@ -554,6 +559,8 @@
       $activeRoutes = 1;
       $todaySalesCaption = 'No sales recorded';
       $todayCollectionCaption = 'No collections';
+      $hqCollectionToday = 0.0;
+      $hqCollectionCaption = 'No remittances collected at HQ today';
       $retailerDuesCaption = '0 Retailers';
       $stockValueCaption = '0 Units registered';
       $dynamicAlertItems = [];
@@ -820,16 +827,30 @@
         />
       </div>
       <div class="flex flex-col">
-        <x-dashboard.stat-card 
-          :title="$branchScoped ? 'Today\'s Collection' : 'Daily Collection'" 
-          :amount="$todayCollection" 
-          :change="$collectionChangePct" 
-          :caption="$todayCollectionCaption" 
-          :href="route('collections.index')"
-          icon="wallet"
-          class="rv mv-blur lift"
-          style="--i:2; --stagger:160ms; --d:80ms"
-        />
+        @if ($isOutletScope)
+          <x-dashboard.stat-card 
+            title="Today's Collection" 
+            :amount="$todayCollection" 
+            :change="$collectionChangePct" 
+            :caption="$todayCollectionCaption" 
+            :href="route('collections.index')"
+            icon="wallet"
+            class="rv mv-blur lift"
+            style="--i:2; --stagger:160ms; --d:80ms"
+          />
+        @else
+          <x-dashboard.stat-card 
+            title="Collection from Branches" 
+            :amount="(float) ($networkPayable['today_sent_to_hq'] ?? 0)" 
+            :change="(int) ($networkPayable['progress_pct'] ?? 0)" 
+            :progress="true"
+            :caption="$hqCollectionCaption" 
+            :href="route('account-transfers.index')"
+            icon="wallet"
+            class="rv mv-blur lift"
+            style="--i:2; --stagger:160ms; --d:80ms"
+          />
+        @endif
       </div>
       <div class="flex flex-col">
         @if ($isOutletScope)

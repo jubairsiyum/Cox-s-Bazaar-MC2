@@ -29,7 +29,8 @@ class DayClosingPolicy
 
     public function reopen(User $user, DayClosing $dayClosing): bool
     {
-        // Only Super Admin can reopen a closed day (per Ecosystem Plan rule)
-        return $user->isSuperAdmin();
+        // Only Super Admin can reopen a closed day, strictly for today's closing.
+        // Historical previous days are permanently finalized and period-locked.
+        return $user->isSuperAdmin() && $dayClosing->closing_date->isToday();
     }
 }

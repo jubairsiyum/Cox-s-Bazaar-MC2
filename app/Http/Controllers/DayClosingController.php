@@ -131,6 +131,8 @@ class DayClosingController extends Controller
     {
         $this->authorize('reopen', $dayClosing);
 
+        abort_unless($dayClosing->closing_date->isToday(), 403, 'Historical past days are permanently locked and cannot be reopened.');
+
         $validated = $request->validate([
             'reopen_reason' => ['required', 'string', 'min:5', 'max:500'],
         ]);

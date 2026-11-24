@@ -238,3 +238,60 @@ it('tracks today branch closing compliance and shows unclosed branches on day cl
         ->assertSee('Pending Close')
         ->assertSee('1 of 2 Branches Closed');
 });
+
+it('blocks reopening past days and hides reopen button on index for historical days', function () {
+    $branch = Location::factory()->brandShop()->create(['name' => 'Cox Sadar Branch']);
+
+    $manager = User::factory()->create(['branch_id' => $branch->id, 'status' => 'active']);
+    $admin = User::factory()->create(['status' => 'active']);
+    $admin->assignRole('Super Admin');
+
+    // Close yesterday (past day)
+    $yesterday = now()->subDay()->toDateString();
+    $closing = DayClosingService::closeDay($branch->id, $yesterday, '5000', $manager);
+
+    // Super Admin cannot reopen a past day (403 Forbidden)
+    $this->actingAs($admin)
+        ->patch(route('day-closings.reopen', $closing), [
+            'reopen_reason' => 'Attempting to reopen yesterday',
+        ])
+        ->assertForbidden();
+
+    // On index, past day shows "Finalized" badge and does NOT show an active Reopen form
+    $this->actingAs($admin)
+        ->get(route('day-closings.index'))
+        ->assertOk()
+        ->assertSee('Finalized')
+        ->assertSee('Details')
+        ->assertDontSee('Reopen Shift');
+});
+
+it('displays cash sales and remittances on day closings index table instead of only 0', function () {
+    $branch = Location::factory()->brandShop()->create(['name' => 'CTG Vivo']);
+
+    $manager = User::factory()->create(['branch_id' => $branch->id, 'status' => 'active']);
+    $admin = User::factory()->create(['status' => 'active']);
+    $admin->assignRole('Super Admin');
+
+    // Create closing with 1,770,000 in sales and remittances
+    $today = now()->toDateString();
+    $closing = DayClosing::create([
+        'location_id' => $branch->id,
+        'closing_date' => $today,
+        'cash_sales' => '1770000.00',
+        'cash_remittances' => '1770000.00',
+        'system_cash' => '0.00',
+        'counted_cash' => '0.00',
+        'variance' => '0.00',
+        'variance_status' => 'exact',
+        'status' => 'closed',
+        'closed_by' => $manager->id,
+    ]);
+
+    $this->actingAs($admin)
+        ->get(route('day-closings.index'))
+        ->assertOk()
+        ->assertSee('1,770,000.00')
+        ->assertSee('Details')
+        ->assertSee('Reopen');
+});

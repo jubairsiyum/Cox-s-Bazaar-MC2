@@ -75,19 +75,19 @@
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="p-4 rounded-2xl border border-line bg-surface shadow-2xs">
             <p class="text-xs font-medium text-muted uppercase tracking-wider">Opening Cash</p>
-            <p class="text-lg sm:text-xl font-bold font-mono text-ink mt-1">৳{{ number_format((float) $summary['opening_balance'], 2) }}</p>
+            <p class="text-lg sm:text-xl font-bold tabular-nums text-ink mt-1">৳{{ number_format((float) $summary['opening_balance'], 2) }}</p>
         </div>
         <div class="p-4 rounded-2xl border border-line bg-surface shadow-2xs">
             <p class="text-xs font-medium text-muted uppercase tracking-wider">Cash Sales (Today)</p>
-            <p class="text-lg sm:text-xl font-bold font-mono text-emerald-600 mt-1">+৳{{ number_format((float) $summary['cash_sales'], 2) }}</p>
+            <p class="text-lg sm:text-xl font-bold tabular-nums text-emerald-600 mt-1">+৳{{ number_format((float) $summary['cash_sales'], 2) }}</p>
         </div>
         <div class="p-4 rounded-2xl border border-line bg-surface shadow-2xs">
             <p class="text-xs font-medium text-muted uppercase tracking-wider">Remittances / Outflows</p>
-            <p class="text-lg sm:text-xl font-bold font-mono text-rose-600 mt-1">-৳{{ number_format((float) $summary['cash_remittances'] + (float) $summary['cash_expenses'], 2) }}</p>
+            <p class="text-lg sm:text-xl font-bold tabular-nums text-rose-600 mt-1">-৳{{ number_format((float) $summary['cash_remittances'] + (float) $summary['cash_expenses'], 2) }}</p>
         </div>
         <div class="p-4 rounded-2xl border border-brand-500/30 bg-brand-500/5 shadow-2xs">
             <p class="text-xs font-semibold text-brand-600 uppercase tracking-wider">Expected System Cash</p>
-            <p class="text-lg sm:text-xl font-bold font-mono text-brand-600 mt-1">৳{{ number_format((float) $summary['system_cash'], 2) }}</p>
+            <p class="text-lg sm:text-xl font-bold tabular-nums text-brand-600 mt-1">৳{{ number_format((float) $summary['system_cash'], 2) }}</p>
         </div>
     </div>
 
@@ -105,14 +105,14 @@
                     </label>
                     <input type="number" step="0.01" min="0" id="counted_cash" name="counted_cash"
                            x-model="countedCash" required
-                           class="w-full rounded-xl border border-line bg-surface px-4 py-3 text-lg font-mono font-bold text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all">
+                           class="w-full rounded-xl border border-line bg-surface px-4 py-3 text-lg tabular-nums font-bold text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all">
                     <p class="text-xs text-muted mt-1.5">Count all banknotes and coins physically present in the branch cash drawer.</p>
                 </div>
 
                 {{-- Live Computed Variance Preview --}}
                 <div class="flex flex-col justify-center">
                     <span class="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">Live Cash Variance</span>
-                    <div class="p-4 rounded-2xl border font-mono transition-all flex items-center justify-between"
+                    <div class="p-4 rounded-2xl border tabular-nums transition-all flex items-center justify-between"
                          :class="varianceClass">
                         <div>
                             <span class="text-2xs font-semibold uppercase tracking-wider block" x-text="varianceLabel"></span>

@@ -191,6 +191,11 @@ class DayClosingService
      * Compute the Payable to HQ summary for an outlet/branch based on daily cash close
      * and remittances transferred to HQ.
      *
+     * When today is closed, this computes the remaining payable from the counted closing cash.
+     * When today is not yet closed, this calculates live sales cash received today
+     * (plus any unremitted cash from past days) minus remittances transferred to HQ today,
+     * so that HQ receivable reflects live branch collections before closing.
+     *
      * @return array{
      *     cash_close_amount: float,
      *     transferred_to_hq: float,
@@ -226,84 +231,178 @@ class DayClosingService
             ->where('status', 'closed')
             ->first();
 
-        // 2. Fetch the latest closed day (today or most recent previous day)
-        $latestClosing = $todayClosing ?? DayClosing::query()
+        if ($todayClosing !== null) {
+            $closingDate = $todayClosing->closing_date->toDateString();
+            $countedCash = (float) $todayClosing->counted_cash;
+            $systemCash = (float) $todayClosing->system_cash;
+            $baseCash = $countedCash > 0 ? $countedCash : $systemCash;
+            $remittedBeforeClose = (float) $todayClosing->cash_remittances;
+            $totalCashClose = round($baseCash + $remittedBeforeClose, 2);
+
+            // Query transfers to Central HQ / warehouse / shared accounts on or after the closing date
+            $transfersBaseQuery = AccountTransfer::query()
+                ->where(function ($q) use ($locationId) {
+                    $q->where('location_id', $locationId)
+                        ->orWhereHas('fromAccount', fn ($fq) => $fq->where('location_id', $locationId));
+                })
+                ->whereDate('transfer_date', '>=', $closingDate)
+                ->whereHas('toAccount', function ($tq) use ($locationId) {
+                    $tq->whereNull('location_id')
+                        ->orWhere('location_id', '!=', $locationId)
+                        ->orWhereHas('location', fn ($l) => $l->where('type', LocationType::Warehouse));
+                });
+
+            $completedTransfers = (float) (clone $transfersBaseQuery)
+                ->where('status', AccountEntryStatus::Completed)
+                ->sum('amount');
+
+            $pendingTransfers = (float) (clone $transfersBaseQuery)
+                ->where('status', AccountEntryStatus::Pending)
+                ->sum('amount');
+
+            $transferredToHq = round(max($completedTransfers, $remittedBeforeClose), 2);
+            $leftAmount = max(0.0, round($totalCashClose - $transferredToHq, 2));
+
+            $isAllClear = $totalCashClose <= 0 || $leftAmount <= 0.001;
+            $progressPct = $isAllClear
+                ? 100
+                : (int) max(0, min(99, round(($transferredToHq / max(1.0, $totalCashClose)) * 100)));
+
+            $formattedCloseDate = $todayClosing->closing_date->format('d M');
+            $dateLabel = ($closingDate === $today) ? 'Today' : $formattedCloseDate;
+
+            if ($isAllClear) {
+                $caption = $totalCashClose > 0
+                    ? 'All clear · ৳'.number_format($transferredToHq).' remitted to HQ'
+                    : 'All clear · ৳0 payable to HQ';
+            } else {
+                $caption = '৳'.number_format($transferredToHq).' remitted of ৳'.number_format($totalCashClose).' ('.$dateLabel.')';
+                if ($pendingTransfers > 0) {
+                    $caption .= ' · ৳'.number_format($pendingTransfers).' pending approval';
+                }
+            }
+
+            return [
+                'cash_close_amount' => $totalCashClose,
+                'transferred_to_hq' => $transferredToHq,
+                'pending_transferred' => $pendingTransfers,
+                'left_amount' => $leftAmount,
+                'progress_pct' => $progressPct,
+                'is_all_clear' => $isAllClear,
+                'closing_date' => $closingDate,
+                'caption' => $caption,
+            ];
+        }
+
+        // 2. Case: Today is NOT yet closed (Live Branch Operations)
+        // Live cash sales, collections, and expenses for today
+        $todayCashSales = (float) SalesInvoice::query()
             ->where('location_id', $locationId)
+            ->whereDate('invoice_date', $today)
+            ->where('status', '!=', SalesInvoiceStatus::Voided)
+            ->sum('paid_amount');
+
+        $todayCollections = 0.0;
+        if (class_exists(CustomerCollection::class)) {
+            $todayCollections = (float) CustomerCollection::query()
+                ->where('location_id', $locationId)
+                ->whereDate('collection_date', $today)
+                ->sum('amount');
+        }
+
+        $todayExpenses = 0.0;
+        if (class_exists(Expense::class)) {
+            $todayExpenses = (float) Expense::query()
+                ->where('location_id', $locationId)
+                ->whereDate('expense_date', $today)
+                ->sum('amount');
+        }
+
+        $todayNetInflows = max(0.0, round($todayCashSales + $todayCollections - $todayExpenses, 2));
+
+        // Check if there was unremitted cash from the most recent past closing
+        $pastClosing = DayClosing::query()
+            ->where('location_id', $locationId)
+            ->whereDate('closing_date', '<', $today)
             ->where('status', 'closed')
             ->orderByDesc('closing_date')
             ->first();
 
-        if ($latestClosing === null) {
-            return [
-                'cash_close_amount' => 0.0,
-                'transferred_to_hq' => 0.0,
-                'pending_transferred' => 0.0,
-                'left_amount' => 0.0,
-                'progress_pct' => 100,
-                'is_all_clear' => true,
-                'closing_date' => null,
-                'caption' => 'All clear · No cash close recorded',
-            ];
+        $pastUnremitted = 0.0;
+        if ($pastClosing !== null) {
+            $pastCounted = (float) $pastClosing->counted_cash;
+            $pastSystem = (float) $pastClosing->system_cash;
+            $pastBase = $pastCounted > 0 ? $pastCounted : $pastSystem;
+            $pastRemittedAtClose = (float) $pastClosing->cash_remittances;
+            $pastTotal = round($pastBase + $pastRemittedAtClose, 2);
+
+            $pastTransfers = (float) AccountTransfer::query()
+                ->where(function ($q) use ($locationId) {
+                    $q->where('location_id', $locationId)
+                        ->orWhereHas('fromAccount', fn ($fq) => $fq->where('location_id', $locationId));
+                })
+                ->whereBetween('transfer_date', [$pastClosing->closing_date->toDateString(), now()->subDay()->toDateString()])
+                ->where('status', AccountEntryStatus::Completed)
+                ->whereHas('toAccount', function ($tq) use ($locationId) {
+                    $tq->whereNull('location_id')
+                        ->orWhere('location_id', '!=', $locationId)
+                        ->orWhereHas('location', fn ($l) => $l->where('type', LocationType::Warehouse));
+                })
+                ->sum('amount');
+
+            $pastRemitted = max($pastRemittedAtClose, $pastTransfers);
+            $pastUnremitted = max(0.0, round($pastTotal - $pastRemitted, 2));
         }
 
-        $closingDate = $latestClosing->closing_date->toDateString();
-        $countedCash = (float) $latestClosing->counted_cash;
-        $systemCash = (float) $latestClosing->system_cash;
-        $baseCash = $countedCash > 0 ? $countedCash : $systemCash;
-        $remittedBeforeClose = (float) $latestClosing->cash_remittances;
-        $totalCashClose = round($baseCash + $remittedBeforeClose, 2);
-
-        // Query transfers to Central HQ / warehouse / shared accounts on or after the closing date
-        $transfersBaseQuery = AccountTransfer::query()
+        // Today's remittances to HQ
+        $transfersTodayQuery = AccountTransfer::query()
             ->where(function ($q) use ($locationId) {
                 $q->where('location_id', $locationId)
                     ->orWhereHas('fromAccount', fn ($fq) => $fq->where('location_id', $locationId));
             })
-            ->whereDate('transfer_date', '>=', $closingDate)
+            ->whereDate('transfer_date', $today)
             ->whereHas('toAccount', function ($tq) use ($locationId) {
                 $tq->whereNull('location_id')
                     ->orWhere('location_id', '!=', $locationId)
                     ->orWhereHas('location', fn ($l) => $l->where('type', LocationType::Warehouse));
             });
 
-        $completedTransfers = (float) (clone $transfersBaseQuery)
+        $completedTransfersToday = (float) (clone $transfersTodayQuery)
             ->where('status', AccountEntryStatus::Completed)
             ->sum('amount');
 
-        $pendingTransfers = (float) (clone $transfersBaseQuery)
+        $pendingTransfersToday = (float) (clone $transfersTodayQuery)
             ->where('status', AccountEntryStatus::Pending)
             ->sum('amount');
 
-        $transferredToHq = round(max($completedTransfers, $remittedBeforeClose), 2);
-        $leftAmount = max(0.0, round($totalCashClose - $transferredToHq, 2));
+        $transferredToHq = round($completedTransfersToday, 2);
+        $totalCashDue = max(round($todayNetInflows + $pastUnremitted, 2), $transferredToHq);
+        $leftAmount = max(0.0, round($totalCashDue - $transferredToHq, 2));
 
-        $isAllClear = $totalCashClose <= 0 || $leftAmount <= 0.001;
+        $isAllClear = $totalCashDue <= 0 || $leftAmount <= 0.001;
         $progressPct = $isAllClear
             ? 100
-            : (int) max(0, min(99, round(($transferredToHq / max(1.0, $totalCashClose)) * 100)));
-
-        $formattedCloseDate = $latestClosing->closing_date->format('d M');
-        $dateLabel = ($closingDate === $today) ? 'Today' : $formattedCloseDate;
+            : (int) max(0, min(99, round(($transferredToHq / max(1.0, $totalCashDue)) * 100)));
 
         if ($isAllClear) {
-            $caption = $totalCashClose > 0
+            $caption = $totalCashDue > 0
                 ? 'All clear · ৳'.number_format($transferredToHq).' remitted to HQ'
-                : 'All clear · ৳0 payable to HQ';
+                : ($pastClosing ? 'All clear · No cash due to HQ' : 'All clear · No cash close recorded');
         } else {
-            $caption = '৳'.number_format($transferredToHq).' remitted of ৳'.number_format($totalCashClose).' ('.$dateLabel.')';
-            if ($pendingTransfers > 0) {
-                $caption .= ' · ৳'.number_format($pendingTransfers).' pending approval';
+            $caption = '৳'.number_format($transferredToHq).' remitted of ৳'.number_format($totalCashDue).' (Today)';
+            if ($pendingTransfersToday > 0) {
+                $caption .= ' · ৳'.number_format($pendingTransfersToday).' pending approval';
             }
         }
 
         return [
-            'cash_close_amount' => $totalCashClose,
+            'cash_close_amount' => $totalCashDue,
             'transferred_to_hq' => $transferredToHq,
-            'pending_transferred' => $pendingTransfers,
+            'pending_transferred' => $pendingTransfersToday,
             'left_amount' => $leftAmount,
             'progress_pct' => $progressPct,
             'is_all_clear' => $isAllClear,
-            'closing_date' => $closingDate,
+            'closing_date' => null,
             'caption' => $caption,
         ];
     }
@@ -355,19 +454,20 @@ class DayClosingService
             })
             ->sum('amount');
 
+        $effectiveSentToHq = round(max($todaySentToHq, $totalSent), 2);
         $isAllClear = $totalClosings <= 0 || $totalReceivable <= 0.001;
         $progressPct = $isAllClear
             ? 100
-            : (int) max(0, min(99, round(($totalSent / max(1.0, $totalClosings)) * 100)));
+            : (int) max(0, min(99, round(($effectiveSentToHq / max(1.0, $totalClosings)) * 100)));
 
         $unclosedCount = $branchLocations->count() - $closedCount;
 
         if ($isAllClear) {
             $caption = $totalClosings > 0
-                ? 'All clear · ৳'.number_format($totalSent).' remitted across all branches'
+                ? 'All clear · ৳'.number_format($effectiveSentToHq).' remitted across all branches'
                 : 'All clear · ৳0 receivable from branches';
         } else {
-            $caption = '৳'.number_format($totalSent).' remitted of ৳'.number_format($totalClosings);
+            $caption = '৳'.number_format($effectiveSentToHq).' remitted of ৳'.number_format($totalClosings);
             if ($unclosedCount > 0) {
                 $caption .= ' · '.$unclosedCount.' '.Str::plural('branch', $unclosedCount).' pending close';
             }
@@ -376,14 +476,14 @@ class DayClosingService
         return [
             'total_closings' => round($totalClosings, 2),
             'total_closing_amount' => round($totalClosings, 2),
-            'total_sent_to_hq' => round($totalSent, 2),
+            'total_sent_to_hq' => $effectiveSentToHq,
             'total_receivable' => round($totalReceivable, 2),
             'progress_pct' => $progressPct,
             'is_all_clear' => $isAllClear,
             'branches_count' => $branchLocations->count(),
             'closed_branches_count' => $closedCount,
             'unclosed_branches_count' => $unclosedCount,
-            'today_sent_to_hq' => round($todaySentToHq, 2),
+            'today_sent_to_hq' => $effectiveSentToHq,
             'caption' => $caption,
         ];
     }

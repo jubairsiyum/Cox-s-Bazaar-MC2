@@ -395,45 +395,134 @@ it('shows 0 collection and 0% change when no sales or collections occurred today
         ->get(route('dashboard'))
         ->assertOk()
         ->assertSee("Today's Sales")
-        ->assertSee('Daily Collection')
+        ->assertSee('Collection')
         ->assertSee('No sales posted today')
-        ->assertSee('No collections today');
+        ->assertSee('No remittances collected at HQ today');
 });
 
-it('renders a dismissible daily closing notice for super admin with unclosed branches', function () {
+it('includes live unclosed branch cash sales in super admin receivable and updates when remitted', function () {
     $admin = User::factory()->create(['status' => 'active']);
     $admin->assignRole('Super Admin');
 
-    Location::factory()->brandShop()->create(['name' => 'Cox Sadar Branch']);
+    $branch1 = Location::factory()->brandShop()->create(['name' => 'Branch Alpha']);
+    $branch2 = Location::factory()->brandShop()->create(['name' => 'Branch Beta']);
 
-    $this->actingAs($admin)
-        ->get(route('dashboard'))
-        ->assertOk()
-        ->assertSee('Daily Closing Notice:')
-        ->assertSee('Dismiss notice');
-});
+    $branch1Acc = Account::factory()->cash()->withBalance(400000)->create(['location_id' => $branch1->id]);
+    $hqAcc = Account::factory()->bank()->withBalance(500000)->create(['location_id' => null]);
 
-it('shows 0 collection and 0% change when no sales or collections occurred today despite yesterday sales', function () {
-    $admin = User::factory()->create(['status' => 'active']);
-    $admin->assignRole('Super Admin');
-
-    $branch = Location::factory()->brandShop()->create(['name' => 'Cox Sadar Branch']);
-
-    // Yesterday had sales and collection
+    // Branch 1 sells 325,000 cash today (unclosed)
     SalesInvoice::factory()->posted()->create([
-        'location_id' => $branch->id,
-        'grand_total' => 50000,
-        'paid_amount' => 50000,
-        'invoice_date' => now()->subDay()->toDateString(),
+        'location_id' => $branch1->id,
+        'grand_total' => 325000,
+        'paid_amount' => 325000,
+        'due_amount' => 0,
+        'invoice_date' => now()->toDateString(),
     ]);
 
-    // Today has 0 sales and 0 collection
+    // Branch 2 sells 265,000 cash today (unclosed)
+    SalesInvoice::factory()->posted()->create([
+        'location_id' => $branch2->id,
+        'grand_total' => 265000,
+        'paid_amount' => 265000,
+        'due_amount' => 0,
+        'invoice_date' => now()->toDateString(),
+    ]);
+
+    // 1. Before remittances: HQ has collected 0, and total receivable is 590,000
+    $summary = DayClosingService::getNetworkPayableSummary();
+    expect($summary['total_closing_amount'])->toBe(590000.0)
+        ->and($summary['today_sent_to_hq'])->toBe(0.0)
+        ->and($summary['total_receivable'])->toBe(590000.0)
+        ->and($summary['progress_pct'])->toBe(0);
+
     $this->actingAs($admin)
         ->get(route('dashboard'))
         ->assertOk()
-        ->assertSee("Today's Sales")
-        ->assertSee('Daily Collection')
-        ->assertSee('No sales posted today')
-        ->assertSee('No collections today');
+        ->assertSee('590,000') // Today's sales and Branch Closings (Receivable)
+        ->assertSee('Collection from Branches')
+        ->assertSee('No remittances collected at HQ today');
+
+    // 2. Branch 1 remits 325,000 to Central HQ
+    AccountTransfer::factory()->completed()->create([
+        'from_account_id' => $branch1Acc->id,
+        'to_account_id' => $hqAcc->id,
+        'location_id' => $branch1->id,
+        'amount' => 325000,
+        'transfer_date' => now()->toDateString(),
+    ]);
+
+    $summaryAfter = DayClosingService::getNetworkPayableSummary();
+    expect($summaryAfter['total_closing_amount'])->toBe(590000.0)
+        ->and($summaryAfter['today_sent_to_hq'])->toBe(325000.0)
+        ->and($summaryAfter['total_receivable'])->toBe(265000.0) // 590k - 325k = 265k left so far
+        ->and($summaryAfter['progress_pct'])->toBe(55);
+
+    $this->actingAs($admin)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertSee('325,000') // Collected at HQ
+        ->assertSee('265,000') // Left so far at Branch Beta
+        ->assertSee('55%');
+});
+
+    $branch1 = Location::factory()->brandShop()->create(['name' => 'Branch Alpha']);
+    $branch2 = Location::factory()->brandShop()->create(['name' => 'Branch Beta']);
+
+    $branch1Acc = Account::factory()->cash()->withBalance(400000)->create(['location_id' => $branch1->id]);
+    $hqAcc = Account::factory()->bank()->withBalance(500000)->create(['location_id' => null]);
+
+    // Branch 1 sells 325,000 cash today (unclosed)
+    SalesInvoice::factory()->posted()->create([
+        'location_id' => $branch1->id,
+        'grand_total' => 325000,
+        'paid_amount' => 325000,
+        'due_amount' => 0,
+        'invoice_date' => now()->toDateString(),
+    ]);
+
+    // Branch 2 sells 265,000 cash today (unclosed)
+    SalesInvoice::factory()->posted()->create([
+        'location_id' => $branch2->id,
+        'grand_total' => 265000,
+        'paid_amount' => 265000,
+        'due_amount' => 0,
+        'invoice_date' => now()->toDateString(),
+    ]);
+
+    // 1. Before remittances: HQ has collected 0, and total receivable is 590,000
+    $summary = DayClosingService::getNetworkPayableSummary();
+    expect($summary['total_closing_amount'])->toBe(590000.0)
+        ->and($summary['today_sent_to_hq'])->toBe(0.0)
+        ->and($summary['total_receivable'])->toBe(590000.0)
+        ->and($summary['progress_pct'])->toBe(0);
+
+    $this->actingAs($admin)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertSee('590,000') // Today's sales and Branch Closings (Receivable)
+        ->assertSee('Collection from Branches')
+        ->assertSee('No remittances collected at HQ today');
+
+    // 2. Branch 1 remits 325,000 to Central HQ
+    AccountTransfer::factory()->completed()->create([
+        'from_account_id' => $branch1Acc->id,
+        'to_account_id' => $hqAcc->id,
+        'location_id' => $branch1->id,
+        'amount' => 325000,
+        'transfer_date' => now()->toDateString(),
+    ]);
+
+    $summaryAfter = DayClosingService::getNetworkPayableSummary();
+    expect($summaryAfter['total_closing_amount'])->toBe(590000.0)
+        ->and($summaryAfter['today_sent_to_hq'])->toBe(325000.0)
+        ->and($summaryAfter['total_receivable'])->toBe(265000.0) // 590k - 325k = 265k left so far
+        ->and($summaryAfter['progress_pct'])->toBe(55);
+
+    $this->actingAs($admin)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertSee('325,000') // Collected at HQ
+        ->assertSee('265,000') // Left so far at Branch Beta
+        ->assertSee('55%');
 });
 
