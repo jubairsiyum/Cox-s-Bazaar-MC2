@@ -200,6 +200,31 @@ it('sends a payment request to a branch and notifies its users with a direct act
         ->assertSee('>Open</span>', false);
 });
 
+it('notifies the Super Admin when a payment request targets a location with no branch managers', function () {
+    $admin = actingAsSuperAdmin();
+
+    $supplier = Supplier::factory()->create(['name' => 'Bismillah Telecom', 'opening_balance' => 0, 'purchase_due' => 0, 'purchase_return_due' => 0]);
+    $warehouse = Location::factory()->warehouse()->create(['name' => 'Main Warehouse']);
+    $order = profilePlaceOrder($supplier, $warehouse);
+
+    $this->actingAs($admin)->post(route('suppliers.profile.payment-requests.store', $supplier), [
+        'location_id' => $warehouse->id,
+        'purchase_order_id' => $order->id,
+        'message' => 'Please settle the warehouse dues.',
+        'amount' => 1000,
+    ])->assertSessionHas('success');
+
+    // The warehouse has no assigned branch managers, so the Super Admin is told.
+    $notification = $admin->notifications()->first();
+
+    expect($notification)->not->toBeNull()
+        ->and($notification->data['title'])->toBe('Payment request from Bismillah Telecom')
+        ->and($notification->data['body'])->toContain('Main Warehouse')
+        ->and($notification->data['body'])->toContain('Please settle the warehouse dues.')
+        ->and($notification->data['url'])->toContain('/supplier-payments/create')
+        ->and($notification->data['type'])->toBe('warning');
+});
+
 it('actions a payment request when the branch records the payment from Finance', function () {
     $admin = actingAsSuperAdmin();
 

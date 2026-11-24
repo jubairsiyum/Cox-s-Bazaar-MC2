@@ -14,6 +14,7 @@ use App\Http\Requests\SupplierProfile\UpdateSupplierPaymentRequestRequest;
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Models\SupplierPaymentRequest;
+use App\Models\User;
 use App\Services\AuditService;
 use App\Services\BranchScope;
 use App\Services\DuplicateCheckService;
@@ -251,6 +252,11 @@ class SupplierProfileController extends Controller
     /**
      * Notify the branch's managers of a payment request, linking to the
      * pre-filled supplier payment recording screen.
+     *
+     * A location without assigned branch managers — most notably the Main
+     * Warehouse, which the Super Admin runs — would otherwise receive nothing.
+     * In that case the alert falls back to the active Super Admins, matching
+     * how purchase-due approvals resolve their audience.
      */
     private function notifyManagers(Supplier $supplier, SupplierPaymentRequest $paymentRequest, string $title): void
     {
@@ -263,8 +269,14 @@ class SupplierProfileController extends Controller
             'payment_request_id' => $paymentRequest->id,
         ], fn ($value) => $value !== null));
 
+        $managers = ManagerLookup::managersFor($paymentRequest->location_id);
+
+        if ($managers->isEmpty()) {
+            $managers = User::query()->active()->role('Super Admin')->get();
+        }
+
         NotificationService::notifyMany(
-            ManagerLookup::managersFor($paymentRequest->location_id),
+            $managers,
             $title,
             sprintf(
                 '%s requests a payment%s for %s%s: %s',
