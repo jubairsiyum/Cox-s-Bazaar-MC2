@@ -6,25 +6,33 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Facades\Vite;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Harden the authentication pages with a Content-Security-Policy (nonce-based)
- * and a standard set of browser security headers.
+ * Harden web responses with standard browser security headers and a
+ * nonce-based Content-Security-Policy on authentication pages.
  */
 class SecurityHeaders
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $nonce = Vite::useCspNonce();
+        $isAuthRoute = $request->routeIs('login', 'password.*', 'verification.*');
+        $nonce = $isAuthRoute ? Vite::useCspNonce() : '';
 
         $response = $next($request);
 
-        if ($response->headers->get('Content-Type') === null) {
-            $response->headers->set('Content-Type', 'text/html; charset=UTF-8');
-        } elseif (! str_contains(strtolower((string) $response->headers->get('Content-Type')), 'charset')) {
-            $response->headers->set('Content-Type', $response->headers->get('Content-Type').'; charset=UTF-8');
+        if ($response instanceof HttpResponse) {
+            $contentType = $response->headers->get('Content-Type');
+            if ($contentType === null) {
+                $response->headers->set('Content-Type', 'text/html; charset=UTF-8');
+            } elseif (
+                str_starts_with(strtolower($contentType), 'text/html')
+                && ! str_contains(strtolower($contentType), 'charset')
+            ) {
+                $response->headers->set('Content-Type', $contentType.'; charset=UTF-8');
+            }
         }
 
         $response->headers->set('X-Content-Type-Options', 'nosniff');
@@ -34,7 +42,10 @@ class SecurityHeaders
 
         if (app()->environment('production')) {
             $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-            $response->headers->set('Content-Security-Policy', $this->csp($nonce));
+            $response->headers->set(
+                'Content-Security-Policy',
+                $isAuthRoute ? $this->csp($nonce) : "base-uri 'self'; object-src 'none'; frame-ancestors 'none'"
+            );
         }
 
         return $response;

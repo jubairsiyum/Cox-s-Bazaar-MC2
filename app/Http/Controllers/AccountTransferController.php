@@ -140,7 +140,7 @@ class AccountTransferController extends Controller
                     ->orWhereHas('location', fn ($l) => $l->where('type', LocationType::Warehouse));
             });
         }
-        $toAccounts = $toAccountsQuery->orderBy('name')->get(['id', 'name', 'type', 'current_balance']);
+        $toAccounts = $toAccountsQuery->orderBy('name')->get(['id', 'name', 'type', 'location_id', 'current_balance']);
 
         $branchId = BranchScope::locationId($user);
         $payableSummary = null;
@@ -251,7 +251,7 @@ class AccountTransferController extends Controller
                     ->orWhereHas('location', fn ($l) => $l->where('type', LocationType::Warehouse));
             });
         }
-        $toAccounts = $toAccountsQuery->orderBy('name')->get(['id', 'name', 'type', 'current_balance']);
+        $toAccounts = $toAccountsQuery->orderBy('name')->get(['id', 'name', 'type', 'location_id', 'current_balance']);
 
         return view('account-transfers.edit', [
             'transfer' => $accountTransfer,
@@ -277,8 +277,6 @@ class AccountTransferController extends Controller
             $validated['reference_no'] = $accountTransfer->reference_no;
         }
 
-        $wasCompleted = $accountTransfer->status === AccountEntryStatus::Completed;
-
         $fromAccountId = (int) ($validated['from_account_id'] ?? $accountTransfer->from_account_id);
         $toAccountId = (int) ($validated['to_account_id'] ?? $accountTransfer->to_account_id);
 
@@ -301,20 +299,25 @@ class AccountTransferController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($accountTransfer, $validated, $balances, $wasCompleted): void {
+            DB::transaction(function () use ($accountTransfer, $validated, $balances): void {
+                $locked = AccountTransfer::query()->whereKey($accountTransfer->id)->lockForUpdate()->firstOrFail();
+                $wasCompleted = $locked->status === AccountEntryStatus::Completed;
+
                 if ($wasCompleted) {
-                    $balances->reverseTransfer($accountTransfer);
+                    $balances->reverseTransfer($locked);
                 }
 
-                $accountTransfer->update($validated);
+                $locked->update($validated);
 
                 if ($wasCompleted) {
-                    $balances->applyTransfer($accountTransfer);
+                    $balances->applyTransfer($locked);
                 }
             });
         } catch (InsufficientAccountBalanceException $exception) {
             return back()->withInput()->with('error', $exception->getMessage());
         }
+
+        $accountTransfer->refresh();
 
         AuditService::updated($accountTransfer, $original, sprintf('Transfer %s updated.', $accountTransfer->reference_no));
 
@@ -332,11 +335,13 @@ class AccountTransferController extends Controller
         $original = $accountTransfer->toArray();
 
         DB::transaction(function () use ($accountTransfer, $balances): void {
-            if ($accountTransfer->status === AccountEntryStatus::Completed) {
-                $balances->reverseTransfer($accountTransfer);
+            $locked = AccountTransfer::query()->whereKey($accountTransfer->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->status === AccountEntryStatus::Completed) {
+                $balances->reverseTransfer($locked);
             }
 
-            $accountTransfer->delete();
+            $locked->delete();
         });
 
         AuditService::log('deleted', null, $original, [], sprintf('Deleted transfer %s and restored both balances.', $accountTransfer->reference_no));
@@ -352,27 +357,41 @@ class AccountTransferController extends Controller
     {
         $this->authorize('approve', $accountTransfer);
 
-        if ($accountTransfer->status !== AccountEntryStatus::Pending) {
-            return back()->with('error', 'Only pending transfers can be approved.');
-        }
-
-        if ((int) $accountTransfer->from_account_id === (int) $accountTransfer->to_account_id) {
-            return back()->with('error', 'A transfer must move money between two different accounts.');
-        }
-
         try {
-            DB::transaction(function () use ($accountTransfer, $balances, $request): void {
-                $accountTransfer->update([
+            $outcome = DB::transaction(function () use ($accountTransfer, $balances, $request): string {
+                $locked = AccountTransfer::query()->whereKey($accountTransfer->id)->lockForUpdate()->firstOrFail();
+
+                if ($locked->status !== AccountEntryStatus::Pending) {
+                    return 'not_pending';
+                }
+
+                if ((int) $locked->from_account_id === (int) $locked->to_account_id) {
+                    return 'same_account';
+                }
+
+                $locked->update([
                     'status' => AccountEntryStatus::Completed,
                     'approved_by' => $request->user()?->id,
                     'approved_at' => now(),
                 ]);
 
-                $balances->applyTransfer($accountTransfer);
+                $balances->applyTransfer($locked);
+
+                return 'ok';
             });
         } catch (InsufficientAccountBalanceException $exception) {
             return back()->with('error', $exception->getMessage());
         }
+
+        if ($outcome === 'not_pending') {
+            return back()->with('error', 'Only pending transfers can be approved.');
+        }
+
+        if ($outcome === 'same_account') {
+            return back()->with('error', 'A transfer must move money between two different accounts.');
+        }
+
+        $accountTransfer->refresh();
 
         AuditService::log('approved', $accountTransfer, [], $accountTransfer->toArray(), sprintf(
             'Approved transfer %s of %s from %s to %s.',
@@ -394,15 +413,27 @@ class AccountTransferController extends Controller
     {
         $this->authorize('reject', $accountTransfer);
 
-        if ($accountTransfer->status !== AccountEntryStatus::Pending) {
+        $processed = DB::transaction(function () use ($accountTransfer, $request): bool {
+            $locked = AccountTransfer::query()->whereKey($accountTransfer->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->status !== AccountEntryStatus::Pending) {
+                return false;
+            }
+
+            $locked->update([
+                'status' => AccountEntryStatus::Cancelled,
+                'approved_by' => $request->user()?->id,
+                'approved_at' => now(),
+            ]);
+
+            return true;
+        });
+
+        if (! $processed) {
             return back()->with('error', 'Only pending transfers can be rejected.');
         }
 
-        $accountTransfer->update([
-            'status' => AccountEntryStatus::Cancelled,
-            'approved_by' => $request->user()?->id,
-            'approved_at' => now(),
-        ]);
+        $accountTransfer->refresh();
 
         AuditService::log('rejected', $accountTransfer, [], $accountTransfer->toArray(), sprintf('Rejected transfer %s.', $accountTransfer->reference_no));
 

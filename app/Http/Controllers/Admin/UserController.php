@@ -74,7 +74,7 @@ class UserController extends Controller
         $this->authorize('create', User::class);
 
         return view('admin.users.create', [
-            'roles' => Role::orderBy('name')->get(),
+            'roles' => $this->assignableRoles($request),
             'locations' => $this->scopedLocations($request),
         ]);
     }
@@ -124,7 +124,7 @@ class UserController extends Controller
 
         return view('admin.users.edit', [
             'user' => $user->load('roles', 'supplier'),
-            'roles' => Role::orderBy('name')->get(),
+            'roles' => $this->assignableRoles($request),
             'locations' => $this->scopedLocations($request),
         ]);
     }
@@ -134,6 +134,8 @@ class UserController extends Controller
      */
     public function update(UpdateUserRequest $request, User $user): RedirectResponse
     {
+        $this->authorize('update', $user);
+
         $validated = $request->validated();
         $original = $user->getOriginal();
 
@@ -253,5 +255,18 @@ class UserController extends Controller
         return BranchScope::scopeQuery(Location::query(), $request->user(), 'id')
             ->orderBy('name')
             ->get(['id', 'name']);
+    }
+
+    /**
+     * Roles the acting administrator may assign in the UI.
+     *
+     * @return Collection<int, Role>
+     */
+    private function assignableRoles(Request $request): Collection
+    {
+        return Role::query()
+            ->when(! ($request->user()?->isSuperAdmin() ?? false), fn ($query) => $query->where('name', '!=', 'Super Admin'))
+            ->orderBy('name')
+            ->get();
     }
 }

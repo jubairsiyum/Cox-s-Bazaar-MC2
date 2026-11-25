@@ -240,24 +240,34 @@ class SalesReturnController extends Controller
     {
         $this->authorize('approve', $salesReturn);
 
-        if ($salesReturn->status !== SalesReturnStatus::Pending) {
-            return back()->with('error', "Sales return '{$salesReturn->return_no}' is not awaiting approval.");
-        }
-
         $original = $salesReturn->getOriginal();
 
         try {
-            DB::transaction(function () use ($salesReturn) {
-                $salesReturn->update([
+            $processed = DB::transaction(function () use ($salesReturn): bool {
+                $locked = SalesReturn::query()->whereKey($salesReturn->id)->lockForUpdate()->firstOrFail();
+
+                if ($locked->status !== SalesReturnStatus::Pending) {
+                    return false;
+                }
+
+                $locked->update([
                     'approved_by' => Auth::id(),
                     'approved_at' => now(),
                 ]);
 
-                SalesReturnService::apply($salesReturn);
+                SalesReturnService::apply($locked);
+
+                return true;
             });
         } catch (InsufficientStockException $e) {
             return back()->with('error', $e->getMessage());
         }
+
+        if (! $processed) {
+            return back()->with('error', "Sales return '{$salesReturn->return_no}' is not awaiting approval.");
+        }
+
+        $salesReturn->refresh();
 
         AuditService::updated($salesReturn, $original, "Sales return '{$salesReturn->return_no}' approved.");
         SalesApprovalNotifier::decided($salesReturn->fresh(), true);
@@ -273,17 +283,29 @@ class SalesReturnController extends Controller
     {
         $this->authorize('reject', $salesReturn);
 
-        if ($salesReturn->status !== SalesReturnStatus::Pending) {
+        $original = $salesReturn->getOriginal();
+
+        $processed = DB::transaction(function () use ($salesReturn): bool {
+            $locked = SalesReturn::query()->whereKey($salesReturn->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->status !== SalesReturnStatus::Pending) {
+                return false;
+            }
+
+            $locked->update([
+                'status' => SalesReturnStatus::Rejected,
+                'approved_by' => Auth::id(),
+                'approved_at' => now(),
+            ]);
+
+            return true;
+        });
+
+        if (! $processed) {
             return back()->with('error', "Sales return '{$salesReturn->return_no}' is not awaiting approval.");
         }
 
-        $original = $salesReturn->getOriginal();
-
-        $salesReturn->update([
-            'status' => SalesReturnStatus::Rejected,
-            'approved_by' => Auth::id(),
-            'approved_at' => now(),
-        ]);
+        $salesReturn->refresh();
 
         AuditService::updated($salesReturn, $original, "Sales return '{$salesReturn->return_no}' rejected.");
         SalesApprovalNotifier::decided($salesReturn->fresh(), false);

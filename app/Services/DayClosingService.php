@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\AccountEntryStatus;
+use App\Enums\AccountTransactionType;
+use App\Enums\AccountType;
 use App\Enums\LocationType;
 use App\Enums\SalesInvoiceStatus;
 use App\Exceptions\DayClosedException;
+use App\Models\AccountTransaction;
 use App\Models\AccountTransfer;
 use App\Models\DayClosing;
-use App\Models\Expense;
 use App\Models\Location;
 use App\Models\SalesInvoice;
 use App\Models\User;
@@ -79,15 +81,8 @@ class DayClosingService
 
         $cashSales = MoneyMath::clean($cashSales);
 
-        // 3. Cash Expenses on this date (if expense table exists)
-        $cashExpenses = '0.00';
-        if (class_exists(Expense::class)) {
-            $expenseSum = Expense::query()
-                ->where('location_id', $locationId)
-                ->whereDate('expense_date', $dateString)
-                ->sum('amount');
-            $cashExpenses = MoneyMath::clean((string) $expenseSum);
-        }
+        // 3. Completed Cash Expenses on this date
+        $cashExpenses = self::cashExpensesForDate($locationId, $dateString);
 
         // 4. Completed Cash Remittances from this branch to HQ on this date
         $cashRemittances = (string) AccountTransfer::query()
@@ -316,13 +311,7 @@ class DayClosingService
                 ->sum('amount');
         }
 
-        $todayExpenses = 0.0;
-        if (class_exists(Expense::class)) {
-            $todayExpenses = (float) Expense::query()
-                ->where('location_id', $locationId)
-                ->whereDate('expense_date', $today)
-                ->sum('amount');
-        }
+        $todayExpenses = (float) self::cashExpensesForDate($locationId, $today);
 
         $todayNetInflows = max(0.0, round($todayCashSales + $todayCollections - $todayExpenses, 2));
 
@@ -610,5 +599,21 @@ class DayClosingService
             'compliance_pct' => $compliancePct,
             'branches' => $records,
         ];
+    }
+
+    /**
+     * Completed cash-account expenses for a branch on the given date.
+     */
+    private static function cashExpensesForDate(int $locationId, string $dateString): string
+    {
+        $expenseSum = AccountTransaction::query()
+            ->where('location_id', $locationId)
+            ->where('type', AccountTransactionType::Expense)
+            ->where('status', AccountEntryStatus::Completed)
+            ->whereDate('transaction_date', $dateString)
+            ->whereHas('account', fn ($query) => $query->where('type', AccountType::Cash))
+            ->sum('amount');
+
+        return MoneyMath::clean((string) $expenseSum);
     }
 }

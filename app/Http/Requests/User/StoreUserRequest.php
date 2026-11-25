@@ -7,6 +7,7 @@ namespace App\Http\Requests\User;
 use App\Enums\UserStatus;
 use App\Models\Supplier;
 use App\Services\DuplicateCheckService;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -38,7 +39,16 @@ class StoreUserRequest extends FormRequest
             'status' => ['required', new Enum(UserStatus::class)],
             'branch_id' => ['nullable', 'integer', Rule::exists('locations', 'id')],
             'roles' => ['nullable', 'array'],
-            'roles.*' => ['string', 'distinct', Rule::exists('roles', 'name')],
+            'roles.*' => [
+                'string',
+                'distinct',
+                Rule::exists('roles', 'name'),
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if ($value === 'Super Admin' && ! ($this->user()?->isSuperAdmin() ?? false)) {
+                        $fail('Only a Super Admin may assign the Super Admin role.');
+                    }
+                },
+            ],
             'supplier_name' => [Rule::requiredIf(fn (): bool => $this->hasSupplierRole()), 'string', 'max:255'],
         ];
     }

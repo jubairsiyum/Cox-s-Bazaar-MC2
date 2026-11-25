@@ -225,20 +225,25 @@ class AccountTransactionController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($accountTransaction, $validated, $balances, $wasCompleted): void {
+            DB::transaction(function () use ($accountTransaction, $validated, $balances): void {
+                $locked = AccountTransaction::query()->whereKey($accountTransaction->id)->lockForUpdate()->firstOrFail();
+                $wasCompleted = $locked->status === AccountEntryStatus::Completed;
+
                 if ($wasCompleted) {
-                    $balances->reverseTransaction($accountTransaction);
+                    $balances->reverseTransaction($locked);
                 }
 
-                $accountTransaction->update($validated);
+                $locked->update($validated);
 
                 if ($wasCompleted) {
-                    $balances->applyTransaction($accountTransaction);
+                    $balances->applyTransaction($locked);
                 }
             });
         } catch (InsufficientAccountBalanceException $exception) {
             return back()->withInput()->with('error', $exception->getMessage());
         }
+
+        $accountTransaction->refresh();
 
         AuditService::updated($accountTransaction, $original, sprintf(
             '%s entry %s updated.',
@@ -260,11 +265,13 @@ class AccountTransactionController extends Controller
         $original = $accountTransaction->toArray();
 
         DB::transaction(function () use ($accountTransaction, $balances): void {
-            if ($accountTransaction->status === AccountEntryStatus::Completed) {
-                $balances->reverseTransaction($accountTransaction);
+            $locked = AccountTransaction::query()->whereKey($accountTransaction->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->status === AccountEntryStatus::Completed) {
+                $balances->reverseTransaction($locked);
             }
 
-            $accountTransaction->delete();
+            $locked->delete();
         });
 
         AuditService::log('deleted', null, $original, [], sprintf(
@@ -284,23 +291,33 @@ class AccountTransactionController extends Controller
     {
         $this->authorize('approve', $accountTransaction);
 
-        if ($accountTransaction->status !== AccountEntryStatus::Pending) {
-            return back()->with('error', 'Only pending transactions can be approved.');
-        }
-
         try {
-            DB::transaction(function () use ($accountTransaction, $balances, $request): void {
-                $accountTransaction->update([
+            $processed = DB::transaction(function () use ($accountTransaction, $balances, $request): bool {
+                $locked = AccountTransaction::query()->whereKey($accountTransaction->id)->lockForUpdate()->firstOrFail();
+
+                if ($locked->status !== AccountEntryStatus::Pending) {
+                    return false;
+                }
+
+                $locked->update([
                     'status' => AccountEntryStatus::Completed,
                     'approved_by' => $request->user()?->id,
                     'approved_at' => now(),
                 ]);
 
-                $balances->applyTransaction($accountTransaction);
+                $balances->applyTransaction($locked);
+
+                return true;
             });
         } catch (InsufficientAccountBalanceException $exception) {
             return back()->with('error', $exception->getMessage());
         }
+
+        if (! $processed) {
+            return back()->with('error', 'Only pending transactions can be approved.');
+        }
+
+        $accountTransaction->refresh();
 
         AuditService::log('approved', $accountTransaction, [], $accountTransaction->toArray(), sprintf(
             'Approved %s entry %s of %s.',
@@ -319,15 +336,27 @@ class AccountTransactionController extends Controller
     {
         $this->authorize('reject', $accountTransaction);
 
-        if ($accountTransaction->status !== AccountEntryStatus::Pending) {
+        $processed = DB::transaction(function () use ($accountTransaction, $request): bool {
+            $locked = AccountTransaction::query()->whereKey($accountTransaction->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->status !== AccountEntryStatus::Pending) {
+                return false;
+            }
+
+            $locked->update([
+                'status' => AccountEntryStatus::Cancelled,
+                'approved_by' => $request->user()?->id,
+                'approved_at' => now(),
+            ]);
+
+            return true;
+        });
+
+        if (! $processed) {
             return back()->with('error', 'Only pending transactions can be rejected.');
         }
 
-        $accountTransaction->update([
-            'status' => AccountEntryStatus::Cancelled,
-            'approved_by' => $request->user()?->id,
-            'approved_at' => now(),
-        ]);
+        $accountTransaction->refresh();
 
         AuditService::log('rejected', $accountTransaction, [], $accountTransaction->toArray(), sprintf(
             'Rejected %s entry %s.',

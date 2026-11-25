@@ -36,8 +36,12 @@ class AccountTransferPolicy
 
     public function update(User $user, AccountTransfer $accountTransfer): bool
     {
-        // Cancelled transfers are frozen; completed ones are editable but their
-        // balance effect is reversed and re-applied by the service layer.
+        // Cancelled transfers are frozen. Completed transfers may only be
+        // corrected by a Super Admin so branch users cannot bypass HQ approval.
+        if ($accountTransfer->status === AccountEntryStatus::Completed && ! $user->isSuperAdmin()) {
+            return false;
+        }
+
         return $accountTransfer->status !== AccountEntryStatus::Cancelled
             && $this->create($user)
             && BranchScope::canAccess($user, $accountTransfer->location_id);

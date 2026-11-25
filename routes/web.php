@@ -58,18 +58,16 @@ if (file_exists(__DIR__.'/error-preview.php')) {
 |--------------------------------------------------------------------------
 */
 Route::middleware('guest')->group(function () {
-    Route::middleware(['security_headers', 'browser_auth'])->group(function () {
+    Route::middleware('browser_auth')->group(function () {
         Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
         Route::post('login', [AuthenticatedSessionController::class, 'store'])->middleware('throttle:6,1');
     });
 
-    Route::middleware('security_headers')->group(function () {
-        Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])->name('password.request');
-        Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])->name('password.email')->middleware('throttle:6,1');
+    Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])->name('password.request');
+    Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])->name('password.email')->middleware('throttle:6,1');
 
-        Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])->name('password.reset');
-        Route::post('reset-password', [NewPasswordController::class, 'store'])->name('password.store')->middleware('throttle:6,1');
-    });
+    Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])->name('password.reset');
+    Route::post('reset-password', [NewPasswordController::class, 'store'])->name('password.store')->middleware('throttle:6,1');
 });
 
 /*
@@ -80,7 +78,7 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
-    Route::get('verify-email', [EmailVerificationController::class, 'notice'])->middleware('security_headers')->name('verification.notice');
+    Route::get('verify-email', [EmailVerificationController::class, 'notice'])->name('verification.notice');
     Route::get('verify-email/{id}/{hash}', [EmailVerificationController::class, 'verify'])
         ->middleware(['signed', 'throttle:6,1'])
         ->name('verification.verify');

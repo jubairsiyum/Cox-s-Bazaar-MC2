@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cox's Bazaar MC2 — Full Role, Financial, Stock, UI, Security &amp; Scaling Audit</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-2: #f1f5f9;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --brand: #2563eb;
+      --brand-soft: rgba(37, 99, 235, 0.1);
+      --critical: #dc2626;
+      --critical-soft: rgba(220, 38, 38, 0.12);
+      --high: #ea580c;
+      --high-soft: rgba(234, 88, 12, 0.12);
+      --medium: #d97706;
+      --medium-soft: rgba(217, 119, 6, 0.12);
+      --low: #0284c7;
+      --low-soft: rgba(2, 132, 199, 0.12);
+      --ok: #16a34a;
+      --ok-soft: rgba(22, 163, 74, 0.12);
+      --code-bg: #0f172a;
+      --code-text: #e2e8f0;
+      --shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 8px 24px rgba(15, 23, 42, 0.04);
+    }
+
+    html.dark {
+      --bg: #0b1120;
+      --surface: #111827;
+      --surface-2: #1e293b;
+      --border: #263244;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --brand: #3b82f6;
+      --brand-soft: rgba(59, 130, 246, 0.15);
+      --critical: #f87171;
+      --critical-soft: rgba(248, 113, 113, 0.14);
+      --high: #fb923c;
+      --high-soft: rgba(251, 146, 60, 0.14);
+      --medium: #fbbf24;
+      --medium-soft: rgba(251, 191, 36, 0.14);
+      --low: #38bdf8;
+      --low-soft: rgba(56, 189, 248, 0.14);
+      --ok: #4ade80;
+      --ok-soft: rgba(74, 222, 128, 0.14);
+      --code-bg: #020617;
+      --code-text: #e2e8f0;
+      --shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.25);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container { max-width: 1380px; margin: 0 auto; padding: 24px 20px 64px; }
+
+    .topbar {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;
+      padding: 22px 26px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 18px; box-shadow: var(--shadow); margin-bottom: 22px;
+    }
+    .brand-row { display: flex; align-items: center; gap: 14px; }
+    .logo-badge {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: linear-gradient(135deg, #2563eb, #0ea5e9);
+      display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 17px; flex-shrink: 0;
+    }
+    .title { font-size: 20px; font-weight: 800; margin: 0; letter-spacing: -0.02em; }
+    .subtitle { font-size: 13px; color: var(--muted); margin: 3px 0 0; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 10px;
+      font-size: 13px; font-weight: 600; border: 1px solid var(--border); background: var(--surface-2);
+      color: var(--text); cursor: pointer; transition: 0.15s ease;
+    }
+    .btn:hover { border-color: var(--brand); color: var(--brand); }
+    .btn-primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .btn-primary:hover { opacity: 0.92; color: #fff; }
+
+    .meta-strip { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px;
+      font-size: 12px; font-weight: 600; background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+    }
+    .pill strong { color: var(--text); }
+
+    .kpi-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 22px;
+    }
+    .kpi-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px 20px; box-shadow: var(--shadow);
+    }
+    .kpi-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .kpi-value { font-size: 28px; font-weight: 800; margin: 6px 0 4px; letter-spacing: -0.02em; }
+    .kpi-sub { font-size: 12.5px; color: var(--muted); }
+
+    .charts-grid { display: grid; grid-template-columns: 360px 1fr; gap: 18px; margin-bottom: 24px; }
+    @media (max-width: 960px) { .charts-grid { grid-template-columns: 1fr; } }
+    .panel {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: var(--shadow);
+    }
+    .panel-title {
+      font-size: 15px; font-weight: 700; margin: 0 0 14px; display: flex; align-items: center; justify-content: space-between;
+    }
+
+    .donut-wrap { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+    .legend { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 140px; }
+    .legend-item { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+    .legend-left { display: flex; align-items: center; gap: 8px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+    .bar-list { display: flex; flex-direction: column; gap: 11px; }
+    .bar-row { display: grid; grid-template-columns: 135px 1fr 125px; align-items: center; gap: 12px; font-size: 13px; }
+    @media (max-width: 600px) { .bar-row { grid-template-columns: 105px 1fr 90px; font-size: 12px; } }
+    .bar-track { height: 11px; background: var(--surface-2); border-radius: 999px; overflow: hidden; display: flex; }
+    .bar-fill-ok { background: var(--ok); height: 100%; }
+    .bar-fill-redir { background: var(--low); height: 100%; }
+    .bar-fill-deny { background: var(--surface-2); height: 100%; }
+    .bar-meta { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+
+    .tabs {
+      display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 18px;
+    }
+    .tab-btn {
+      padding: 9px 16px; border-radius: 10px; font-size: 13.5px; font-weight: 600;
+      border: 1px solid transparent; background: transparent; color: var(--muted); cursor: pointer; transition: 0.15s;
+    }
+    .tab-btn:hover { background: var(--surface); color: var(--text); }
+    .tab-btn.active { background: var(--brand); color: #fff; box-shadow: 0 2px 10px rgba(37, 99, 235, 0.28); }
+
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 18px;
+    }
+    .filter-group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .chip {
+      padding: 6px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+      border: 1px solid var(--border); background: var(--surface-2); color: var(--muted); cursor: pointer; transition: 0.15s;
+    }
+    .chip.active, .chip:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
+    .search-box {
+      padding: 8px 13px; border-radius: 10px; border: 1px solid var(--border);
+      background: var(--surface-2); color: var(--text); font-size: 13px; min-width: 240px; outline: none;
+    }
+    .search-box:focus { border-color: var(--brand); }
+
+    .findings-list { display: flex; flex-direction: column; gap: 14px; }
+    .finding-card {
+      background: var(--surface); border: 1px solid var(--border); border-left-width: 4px; border-radius: 14px;
+      overflow: hidden; box-shadow: var(--shadow);
+    }
+    .finding-card[data-sev="critical"] { border-left-color: var(--critical); }
+    .finding-card[data-sev="high"] { border-left-color: var(--high); }
+    .finding-card[data-sev="medium"] { border-left-color: var(--medium); }
+    .finding-card[data-sev="low"] { border-left-color: var(--low); }
+
+    .finding-head {
+      padding: 16px 20px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+      cursor: pointer; user-select: none;
+    }
+    .finding-head:hover { background: rgba(148, 163, 184, 0.05); }
+    .finding-title-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    .finding-title { font-size: 15px; font-weight: 700; margin: 0; }
+    .sev-badge {
+      font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; padding: 3px 9px; border-radius: 999px;
+    }
+    .sev-critical { background: var(--critical-soft); color: var(--critical); }
+    .sev-high { background: var(--high-soft); color: var(--high); }
+    .sev-medium { background: var(--medium-soft); color: var(--medium); }
+    .sev-low { background: var(--low-soft); color: var(--low); }
+
+    .cat-badge {
+      font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px;
+      background: var(--surface-2); color: var(--muted); border: 1px solid var(--border);
+    }
+
+    .finding-body { display: none; padding: 0 20px 20px; border-top: 1px solid var(--border); }
+    .finding-card.open .finding-body { display: block; }
+    .finding-card.open .chev { transform: rotate(180deg); }
+    .chev { transition: transform 0.2s; color: var(--muted); font-size: 12px; }
+
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+    @media (max-width: 820px) { .two-col { grid-template-columns: 1fr; } }
+
+    .box { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+    .box h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+    .box p, .box ul { margin: 0; font-size: 13.5px; }
+    .box ul { padding-left: 18px; }
+    .box li { margin-bottom: 4px; }
+
+    .file-ref {
+      display: inline-block; margin-top: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px; padding: 3px 8px; border-radius: 6px; background: var(--brand-soft); color: var(--brand); word-break: break-all;
+    }
+
+    pre {
+      margin: 12px 0 0; padding: 14px; border-radius: 10px; overflow-x: auto;
+      background: var(--code-bg); color: var(--code-text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.5; border: 1px solid var(--border);
+    }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; }
+
+    .table-wrap {
+      overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow);
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    th, td { padding: 9px 10px; border-bottom: 1px solid var(--border); text-align: center; white-space: nowrap; }
+    th { background: var(--surface-2); font-weight: 700; position: sticky; top: 0; z-index: 2; }
+    th:first-child, td:first-child {
+      text-align: left; position: sticky; left: 0; z-index: 1; background: var(--surface);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; border-right: 1px solid var(--border);
+    }
+    th:first-child { z-index: 3; background: var(--surface-2); }
+    tr:hover td { background: rgba(148, 163, 184, 0.06); }
+
+    .st {
+      display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px;
+      font-weight: 700; font-size: 11.5px; font-variant-numeric: tabular-nums;
+    }
+    .st-200 { background: var(--ok-soft); color: var(--ok); }
+    .st-302 { background: var(--low-soft); color: var(--low); }
+    .st-403 { background: var(--surface-2); color: var(--muted); }
+    .st-500 { background: var(--critical-soft); color: var(--critical); }
+    .st-bug { outline: 2px solid var(--critical); background: var(--critical-soft); color: var(--critical); }
+    .ms { font-weight: 500; opacity: 0.78; font-size: 10.5px; }
+
+    .roadmap { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+    .phase { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px 20px; box-shadow: var(--shadow); }
+    .phase-tag { display: inline-block; font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; margin-bottom: 10px; }
+    .phase h3 { margin: 0 0 10px; font-size: 16px; }
+    .check-item { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-top: 1px dashed var(--border); font-size: 13.5px; }
+    .check-item:first-of-type { border-top: none; }
+    .check-item input { margin-top: 4px; accent-color: var(--brand); }
+
+    @media print {
+      body { background: #fff; color: #000; }
+      .actions, .toolbar, .tabs { display: none !important; }
+      .tab-pane { display: block !important; margin-bottom: 24px; }
+      .finding-body { display: block !important; }
+      .panel, .kpi-card, .finding-card, .table-wrap, .phase { box-shadow: none; break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <header class="topbar">
+      <div class="brand-row">
+        <div class="logo-badge">CB</div>
+        <div>
+          <h1 class="title">Cox's Bazaar MC2 — Full Role, Financial, Stock, UI, Security &amp; Scaling Audit</h1>
+          <p class="subtitle">Localhost Live Probe (<code>http://127.0.0.1:8000</code> · MySQL <code>coxdb</code>) + Pest Suite + Deep Integrity &amp; UI Review</p>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn" onclick="toggleTheme()" id="themeBtn">☀️ Light Mode</button>
+        <button class="btn" onclick="toggleAllCards(true)">Expand All</button>
+        <button class="btn" onclick="toggleAllCards(false)">Collapse All</button>
+        <button class="btn btn-primary" onclick="window.print()">Print / Save PDF</button>
+      </div>
+    </header>
+
+    <div class="meta-strip">
+      <span class="pill">Audit Date: <strong>2026-11-25</strong></span>
+      <span class="pill">Runtime: <strong>PHP 8.5.12 · Laravel 13.x</strong></span>
+      <span class="pill">DB / Drivers: <strong>MySQL (coxdb) · DB Cache/Session/Queue</strong></span>
+      <span class="pill">Pest Suite: <strong>782 / 783 Passed (4,297 assertions · 193.3s)</strong></span>
+      <span class="pill">Browser DevTools: <strong>Unavailable (DevToolsActivePort not active)</strong></span>
+    </div>
+
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Total Findings</div>
+        <div class="kpi-value" style="color: var(--high)">17</div>
+        <div class="kpi-sub">3 Critical · 10 High · 3 Medium · 1 Low</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Automated Tests (Pest)</div>
+        <div class="kpi-value" style="color: var(--ok)">99.87%</div>
+        <div class="kpi-sub">782 passed · 1 failed (<code>BranchMonthlyTargetTest</code>)</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Roles &amp; Endpoints Probed</div>
+        <div class="kpi-value" style="color: var(--brand)">8 × 41</div>
+        <div class="kpi-sub">Guest + all 7 seeded ERP roles tested live</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Auth Route Security Headers</div>
+        <div class="kpi-value" style="color: var(--critical)">0 / 40</div>
+        <div class="kpi-sub"><code>SecurityHeaders</code> missing on all logged-in routes</div>
+      </div>
+    </section>
+
+    <section class="charts-grid">
+      <div class="panel">
+        <h2 class="panel-title">Findings by Severity (17)</h2>
+        <div class="donut-wrap">
+          <svg width="136" height="136" viewBox="0 0 42 42" aria-label="Severity Donut Chart">
+            <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="var(--surface-2)" stroke-width="6"></circle>
+            <!-- Total = 17 => C:3 (17.65), H:10 (58.82), M:3 (17.65), L:1 (5.88) -->
+            <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="var(--critical)" stroke-width="6"
+                    stroke-dasharray="17.65 82.35" stroke-dashoffset="25"></circle>
+            <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="var(--high)" stroke-width="6"
+                    stroke-dasharray="58.82 41.18" stroke-dashoffset="7.35"></circle>
+            <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="var(--medium)" stroke-width="6"
+                    stroke-dasharray="17.65 82.35" stroke-dashoffset="-51.47"></circle>
+            <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="var(--low)" stroke-width="6"
+                    stroke-dasharray="5.88 94.12" stroke-dashoffset="-69.12"></circle>
+            <text x="21" y="20.5" text-anchor="middle" fill="var(--text)" font-size="7.5" font-weight="800">17</text>
+            <text x="21" y="25.5" text-anchor="middle" fill="var(--muted)" font-size="3.1" font-weight="600">ISSUES</text>
+          </svg>
+          <div class="legend">
+            <div class="legend-item"><span class="legend-left"><span class="dot" style="background:var(--critical)"></span>Critical</span><strong>3</strong></div>
+            <div class="legend-item"><span class="legend-left"><span class="dot" style="background:var(--high)"></span>High</span><strong>10</strong></div>
+            <div class="legend-item"><span class="legend-left"><span class="dot" style="background:var(--medium)"></span>Medium</span><strong>3</strong></div>
+            <div class="legend-item"><span class="legend-left"><span class="dot" style="background:var(--low)"></span>Low</span><strong>1</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel-title">
+          <span>Live Role Access Coverage &amp; Avg Response Latency (40 App Routes)</span>
+          <span style="font-size:12px;color:var(--muted);font-weight:500;">Green = 200 · Blue = 302 · Gray = 403</span>
+        </h2>
+        <div class="bar-list" id="roleSummaryBars"></div>
+      </div>
+    </section>
+
+    <nav class="tabs">
+      <button class="tab-btn active" onclick="switchTab('findings', this)">Problems &amp; Solutions (17)</button>
+      <button class="tab-btn" onclick="switchTab('ui_vs_route', this)">UI / Sidebar vs Route Mismatches</button>
+      <button class="tab-btn" onclick="switchTab('matrix', this)">Live Role × Route Matrix (8 × 41)</button>
+      <button class="tab-btn" onclick="switchTab('roadmap', this)">Fix Priority Roadmap</button>
+    </nav>
+
+    <!-- TAB 1: FINDINGS -->
+    <section id="tab-findings" class="tab-pane active">
+      <div class="toolbar">
+        <div class="filter-group" id="catFilters">
+          <button class="chip active" data-cat="all">All (17)</button>
+          <button class="chip" data-cat="financial">Financial (2)</button>
+          <button class="chip" data-cat="stock">Stock &amp; Transfer (2)</button>
+          <button class="chip" data-cat="role">Role &amp; UI Mismatch (5)</button>
+          <button class="chip" data-cat="print">Print &amp; Design (1)</button>
+          <button class="chip" data-cat="security">Security (4)</button>
+          <button class="chip" data-cat="scaling">Scaling &amp; Perf (3)</button>
+        </div>
+        <div class="filter-group" id="sevFilters">
+          <button class="chip active" data-sev="all">All Severities</button>
+          <button class="chip" data-sev="critical">Critical</button>
+          <button class="chip" data-sev="high">High</button>
+          <button class="chip" data-sev="medium">Medium</button>
+          <button class="chip" data-sev="low">Low</button>
+        </div>
+        <input type="search" class="search-box" id="searchInput" placeholder="Search file, route, role, or keyword..." />
+      </div>
+
+      <div class="findings-list" id="findingsContainer"></div>
+    </section>
+
+    <!-- TAB 2: UI VS ROUTE MISMATCH -->
+    <section id="tab-ui_vs_route" class="tab-pane">
+      <div class="panel" style="margin-bottom:18px;">
+        <h2 class="panel-title">Sidebar UI Hidden vs Backend Route Accessible (All Verified)</h2>
+        <p style="font-size:13.5px;color:var(--muted);margin:0;">
+          In <code>resources/views/components/dashboard/sidebar.blade.php</code>, menu items are hidden per role, but the backend routes in <code>routes/web.php</code> still allow direct URL access (`200 OK`) — and some pages show global/warehouse data instead of branch-scoped data.
+        </p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Role</th>
+              <th>Sidebar UI Behavior</th>
+              <th>Actual Backend Route Access</th>
+              <th>Data / Dropdown Leak</th>
+              <th>Recommended Fix</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Outlet Manager</td>
+              <td>Sidebar hides Master Data, Suppliers, Purchasing, &amp; Finance (except Cash Remittance &amp; Daily Close)</td>
+              <td><span class="st st-bug">200 OK</span> on <code>/brands</code>, <code>/categories</code>, <code>/units</code>, <code>/suppliers</code>, <code>/purchase-orders</code>, <code>/purchase-invoices</code>, <code>/cash-accounts</code>, <code>/bank-accounts</code>, <code>/transactions</code>, <code>/supplier-payments</code></td>
+              <td>Sees HQ account balances on <code>/account-transfers/create</code>; sees global counts on <code>/brands</code></td>
+              <td>Align <code>RolesAndPermissionsSeeder</code> / route middleware with the sidebar boundary, and hide HQ <code>current_balance</code></td>
+            </tr>
+            <tr>
+              <td>Sales Staff</td>
+              <td>Sidebar hides Master Data (<code>/brands</code>, <code>/categories</code>, <code>/units</code>) &amp; Daily Cash Close? (Shown via <code>dashboard.view</code>)</td>
+              <td><span class="st st-bug">200 OK</span> on <code>/brands</code>, <code>/categories</code>, <code>/units</code>, <code>/day-closings</code>, <code>/branch-targets</code>, <code>/ecommerce</code></td>
+              <td>Sees global catalog stats on <code>/brands</code> &amp; can submit branch <code>POST /day-closings</code></td>
+              <td>Restrict Master Data GET routes if not needed for Sales Staff, and remove <code>dashboard.view</code> from <code>/day-closings</code></td>
+            </tr>
+            <tr>
+              <td>Manager</td>
+              <td>Not in <code>$isBranchOutlet</code> — sees Master Data, Purchasing, Finance, Products, Users</td>
+              <td><span class="st st-bug">403 Forbidden</span> on <code>/products</code>; <span class="st st-bug">200 OK</span> on <code>/users</code> (with Super Admin escalation!) &amp; <code>/branches</code></td>
+              <td><code>/branches</code> shows Main Warehouse &amp; all branches; <code>/brands</code> shows global product counts</td>
+              <td>Grant <code>products.view</code> to Manager, scope <code>BranchController</code>, and lock down <code>UserController</code></td>
+            </tr>
+            <tr>
+              <td>Storekeeper</td>
+              <td>Sees Master Data, Inventory, Purchasing (except PO create)</td>
+              <td><span class="st st-bug">200 OK</span> on <code>/day-closings</code>, <code>/branches</code>, <code>/branch-targets</code>, <code>/ecommerce</code></td>
+              <td>Can view/edit/delete other branches/warehouses via <code>/branches</code> &amp; lock branch day via <code>/day-closings</code></td>
+              <td>Scope <code>BranchController</code> to user's branch; remove <code>dashboard.view</code> from <code>/day-closings</code></td>
+            </tr>
+            <tr>
+              <td>Supplier</td>
+              <td>Minimal Supplier Portal sidebar (own sections + Notifications)</td>
+              <td><span class="st st-bug">200 OK</span> on <code>/branch-targets</code> &amp; <code>/ecommerce</code></td>
+              <td>Supplier login can open internal branch target page</td>
+              <td>Block <code>isSupplierPortalUser()</code> on <code>/branch-targets</code> and restrict <code>/ecommerce</code> to <code>local</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 3: MATRIX -->
+    <section id="tab-matrix" class="tab-pane">
+      <div class="toolbar">
+        <div class="filter-group">
+          <button class="chip active" onclick="filterMatrix('all', this)">All Routes (41)</button>
+          <button class="chip" onclick="filterMatrix('anomalies', this)">Anomalies / Bugs Only</button>
+        </div>
+        <span style="font-size:12.5px;color:var(--muted);">
+          Red-outlined cells mark verified role-permission bugs or UI-vs-route mismatches. Outlet Manager &amp; Supplier ran via <code>HttpKernel</code>.
+        </span>
+      </div>
+      <div class="table-wrap">
+        <table id="matrixTable"></table>
+      </div>
+    </section>
+
+    <!-- TAB 4: ROADMAP -->
+    <section id="tab-roadmap" class="tab-pane">
+      <div class="roadmap">
+        <div class="phase">
+          <span class="phase-tag sev-critical">Phase 1 · Immediate (Security, Finance &amp; Locks)</span>
+          <h3>Stop Escalation, Balance Drift &amp; Double-Execution</h3>
+          <label class="check-item"><input type="checkbox" /> <span>Authorize <code>UserController::update()</code> + block <code>Super Admin</code> role assignment by non-Super-Admins.</span></label>
+          <label class="check-item"><input type="checkbox" /> <span>Fix <code>DayClosingService::calculateSummary()</code> to query completed <code>AccountTransaction</code> expenses instead of missing <code>Expense</code> model.</span></label>
+          <label class="check-item"><input type="checkbox" /> <span>Lock <code>AccountTransfer</code>, <code>AccountTransaction</code>, <code>StockTransfer</code>, &amp; <code>SalesReturn</code> rows inside <code>DB::transaction()</code> before state transitions, and forbid editing <code>Completed</code> transfers.</span></label>
+          <label class="check-item"><input type="checkbox" /> <span>Enforce server-side catalog prices / discount limits in <code>PosController::store()</code> &amp; apply <code>SecurityHeaders</code> globally.</span></label>
+        </div>
+
+        <div class="phase">
+          <span class="phase-tag sev-high">Phase 2 · Role, UI &amp; Print Alignment</span>
+          <h3>Align UI, Permissions, Stock Deletes &amp; Print Invoices</h3>
+          <label class="check-item"><input type="checkbox" /> <span>Align sidebar visibility with route middleware (Master Data, Suppliers, Finance, <code>products.view</code> for Manager, <code>day-closings</code>, <code>branch-targets</code>, <code>BranchController</code>).</span></label>
+          <label class="check-item"><input type="checkbox" /> <span>Block deleting/cancelling <code>Received</code> stock transfers without stock reversal &amp; receiving-side approval.</span></label>
+          <label class="check-item"><input type="checkbox" /> <span>Fix missing <code>public/images/logo.svg</code> &amp; add <code>print-color-adjust: exact</code> + unified print layout on <code>sales-invoices/print</code> and <code>stock-transfers/show</code>.</span></label>
+          <label class="check-item"><input type="checkbox" /> <span>Fix <code>BranchMonthlyTargetTest</code> + warehouse filter + <code>!Y-m</code> Carbon format.</span></label>
+        </div>
+
+        <div class="phase">
+          <span class="phase-tag sev-medium">Phase 3 · Scaling &amp; Production Readiness</span>
+          <h3>Eliminate Bottlenecks Before Load Grows</h3>
+          <label class="check-item"><input type="checkbox" /> <span>Cache <code>Setting::get()</code> with invalidation on <code>Setting::set()</code>.</span></label>
+          <label class="check-item"><input type="checkbox" /> <span>Move Dashboard queries into a cached service and replace <code>whereDate()</code> with indexed <code>whereBetween()</code>.</span></label>
+          <label class="check-item"><input type="checkbox" /> <span>Aggregate <code>TargetService::getNetworkOverview()</code> with <code>GROUP BY location_id</code> instead of per-branch loops.</span></label>
+          <label class="check-item"><input type="checkbox" /> <span>Replace PHP in-memory merge in <code>AccountTransactionController</code> with SQL <code>UNION ALL</code> &amp; add composite index on <code>stock_movements(location_id, unit_id)</code>.</span></label>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    const FINDINGS = [
+      {
+        id: 'F-01',
+        severity: 'critical',
+        category: 'security',
+        catLabel: 'Security · AuthZ',
+        title: 'Privilege Escalation & Cross-Branch IDOR in User Management (Manager → Super Admin)',
+        files: [
+          'app/Http/Controllers/Admin/UserController.php (L135–171)',
+          'app/Http/Requests/User/StoreUserRequest.php (L40–41)',
+          'app/Http/Requests/User/UpdateUserRequest.php (L22–46)',
+          'app/Policies/UserPolicy.php (L44–53)'
+        ],
+        problem: 'Manager holds users.view, users.create, and users.update. UserController::update() never calls $this->authorize(\'update\', $user), and UpdateUserRequest::authorize() only checks $this->user()?->can(\'users.update\'). Neither StoreUserRequest nor UpdateUserRequest prevents assigning the Super Admin role.',
+        impact: 'A Manager can send PATCH /users/1 to overwrite the Super Admin password/email, or create/update a user with the Super Admin role — gaining unrestricted cross-branch control.',
+        solution: [
+          'Check $this->user()?->can(\'update\', $this->route(\'user\')) in UpdateUserRequest::authorize() and call $this->authorize(\'update\', $user) in UserController::update().',
+          'Reject "Super Admin" role assignment in StoreUserRequest/UpdateUserRequest unless $this->user()->isSuperAdmin().',
+          'Filter Super Admin out of role dropdowns in UserController::create()/edit() for non-Super-Admins.'
+        ],
+        code: `// UpdateUserRequest.php
+public function authorize(): bool
+{
+    $target = $this->route('user');
+    return $target && ($this->user()?->can('update', $target) ?? false);
+}
+
+// In rules() for StoreUserRequest & UpdateUserRequest:
+'roles.*' => [
+    'string', 'distinct', Rule::exists('roles', 'name'),
+    function (string $attr, mixed $value, Closure $fail): void {
+        if ($value === 'Super Admin' && ! $this->user()?->isSuperAdmin()) {
+            $fail('Only Super Admin can assign the Super Admin role.');
+        }
+    },
+],`
+      },
+      {
+        id: 'F-02',
+        severity: 'critical',
+        category: 'financial',
+        catLabel: 'Financial Mismatch',
+        title: 'DayClosingService::calculateSummary() Always Reports ৳0.00 Expenses (Missing App\\Models\\Expense)',
+        files: [
+          'app/Services/DayClosingService.php (L73–104)',
+          'app/Models/AccountTransaction.php'
+        ],
+        problem: 'DayClosingService::calculateSummary() computes $cashExpenses using "if (class_exists(Expense::class))", but App\\Models\\Expense does NOT exist in this codebase (expenses are stored in AccountTransaction with type = expense, status = completed).',
+        impact: 'Daily Cash Close ALWAYS sets cash_expenses = 0.00, inflating system_cash and causing false cash shortages/variances whenever a branch records cash expenses.',
+        solution: [
+          'Replace the dead Expense::class check with AccountTransaction::query() filtered by location_id, type = expense, status = completed, and transaction_date = $dateString (joining/filtering cash accounts).',
+          'Also filter $cashSales in calculateSummary() to posted/active invoices rather than draft invoices.'
+        ],
+        code: `// DayClosingService.php
+$cashExpenses = (string) AccountTransaction::query()
+    ->where('location_id', $locationId)
+    ->where('type', AccountTransactionType::Expense)
+    ->where('status', AccountEntryStatus::Completed)
+    ->whereDate('transaction_date', $dateString)
+    ->whereHas('account', fn ($q) => $q->where('type', AccountType::Cash))
+    ->sum('amount');`
+      },
+      {
+        id: 'F-03',
+        severity: 'critical',
+        category: 'financial',
+        catLabel: 'Financial · Integrity',
+        title: 'Completed HQ Remittances Can Be Edited Without Approval & Double-Approved via Race Condition',
+        files: [
+          'app/Policies/AccountTransferPolicy.php (L37–44)',
+          'app/Http/Controllers/AccountTransferController.php (L132–143, L269–375)',
+          'app/Http/Controllers/AccountTransactionController.php (L283–300)',
+          'resources/views/account-transfers/create.blade.php (L128)'
+        ],
+        problem: '1) AccountTransferPolicy::update() allows branch users to edit any non-Cancelled transfer (including Completed remittances!) and AccountTransferController::update() reverses & re-applies balances without HQ approval. 2) approve() checks status === Pending outside DB::transaction() without lockForUpdate(), allowing double-click balance duplication. 3) /account-transfers/create exposes Central HQ account balances in the To Account dropdown.',
+        impact: 'Branch users can bypass HQ remittance approval by editing an approved transfer, double-clicks can move funds twice, and branch staff can view HQ cash/bank balances.',
+        solution: [
+          'Restrict AccountTransferPolicy::update() to Pending transfers (or Super Admin only for Completed).',
+          'Wrap approve()/reject() status checks with lockForUpdate() inside DB::transaction().',
+          'Hide current_balance on destination HQ accounts in account-transfers/create.blade.php for branch users.'
+        ],
+        code: `// AccountTransferPolicy.php
+public function update(User $user, AccountTransfer $accountTransfer): bool
+{
+    if ($accountTransfer->status === AccountEntryStatus::Completed && ! $user->isSuperAdmin()) {
+        return false;
+    }
+    return $accountTransfer->status !== AccountEntryStatus::Cancelled
+        && $this->create($user)
+        && BranchScope::canAccess($user, $accountTransfer->location_id);
+}`
+      },
+      {
+        id: 'F-04',
+        severity: 'high',
+        category: 'stock',
+        catLabel: 'Stock & Transfer',
+        title: 'Stock Transfer / Return Double-Approve Race Condition (Duplicate Stock Increase/Credit)',
+        files: [
+          'app/Http/Controllers/StockTransferController.php (L291–438, L490–505)',
+          'app/Http/Controllers/SalesReturnController.php (L239–267)'
+        ],
+        problem: 'While single-click transfers update stock accurately (InTransit deducts source, Received adds destination), approve(), dispatch(), reject(), cancel(), and SalesReturnController::approve() all check $model->status OUTSIDE DB::transaction() without lockForUpdate().',
+        impact: 'Double-clicking "Accept / Receive" or concurrent requests can execute StockTransferService::applyStatusChange() or SalesReturnService::apply() twice — double-adding destination stock or double-crediting invoices.',
+        solution: [
+          'Re-fetch the StockTransfer / SalesReturn inside DB::transaction() using ->lockForUpdate()->firstOrFail(), then verify the status before mutating stock or balances.'
+        ],
+        code: `// Inside StockTransferController::approve() DB::transaction:
+$locked = StockTransfer::query()->whereKey($stockTransfer->id)->lockForUpdate()->firstOrFail();
+if (! in_array($locked->status, [StockTransferStatus::Draft, StockTransferStatus::InTransit, StockTransferStatus::Requested], true)) {
+    return; // Already processed
+}`
+      },
+      {
+        id: 'F-05',
+        severity: 'high',
+        category: 'stock',
+        catLabel: 'Stock & Transfer',
+        title: 'Received Stock Transfers Can Be Deleted Without Stock Reversal or Pulled Back by Sender',
+        files: [
+          'app/Http/Controllers/StockTransferController.php (L268–284)',
+          'app/Policies/StockTransferPolicy.php (L47–59)',
+          'app/Enums/StockTransferStatus.php (L55)'
+        ],
+        problem: '1) StockTransferController::destroy() blocks deleting Requested and InTransit transfers, but allows deleting a Received transfer without reversing stock movements. 2) StockTransferStatus::transitionsFrom(Received) allows transitioning back to Cancelled via edit/update by the sending branch.',
+        impact: 'Deleting a Received transfer leaves orphan stock movements, and a sending branch can cancel an already-received transfer without the receiving branch\'s consent.',
+        solution: [
+          'Block StockTransferPolicy::delete() when status === StockTransferStatus::Received (or reverse stock inside a transaction if Super Admin).',
+          'Remove Cancelled from StockTransferStatus::transitionsFrom(Received) unless performed by Super Admin.'
+        ],
+        code: `// StockTransferPolicy.php
+public function delete(User $user, StockTransfer $stockTransfer): bool
+{
+    return ! in_array($stockTransfer->status, [StockTransferStatus::Requested, StockTransferStatus::Received], true)
+        && $user->can('stock-transfers.manage')
+        && LocationScope::canAccess($user, $stockTransfer->from_location_id);
+}`
+      },
+      {
+        id: 'F-06',
+        severity: 'high',
+        category: 'role',
+        catLabel: 'Role & Access',
+        title: 'Manager Role Receives 403 Forbidden on /products (Live Verified)',
+        files: [
+          'database/seeders/RolesAndPermissionsSeeder.php (L70–91)',
+          'routes/web.php (L199–201)'
+        ],
+        problem: 'Verified live on localhost: Manager (manager@cberp.local) gets 403 Forbidden on GET /products because RolesAndPermissionsSeeder grants products.manage without products.view, while the route requires permission:products.view.',
+        impact: 'Managers see Products in their sidebar but get blocked with 403 when clicking it.',
+        solution: [
+          'Add \'products.view\' to Manager in RolesAndPermissionsSeeder.',
+          'Update routes/web.php line 199 to permission:products.view|products.manage.'
+        ],
+        code: `// RolesAndPermissionsSeeder.php (Manager)
+'products.manage', 'products.view',`
+      },
+      {
+        id: 'F-07',
+        severity: 'high',
+        category: 'role',
+        catLabel: 'Role & Access',
+        title: 'Sales Staff & Storekeeper Can Access & Submit Daily Cash Closing (/day-closings)',
+        files: [
+          'routes/web.php (L612–617)',
+          'app/Policies/DayClosingPolicy.php (L13–28)'
+        ],
+        problem: 'Verified live: Sales Staff and Storekeeper receive 200 OK on GET /day-closings because route middleware and DayClosingPolicy allow dashboard.view.',
+        impact: 'Any Sales Staff or Storekeeper can POST /day-closings and lock the branch\'s POS and Sales Invoices for the rest of the day.',
+        solution: [
+          'Remove dashboard.view from /day-closings route middleware and DayClosingPolicy::viewAny()/create().'
+        ],
+        code: `// DayClosingPolicy.php
+public function create(User $user): bool
+{
+    return $user->hasAnyPermission(['finance.manage', 'account-transfers.manage'])
+        && (BranchScope::locationId($user) !== null || BranchScope::isUnrestricted($user));
+}`
+      },
+      {
+        id: 'F-08',
+        severity: 'high',
+        category: 'role',
+        catLabel: 'Role & Access',
+        title: 'BranchController index/edit/update/destroy Lack Branch Isolation',
+        files: [
+          'app/Http/Controllers/BranchController.php (L30–56, L120–150)',
+          'app/Policies/LocationPolicy.php'
+        ],
+        problem: 'BranchController::show() enforces BranchScope::canAccess(), but index(), edit(), update(), and destroy() do not. Both Manager and Storekeeper hold branches.manage.',
+        impact: 'A branch-restricted Manager or Storekeeper can view all locations and edit/delete other branches or Main Warehouse.',
+        solution: [
+          'Scope BranchController::index() with BranchScope::scopeQuery(..., \'id\') and enforce BranchScope::canAccess() in edit/update/destroy.'
+        ],
+        code: `abort_unless(BranchScope::canAccess($request->user(), $location->id), 403);`
+      },
+      {
+        id: 'F-09',
+        severity: 'high',
+        category: 'role',
+        catLabel: 'Role & UI Mismatch',
+        title: 'UI Sidebar Hides Master Data / Purchasing / Finance While Backend Routes Still Return 200 OK',
+        files: [
+          'resources/views/components/dashboard/sidebar.blade.php (L98–128)',
+          'resources/views/brands/index.blade.php (L26–31)',
+          'resources/views/stock-transfers/create.blade.php',
+          'app/Http/Controllers/SalesInvoiceController.php (L71, L111)'
+        ],
+        problem: 'As you noted with /brands: sidebar.blade.php hides Master Data (/brands, /categories, /units), Purchasing, Suppliers, and Finance accounts for Outlet Manager / Sales Staff, yet direct URL access still returns 200 OK. Furthermore, /brands shows global product counts across all branches (including Main Warehouse), and Sales/Transfer dropdowns load Location::active()->get() including Main Warehouse.',
+        impact: 'Users can bypass UI navigation by typing URLs directly, and branch users see global/warehouse data in brand stats and location filter dropdowns.',
+        solution: [
+          'Remove unneeded permissions from Outlet Manager / Sales Staff (or gate routes explicitly) so UI and backend match.',
+          'Scope product stats on /brands and location filter dropdowns in SalesInvoice/SalesReport using BranchScope.'
+        ],
+        code: `// Scope location dropdowns for branch users:
+'locations' => BranchScope::scopeQuery(Location::query(), $request->user(), 'id')->active()->orderBy('name')->get(['id', 'name']),`
+      },
+      {
+        id: 'F-10',
+        severity: 'high',
+        category: 'print',
+        catLabel: 'Print & Design',
+        title: 'Print Invoice Defects: Missing logo.svg, Invisible White Print Headers & Dark-Mode Print Bleed',
+        files: [
+          'resources/views/sales-invoices/print.blade.php (L28, L58, L149–151)',
+          'resources/views/stock-transfers/show.blade.php (L17–22)',
+          'resources/views/layouts/print.blade.php (L10–12)'
+        ],
+        problem: '1) sales-invoices/print.blade.php references asset(\'images/logo.svg\') which does NOT exist in public/images/. 2) Its thead th sets dark background #1e293b + white text #fff WITHOUT print-color-adjust: exact — when browser "Background graphics" is unchecked, table headers print white-on-white (invisible). 3) It skips the action bar and auto-prints immediately, unlike layouts/print.blade.php and x-report-document. 4) stock-transfers/show.blade.php prints the live Tailwind page directly (Dark Mode bleeds onto print). 5) layouts/print.blade.php loads Google Fonts externally (breaks offline).',
+        impact: 'Sales invoice printouts lose the company logo and risk invisible table headers; stock transfer prints inherit dark-mode UI colors.',
+        solution: [
+          'Add -webkit-print-color-adjust: exact; print-color-adjust: exact; on thead th (or use light bordered header for print safety).',
+          'Provide a valid logo asset or SVG fallback and align sales-invoices/print.blade.php + stock-transfers/show.blade.php with a unified light-paper print layout + Print/Back action bar.'
+        ],
+        code: `/* sales-invoices/print.blade.php */
+thead th {
+    background-color: #1e293b !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+}`
+      },
+      {
+        id: 'F-11',
+        severity: 'high',
+        category: 'security',
+        catLabel: 'Security · Headers',
+        title: 'SecurityHeaders Middleware Missing on All 40 Authenticated Routes',
+        files: [
+          'routes/web.php (L61–80)',
+          'app/Http/Middleware/SecurityHeaders.php (L16–57)',
+          'bootstrap/app.php (L21–32)'
+        ],
+        problem: 'Every authenticated endpoint returned NO X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, HSTS, or CSP headers — SecurityHeaders is attached only to guest auth routes.',
+        impact: 'Logged-in ERP screens are exposed to clickjacking and lack MIME-sniffing protections.',
+        solution: [
+          'Register SecurityHeaders globally in bootstrap/app.php ($middleware->web(append: [SecurityHeaders::class])).'
+        ],
+        code: `$middleware->web(append: [SecurityHeaders::class]);`
+      },
+      {
+        id: 'F-12',
+        severity: 'high',
+        category: 'security',
+        catLabel: 'Security · Integrity',
+        title: 'POS Endpoint Accepts Client-Supplied Unit Prices & Unbounded Cart Discounts',
+        files: [
+          'app/Http/Controllers/PosController.php (L104–106)',
+          'app/Http/Requests/Pos/StorePosSaleRequest.php (L27, L33–34)'
+        ],
+        problem: 'PosController::store() trusts items.*.unit_price and cart_discount from the request payload with only numeric|min:0 validation.',
+        impact: 'A cashier or tampered POST /pos request can sell items at ৳0.01 or apply a 100% discount.',
+        solution: [
+          'Use authoritative Product::sale_price from DB unless the user holds a dedicated price-override permission, and enforce discount caps.'
+        ],
+        code: `$unitPrice = $user->can('pos.override-price') ? MoneyMath::clean((string) $item['unit_price']) : (string) $unit->product->sale_price;`
+      },
+      {
+        id: 'F-13',
+        severity: 'high',
+        category: 'scaling',
+        catLabel: 'Scaling & Perf',
+        title: 'Dashboard Runs ~20+ Uncached Queries in Blade with Non-Sargable whereDate()/whereYear()',
+        files: [
+          'resources/views/dashboard/index.blade.php (L78–393)',
+          'database/migrations/2026_11_18_130003_create_sales_invoices_table.php (L16)'
+        ],
+        problem: 'Dashboard Blade view executes 20+ uncached SQL queries using whereDate() and whereYear(), bypassing the invoice_date index.',
+        impact: 'Full index/table scans on sales_invoices as history grows.',
+        solution: [
+          'Extract to a cached DashboardMetricsService using sargable whereBetween(\'invoice_date\', [$start, $end]).'
+        ],
+        code: `->whereBetween('invoice_date', [today()->startOfDay(), today()->endOfDay()])`
+      },
+      {
+        id: 'F-14',
+        severity: 'medium',
+        category: 'role',
+        catLabel: 'Role & Test Bug',
+        title: 'Failing Pest Test + Warehouse Dropdown Mismatch & Month-End Carbon Bug in Branch Targets',
+        files: [
+          'tests/Feature/BranchMonthlyTargetTest.php (L19–38)',
+          'app/Http/Controllers/BranchTargetController.php (L33, L37)',
+          'app/Services/TargetService.php (L24, L125)',
+          'routes/web.php (L469–483, L748–756)'
+        ],
+        problem: '1) BranchMonthlyTargetTest fails (782/783) because LocationFactory randomly picks Warehouse, which TargetService excludes while BranchTargetController dropdown includes it. 2) Carbon::createFromFormat(\'Y-m\', $month) overflows on days 29–31. 3) /branch-targets & /ecommerce return 200 OK for Supplier.',
+        impact: 'Failing CI test, disappearing warehouse targets, month-end date bug, and Supplier access to internal target/demo pages.',
+        solution: [
+          'Filter Warehouse out of BranchTargetController::$locations, use createFromFormat(\'!Y-m\', $month), block isSupplierPortalUser() on /branch-targets, and guard demo routes behind local env.'
+        ],
+        code: `$activeDate = Carbon::createFromFormat('!Y-m', $month);`
+      },
+      {
+        id: 'F-15',
+        severity: 'medium',
+        category: 'scaling',
+        catLabel: 'Scaling & Perf',
+        title: 'TargetService::getNetworkOverview() Triggers O(N) N+1 Queries Across Branches',
+        files: [
+          'app/Services/TargetService.php (L119–150)'
+        ],
+        problem: 'Loops over every active branch calling getBranchPerformance(), executing 5+ queries per branch.',
+        impact: 'Query count scales linearly with number of outlets.',
+        solution: [
+          'Use a single GROUP BY location_id query for branch_targets and sales_invoices.'
+        ],
+        code: `->groupBy('location_id')->get()->keyBy('location_id');`
+      },
+      {
+        id: 'F-16',
+        severity: 'medium',
+        category: 'scaling',
+        catLabel: 'Scaling & Perf',
+        title: 'In-Memory Unified Feed Pagination, Uncached Settings & Unindexed Stock/Notification Queries',
+        files: [
+          'app/Http/Controllers/AccountTransactionController.php (L86–107)',
+          'app/Models/Setting.php (L21–24)',
+          'app/Services/NotificationService.php (L85–88)',
+          'database/migrations/2026_11_15_145709_create_stock_movements_table.php'
+        ],
+        problem: 'AccountTransactionController merges/sorts up to page*perPage rows from 2 tables in PHP; Setting::get() is uncached; NotificationService queries JSON data->location_id on every page load; stock_movements lacks a composite (location_id, unit_id) index.',
+        impact: 'Memory spikes on deep pages and extra DB scans per request as data grows.',
+        solution: [
+          'Use SQL UNION ALL + LIMIT/OFFSET, cache Setting::get(), add composite index on stock_movements(location_id, unit_id), and use Redis in production.'
+        ],
+        code: `$table->index(['location_id', 'unit_id'], 'stock_movements_loc_unit_idx');`
+      },
+      {
+        id: 'F-17',
+        severity: 'low',
+        category: 'security',
+        catLabel: 'Security · Hygiene',
+        title: 'DashboardController Queries User Stats for All Roles & Duplicate <title> / Toast CSS Glitch',
+        files: [
+          'app/Http/Controllers/DashboardController.php (L25–30)',
+          'resources/views/layouts/app.blade.php'
+        ],
+        problem: 'Passes totalUsers/activeUsers/totalRoles/recentUsers to the dashboard view for every non-supplier role; layout renders duplicate <title> tags and broken toast utility -500/30.',
+        impact: 'Wasted queries and minor HTML/UI polish defects.',
+        solution: [
+          'Gate user queries behind $request->user()->can(\'users.view\') and clean up layout <title>/toast classes.'
+        ],
+        code: `if ($request->user()->can('users.view')) { /* load user KPIs */ }`
+      }
+    ];
+
+    const ROLES = [
+      { key: 'guest', label: 'Guest', mode: 'HTTP' },
+      { key: 'super', label: 'Super Admin', mode: 'HTTP' },
+      { key: 'manager', label: 'Manager', mode: 'HTTP' },
+      { key: 'outlet', label: 'Outlet Mgr', mode: 'Kernel' },
+      { key: 'accountant', label: 'Accountant', mode: 'HTTP' },
+      { key: 'sales', label: 'Sales Staff', mode: 'HTTP' },
+      { key: 'storekeeper', label: 'Storekeeper', mode: 'HTTP' },
+      { key: 'supplier', label: 'Supplier', mode: 'Kernel' }
+    ];
+
+    const MATRIX_ROWS = [
+      { path: '/dashboard', vals: [['302',87.9],['200',192.8],['200',134.9],['200',null],['200',145],['200',139.3],['200',155.9],['302',null]] },
+      { path: '/profile', vals: [['302',39.3],['200',70.8],['200',75.4],['200',null],['200',75.4],['200',68.9],['200',76.5],['200',null]] },
+      { path: '/users', vals: [['302',37.4],['200',86.4],['200',91.4,true],['403',null],['403',58.1],['403',47],['403',42.4],['403',null]] },
+      { path: '/roles', vals: [['302',37.5],['200',84.3],['403',41.9],['403',null],['403',60.5],['403',45.5],['403',53.3],['403',null]] },
+      { path: '/permissions', vals: [['302',38.9],['200',77.7],['403',67.3],['403',null],['403',43],['403',71.9],['403',50.8],['403',null]] },
+      { path: '/audit-logs', vals: [['302',36],['200',142.3],['200',96],['403',null],['403',50.1],['403',63.5],['403',41],['403',null]] },
+      { path: '/settings', vals: [['302',30.8],['200',71.4],['403',42.3],['403',null],['403',59.6],['403',69.2],['403',44.5],['403',null]] },
+      { path: '/units', vals: [['302',48.9],['200',87.5],['200',84.3],['200',null,true],['200',88.6],['200',82.1,true],['200',80.5],['403',null]] },
+      { path: '/brands', vals: [['302',46.2],['200',129.3],['200',113.4,true],['200',null,true],['200',105.6],['200',112,true],['200',127.2],['403',null]] },
+      { path: '/categories', vals: [['302',34.4],['200',112.9],['200',119.8],['200',null,true],['200',99.8],['200',85.8,true],['200',107.1],['403',null]] },
+      { path: '/products', vals: [['302',33.4],['200',119.3],['403',51.6,true],['200',null],['200',107.2],['200',83.8],['200',89.7],['403',null]] },
+      { path: '/products/requests', vals: [['302',39.2],['200',69.4],['200',98.8],['200',null],['200',78.7],['200',63.9],['200',117.4],['403',null]] },
+      { path: '/suppliers', vals: [['302',33.3],['200',82.7],['200',90.1],['200',null,true],['200',87.1],['403',63.2],['403',64.5],['403',null]] },
+      { path: '/my-supplier-profile', vals: [['302',43.4],['403',70.5],['403',49.2],['403',null],['403',50.7],['403',43],['403',36.9],['302',null]] },
+      { path: '/customers', vals: [['302',51.7],['200',87.1],['200',91.5],['200',null],['200',75.5],['200',92.4],['403',45.1],['403',null]] },
+      { path: '/branches', vals: [['302',31.8],['200',123.3],['200',103.8,true],['403',null],['403',41.6],['403',44.3],['200',88.3,true],['403',null]] },
+      { path: '/stock-transfers', vals: [['302',40.1],['200',167.9],['200',98.3],['200',null],['403',44.6],['403',57.8],['200',87.3],['403',null]] },
+      { path: '/stocks', vals: [['302',38.3],['200',129.8],['200',104],['200',null],['200',106.5],['200',119.5],['200',113],['403',null]] },
+      { path: '/stock-adjustments', vals: [['302',31.8],['200',84.1],['200',79],['200',null],['403',52.5],['403',44.2],['200',90.7],['403',null]] },
+      { path: '/notifications', vals: [['302',30.1],['200',79.6],['200',81.6],['200',null],['200',76.6],['200',71.9],['200',68.8],['200',null]] },
+      { path: '/purchase-orders/create', vals: [['302',33.2],['200',75.1],['200',76.4],['200',null,true],['403',44.5],['403',44.2],['403',103.2],['403',null]] },
+      { path: '/purchase-invoices', vals: [['302',31.6],['200',89.4],['200',91.7],['200',null,true],['200',88.9],['403',53.1],['200',87.5],['403',null]] },
+      { path: '/purchase-dues', vals: [['302',34.2],['200',95.5],['200',103.9],['200',null,true],['200',97.7],['403',47.4],['200',89.6],['403',null]] },
+      { path: '/purchase-returns', vals: [['302',48.8],['200',95.8],['200',104.7],['200',null,true],['403',63.6],['403',59.8],['200',94.8],['403',null]] },
+      { path: '/cash-accounts', vals: [['302',34.3],['200',112.8],['200',88.9],['200',null,true],['200',77],['403',43.2],['403',60.9],['403',null]] },
+      { path: '/bank-accounts', vals: [['302',51.8],['200',90.7],['200',93.3],['200',null,true],['200',75.9],['403',55.1],['403',51.7],['403',null]] },
+      { path: '/transactions', vals: [['302',33.5],['200',109],['200',88.4],['200',null,true],['200',82.7],['403',44],['403',47.3],['403',null]] },
+      { path: '/transaction-categories', vals: [['302',32.6],['200',87.6],['200',88.4],['200',null,true],['200',102.8],['403',43.7],['403',46.2],['403',null]] },
+      { path: '/payment-methods', vals: [['302',46.4],['200',84.4],['200',79.1],['200',null,true],['200',92],['403',44.9],['403',42],['403',null]] },
+      { path: '/account-transfers', vals: [['302',46.6],['200',100.9],['200',76.4],['200',null],['200',80.1],['403',45.3],['403',63.3],['403',null]] },
+      { path: '/day-closings', vals: [['302',45.8],['200',107.6],['200',90.6],['200',null],['200',95],['200',104,true],['200',105.4,true],['403',null]] },
+      { path: '/supplier-payments', vals: [['302',36.4],['200',79.7],['200',96.6],['200',null,true],['200',88],['403',59.6],['403',46.2],['403',null]] },
+      { path: '/sales-orders', vals: [['302',38.6],['200',132.1],['200',87.5],['200',null],['403',61.9],['200',77.8],['403',43.3],['403',null]] },
+      { path: '/sales-invoices', vals: [['302',48.3],['200',138.1],['200',136.2],['200',null],['200',105.8],['200',109.8],['403',71.9],['403',null]] },
+      { path: '/sales-returns', vals: [['302',34.1],['200',136.5],['200',90.2],['200',null],['403',50.6],['200',72.9],['403',58.7],['403',null]] },
+      { path: '/collections', vals: [['302',41.2],['200',119],['200',84],['200',null],['200',86.1],['200',90.9],['403',62.5],['403',null]] },
+      { path: '/pos', vals: [['302',33.8],['200',83.4],['200',70],['200',null],['403',51.9],['200',71.6],['403',44.3],['403',null]] },
+      { path: '/reports/sales', vals: [['302',54.9],['200',116.4],['200',82.9],['200',null],['200',89.6],['200',82.7],['403',45],['403',null]] },
+      { path: '/branch-targets', vals: [['302',30.9],['200',105.5],['200',73.5],['200',null],['200',84.3,true],['200',87.7,true],['200',89.6,true],['200',null,true]] },
+      { path: '/ecommerce', vals: [['302',29.8],['200',100.5],['200',162.1],['200',null],['200',118.9,true],['200',82.4,true],['200',84.8,true],['200',null,true]] },
+      { path: '/_errors/500', vals: [['500',52.5],['500',44.2],['500',34.2],['-',null],['500',36.1],['500',41.8],['500',51.1],['-',null]] }
+    ];
+
+    let activeCat = 'all';
+    let activeSev = 'all';
+    let searchQuery = '';
+
+    function escapeHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function renderRoleBars() {
+      const container = document.getElementById('roleSummaryBars');
+      const appRows = MATRIX_ROWS.slice(0, 40);
+      container.innerHTML = ROLES.map((r, idx) => {
+        let c200 = 0, c302 = 0, c403 = 0, msSum = 0, msCount = 0;
+        appRows.forEach(row => {
+          const [code, ms] = row.vals[idx];
+          if (code === '200') c200++;
+          else if (code === '302') c302++;
+          else c403++;
+          if (ms !== null) { msSum += ms; msCount++; }
+        });
+        const avgMs = msCount ? (msSum / msCount).toFixed(1) + ' ms' : 'Kernel';
+        return `
+          <div class="bar-row">
+            <strong style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.label}</strong>
+            <div class="bar-track" title="200 OK: ${c200} | 302 Redirect: ${c302} | 403 Forbidden: ${c403}">
+              <div class="bar-fill-ok" style="width:${(c200/40)*100}%"></div>
+              <div class="bar-fill-redir" style="width:${(c302/40)*100}%"></div>
+              <div class="bar-fill-deny" style="width:${(c403/40)*100}%"></div>
+            </div>
+            <div class="bar-meta">${c200} OK · ${avgMs}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderFindings() {
+      const container = document.getElementById('findingsContainer');
+      const filtered = FINDINGS.filter(f => {
+        if (activeCat !== 'all' && f.category !== activeCat) return false;
+        if (activeSev !== 'all' && f.severity !== activeSev) return false;
+        if (searchQuery) {
+          const hay = (f.title + ' ' + f.problem + ' ' + f.impact + ' ' + f.files.join(' ') + ' ' + f.catLabel).toLowerCase();
+          if (!hay.includes(searchQuery)) return false;
+        }
+        return true;
+      });
+
+      if (!filtered.length) {
+        container.innerHTML = `<div class="panel" style="text-align:center;color:var(--muted);">No findings match the current filter.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map((f, i) => `
+        <article class="finding-card ${i < 3 ? 'open' : ''}" data-sev="${f.severity}">
+          <div class="finding-head" onclick="this.parentElement.classList.toggle('open')">
+            <div class="finding-title-wrap">
+              <span class="sev-badge sev-${f.severity}">${f.severity}</span>
+              <span class="cat-badge">${f.catLabel}</span>
+              <h3 class="finding-title">${f.id}: ${escapeHtml(f.title)}</h3>
+            </div>
+            <span class="chev">▼</span>
+          </div>
+          <div class="finding-body">
+            <div>${f.files.map(file => `<span class="file-ref">${escapeHtml(file)}</span>`).join(' ')}</div>
+            <div class="two-col">
+              <div class="box">
+                <h4>Problem &amp; Impact</h4>
+                <p><strong>Root Cause:</strong> ${escapeHtml(f.problem)}</p>
+                <p style="margin-top:8px;"><strong>Impact:</strong> ${escapeHtml(f.impact)}</p>
+              </div>
+              <div class="box">
+                <h4>Recommended Solution</h4>
+                <ul>${f.solution.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ul>
+              </div>
+            </div>
+            <pre><code>${escapeHtml(f.code)}</code></pre>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function renderMatrix(mode = 'all') {
+      const table = document.getElementById('matrixTable');
+      const rows = mode === 'anomalies'
+        ? MATRIX_ROWS.filter(r => r.vals.some(v => v[2]))
+        : MATRIX_ROWS;
+
+      const thead = `<thead><tr><th>Route</th>${ROLES.map(r => `<th>${r.label}<br><span style="font-weight:500;font-size:10.5px;color:var(--muted)">(${r.mode})</span></th>`).join('')}</tr></thead>`;
+      const tbody = `<tbody>${rows.map(r => {
+        const cells = r.vals.map(([code, ms, isBug]) => {
+          if (code === '-') return `<td><span style="color:var(--muted)">—</span></td>`;
+          const cls = `st st-${code}` + (isBug ? ' st-bug' : '');
+          const msTxt = ms !== null ? `<span class="ms">${ms}ms</span>` : '';
+          return `<td><span class="${cls}" title="${isBug ? 'Verified Anomaly / UI Mismatch' : ''}">${code} ${msTxt}</span></td>`;
+        }).join('');
+        return `<tr><td>${escapeHtml(r.path)}</td>${cells}</tr>`;
+      }).join('')}</tbody>`;
+      table.innerHTML = thead + tbody;
+    }
+
+    function filterMatrix(mode, btn) {
+      btn.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      renderMatrix(mode);
+    }
+
+    function switchTab(id, btn) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + id).classList.add('active');
+    }
+
+    function toggleAllCards(open) {
+      document.querySelectorAll('.finding-card').forEach(c => c.classList.toggle('open', open));
+    }
+
+    function toggleTheme() {
+      const html = document.documentElement;
+      const isDark = html.classList.toggle('dark');
+      document.getElementById('themeBtn').textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+      try { localStorage.setItem('audit_report_theme', isDark ? 'dark' : 'light'); } catch (e) {}
+    }
+
+    document.getElementById('catFilters').addEventListener('click', e => {
+      if (!e.target.dataset.cat) return;
+      document.querySelectorAll('#catFilters .chip').forEach(c => c.classList.remove('active'));
+      e.target.classList.add('active');
+      activeCat = e.target.dataset.cat;
+      renderFindings();
+    });
+
+    document.getElementById('sevFilters').addEventListener('click', e => {
+      if (!e.target.dataset.sev) return;
+      document.querySelectorAll('#sevFilters .chip').forEach(c => c.classList.remove('active'));
+      e.target.classList.add('active');
+      activeSev = e.target.dataset.sev;
+      renderFindings();
+    });
+
+    document.getElementById('searchInput').addEventListener('input', e => {
+      searchQuery = e.target.value.trim().toLowerCase();
+      renderFindings();
+    });
+
+    try {
+      if (localStorage.getItem('audit_report_theme') === 'light') {
+        document.documentElement.classList.remove('dark');
+        document.getElementById('themeBtn').textContent = '🌙 Dark Mode';
+      }
+    } catch (e) {}
+
+    renderRoleBars();
+    renderFindings();
+    renderMatrix('all');
+  </script>
+</body>
+</html>

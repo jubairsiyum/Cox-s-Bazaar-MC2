@@ -216,27 +216,30 @@ class StockTransferController extends Controller
         abort_if($stockTransfer->is_request, 403, 'Stock requests are decided by their source and cannot be edited.');
 
         $original = $stockTransfer->getOriginal();
-        $fromStatus = StockTransferStatus::from((string) $stockTransfer->getRawOriginal('status'));
         $validated = $request->validated();
-        $itemsEditable = $stockTransfer->status === StockTransferStatus::Draft;
-        $items = $itemsEditable ? $validated['items'] : [];
         $shipping = round((float) ($validated['shipping_charges'] ?? 0), 2);
+        $fromStatus = StockTransferStatus::from((string) $stockTransfer->getRawOriginal('status'));
 
         try {
-            DB::transaction(function () use ($stockTransfer, $validated, $items, $itemsEditable, $shipping, $fromStatus) {
+            $fromStatus = DB::transaction(function () use ($stockTransfer, $validated, $shipping) {
+                $locked = StockTransfer::query()->whereKey($stockTransfer->id)->lockForUpdate()->firstOrFail();
+                $lockedFromStatus = StockTransferStatus::from((string) $locked->getRawOriginal('status'));
+                $itemsEditable = $locked->status === StockTransferStatus::Draft;
+                $items = $itemsEditable ? $validated['items'] : [];
+
                 if ($itemsEditable) {
                     StockTransferService::assertAvailableAtSource((int) $validated['from_location_id'], $items);
 
-                    $stockTransfer->items()->delete();
-                    $this->saveItems($stockTransfer, $items);
+                    $locked->items()->delete();
+                    $this->saveItems($locked, $items);
                 }
 
                 $itemsTotal = $itemsEditable
                     ? $this->itemsTotal($items)
-                    : (float) $stockTransfer->items()->sum('subtotal');
+                    : (float) $locked->items()->sum('subtotal');
 
-                $stockTransfer->update([
-                    'reference_no' => $validated['reference_no'] ?: $stockTransfer->reference_no,
+                $locked->update([
+                    'reference_no' => $validated['reference_no'] ?: $locked->reference_no,
                     'transfer_date' => $validated['transfer_date'],
                     'status' => $validated['status'],
                     'from_location_id' => $validated['from_location_id'],
@@ -246,11 +249,15 @@ class StockTransferController extends Controller
                     'additional_notes' => $validated['additional_notes'] ?? null,
                 ]);
 
-                StockTransferService::applyStatusChange($stockTransfer, $fromStatus, $stockTransfer->status);
+                StockTransferService::applyStatusChange($locked, $lockedFromStatus, $locked->status);
+
+                return $lockedFromStatus;
             });
         } catch (InsufficientStockException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
+
+        $stockTransfer->refresh();
 
         AuditService::updated($stockTransfer, $original, "Stock transfer '{$stockTransfer->reference_no}' updated.");
 
@@ -292,34 +299,45 @@ class StockTransferController extends Controller
     {
         $this->authorize('dispatch', $stockTransfer);
 
-        if (! in_array($stockTransfer->status, [StockTransferStatus::Draft, StockTransferStatus::Requested], true)) {
-            return back()->with('error', "Stock transfer '{$stockTransfer->reference_no}' cannot be dispatched.");
-        }
-
         $original = $stockTransfer->getOriginal();
-        $fromStatus = StockTransferStatus::from((string) $stockTransfer->getRawOriginal('status'));
 
         try {
-            DB::transaction(function () use ($stockTransfer, $fromStatus) {
+            $processed = DB::transaction(function () use ($stockTransfer): bool {
+                $locked = StockTransfer::query()->whereKey($stockTransfer->id)->lockForUpdate()->firstOrFail();
+
+                if (! in_array($locked->status, [StockTransferStatus::Draft, StockTransferStatus::Requested], true)) {
+                    return false;
+                }
+
+                $fromStatus = StockTransferStatus::from((string) $locked->getRawOriginal('status'));
+
                 StockTransferService::assertAvailableAtSource(
-                    (int) $stockTransfer->from_location_id,
-                    $stockTransfer->items()->orderBy('id')->get()
+                    (int) $locked->from_location_id,
+                    $locked->items()->orderBy('id')->get()
                         ->map(fn ($item) => ['unit_id' => $item->unit_id, 'quantity' => $item->quantity])
                         ->values()
                         ->all()
                 );
 
-                $stockTransfer->update([
+                $locked->update([
                     'status' => StockTransferStatus::InTransit,
                 ]);
 
-                StockTransferService::applyStatusChange($stockTransfer, $fromStatus, StockTransferStatus::InTransit);
+                StockTransferService::applyStatusChange($locked, $fromStatus, StockTransferStatus::InTransit);
+
+                return true;
             });
         } catch (InsufficientStockException|ValidationException $e) {
             return back()->with('error', $e instanceof ValidationException
                 ? collect($e->errors())->flatten()->first()
                 : $e->getMessage());
         }
+
+        if (! $processed) {
+            return back()->with('error', "Stock transfer '{$stockTransfer->reference_no}' cannot be dispatched.");
+        }
+
+        $stockTransfer->refresh();
 
         AuditService::updated($stockTransfer, $original, "Stock transfer '{$stockTransfer->reference_no}' dispatched (In Transit).");
 
@@ -348,39 +366,50 @@ class StockTransferController extends Controller
     {
         $this->authorize('approve', $stockTransfer);
 
-        if (! in_array($stockTransfer->status, [StockTransferStatus::Draft, StockTransferStatus::InTransit, StockTransferStatus::Requested], true)) {
-            return back()->with('error', "Stock transfer '{$stockTransfer->reference_no}' can no longer be approved.");
-        }
-
         $original = $stockTransfer->getOriginal();
-        $fromStatus = StockTransferStatus::from((string) $stockTransfer->getRawOriginal('status'));
 
         try {
-            DB::transaction(function () use ($stockTransfer, $fromStatus) {
+            $fromStatus = DB::transaction(function () use ($stockTransfer): ?StockTransferStatus {
+                $locked = StockTransfer::query()->whereKey($stockTransfer->id)->lockForUpdate()->firstOrFail();
+
+                if (! in_array($locked->status, [StockTransferStatus::Draft, StockTransferStatus::InTransit, StockTransferStatus::Requested], true)) {
+                    return null;
+                }
+
+                $lockedFromStatus = StockTransferStatus::from((string) $locked->getRawOriginal('status'));
+
                 // A draft or a stock request has not dispatched yet, so its stock is still to be taken from the source.
-                if (in_array($fromStatus, [StockTransferStatus::Draft, StockTransferStatus::Requested], true)) {
+                if (in_array($lockedFromStatus, [StockTransferStatus::Draft, StockTransferStatus::Requested], true)) {
                     StockTransferService::assertAvailableAtSource(
-                        (int) $stockTransfer->from_location_id,
-                        $stockTransfer->items()->orderBy('id')->get()
+                        (int) $locked->from_location_id,
+                        $locked->items()->orderBy('id')->get()
                             ->map(fn ($item) => ['unit_id' => $item->unit_id, 'quantity' => $item->quantity])
                             ->values()
                             ->all()
                     );
                 }
 
-                $stockTransfer->update([
+                $locked->update([
                     'status' => StockTransferStatus::Received,
                     'approved_by' => Auth::id(),
                     'approved_at' => now(),
                 ]);
 
-                StockTransferService::applyStatusChange($stockTransfer, $fromStatus, StockTransferStatus::Received);
+                StockTransferService::applyStatusChange($locked, $lockedFromStatus, StockTransferStatus::Received);
+
+                return $lockedFromStatus;
             });
         } catch (InsufficientStockException|ValidationException $e) {
             return back()->with('error', $e instanceof ValidationException
                 ? collect($e->errors())->flatten()->first()
                 : $e->getMessage());
         }
+
+        if ($fromStatus === null) {
+            return back()->with('error', "Stock transfer '{$stockTransfer->reference_no}' can no longer be approved.");
+        }
+
+        $stockTransfer->refresh();
 
         AuditService::updated($stockTransfer, $original, "Stock transfer '{$stockTransfer->reference_no}' approved and received.");
 
@@ -417,25 +446,36 @@ class StockTransferController extends Controller
     {
         $this->authorize('reject', $stockTransfer);
 
-        if (! in_array($stockTransfer->status, [StockTransferStatus::Draft, StockTransferStatus::InTransit, StockTransferStatus::Requested], true)) {
-            return back()->with('error', "Stock transfer '{$stockTransfer->reference_no}' can no longer be rejected.");
-        }
-
         $reason = $stockTransfer->is_request
             ? $request->validate(['reason' => ['required', 'string', 'max:500']])['reason']
             : null;
 
         $original = $stockTransfer->getOriginal();
-        $fromStatus = StockTransferStatus::from((string) $stockTransfer->getRawOriginal('status'));
 
-        DB::transaction(function () use ($stockTransfer, $fromStatus, $reason) {
-            $stockTransfer->update([
+        $processed = DB::transaction(function () use ($stockTransfer, $reason): bool {
+            $locked = StockTransfer::query()->whereKey($stockTransfer->id)->lockForUpdate()->firstOrFail();
+
+            if (! in_array($locked->status, [StockTransferStatus::Draft, StockTransferStatus::InTransit, StockTransferStatus::Requested], true)) {
+                return false;
+            }
+
+            $fromStatus = StockTransferStatus::from((string) $locked->getRawOriginal('status'));
+
+            $locked->update([
                 'status' => StockTransferStatus::Rejected,
                 'rejection_reason' => $reason,
             ]);
 
-            StockTransferService::applyStatusChange($stockTransfer, $fromStatus, StockTransferStatus::Rejected);
+            StockTransferService::applyStatusChange($locked, $fromStatus, StockTransferStatus::Rejected);
+
+            return true;
         });
+
+        if (! $processed) {
+            return back()->with('error', "Stock transfer '{$stockTransfer->reference_no}' can no longer be rejected.");
+        }
+
+        $stockTransfer->refresh();
 
         AuditService::updated($stockTransfer, $original, "Stock transfer '{$stockTransfer->reference_no}' rejected.");
 
@@ -491,18 +531,29 @@ class StockTransferController extends Controller
     {
         $this->authorize('cancel', $stockTransfer);
 
-        if (! in_array($stockTransfer->status, [StockTransferStatus::Draft, StockTransferStatus::InTransit], true)) {
+        $original = $stockTransfer->getOriginal();
+
+        $processed = DB::transaction(function () use ($stockTransfer): bool {
+            $locked = StockTransfer::query()->whereKey($stockTransfer->id)->lockForUpdate()->firstOrFail();
+
+            if (! in_array($locked->status, [StockTransferStatus::Draft, StockTransferStatus::InTransit], true)) {
+                return false;
+            }
+
+            $fromStatus = StockTransferStatus::from((string) $locked->getRawOriginal('status'));
+
+            $locked->update(['status' => StockTransferStatus::Cancelled]);
+
+            StockTransferService::applyStatusChange($locked, $fromStatus, StockTransferStatus::Cancelled);
+
+            return true;
+        });
+
+        if (! $processed) {
             return back()->with('error', "Stock transfer '{$stockTransfer->reference_no}' can no longer be cancelled.");
         }
 
-        $original = $stockTransfer->getOriginal();
-        $fromStatus = StockTransferStatus::from((string) $stockTransfer->getRawOriginal('status'));
-
-        DB::transaction(function () use ($stockTransfer, $fromStatus) {
-            $stockTransfer->update(['status' => StockTransferStatus::Cancelled]);
-
-            StockTransferService::applyStatusChange($stockTransfer, $fromStatus, StockTransferStatus::Cancelled);
-        });
+        $stockTransfer->refresh();
 
         AuditService::updated($stockTransfer, $original, "Stock transfer '{$stockTransfer->reference_no}' cancelled by the sending side.");
 

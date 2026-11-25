@@ -144,7 +144,8 @@
                                         <td class="py-3 px-5">
                                             <input type="number" min="0" step="0.01" :name="`items[${index}][unit_price]`"
                                                    x-model.number="row.unit_price"
-                                                   class="w-24 rounded-xl border border-line bg-surface px-2.5 py-2 text-sm text-ink tabular-nums shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20">
+                                                   @if(!$isPosAdmin) readonly @endif
+                                                   class="w-24 rounded-xl border border-line {{ $isPosAdmin ? 'bg-surface' : 'bg-soft/60 cursor-not-allowed' }} px-2.5 py-2 text-sm text-ink tabular-nums shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20">
                                         </td>
                                         <td class="py-3 px-5">
                                             <input type="number" min="0" step="0.01" :name="`items[${index}][discount]`"

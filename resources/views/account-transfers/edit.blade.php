@@ -110,7 +110,7 @@
                             class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 transition-all cursor-pointer @error('to_account_id') border-danger @enderror">
                         @foreach(($toAccounts ?? $accounts) as $account)
                             <option value="{{ $account->id }}" @selected(old('to_account_id', $transfer->to_account_id) == $account->id)>
-                                {{ $account->name }} ({{ $account->type->label() }} — {{ \App\Helpers\Money::format($account->current_balance) }})
+                                {{ $account->name }} ({{ $account->type->label() }}@if(\App\Services\BranchScope::canAccess(auth()->user(), $account->location_id)) — {{ \App\Helpers\Money::format($account->current_balance) }}@endif)
                             </option>
                         @endforeach
                     </select>

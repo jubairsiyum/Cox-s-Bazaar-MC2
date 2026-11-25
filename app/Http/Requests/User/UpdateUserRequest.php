@@ -8,6 +8,7 @@ use App\Enums\UserStatus;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Services\DuplicateCheckService;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -21,7 +22,10 @@ class UpdateUserRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()?->can('users.update') ?? false;
+        /** @var User|null $target */
+        $target = $this->route('user');
+
+        return $target instanceof User && ($this->user()?->can('update', $target) ?? false);
     }
 
     /**
@@ -42,7 +46,16 @@ class UpdateUserRequest extends FormRequest
             'status' => ['required', new Enum(UserStatus::class)],
             'branch_id' => ['nullable', 'integer', Rule::exists('locations', 'id')],
             'roles' => ['nullable', 'array'],
-            'roles.*' => ['string', 'distinct', Rule::exists('roles', 'name')],
+            'roles.*' => [
+                'string',
+                'distinct',
+                Rule::exists('roles', 'name'),
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if ($value === 'Super Admin' && ! ($this->user()?->isSuperAdmin() ?? false)) {
+                        $fail('Only a Super Admin may assign the Super Admin role.');
+                    }
+                },
+            ],
             'supplier_name' => [Rule::requiredIf(fn (): bool => $this->hasSupplierRole()), 'string', 'max:255'],
         ];
     }
@@ -50,12 +63,26 @@ class UpdateUserRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
+            /** @var User $user */
+            $user = $this->route('user');
+            $actor = $this->user();
+
+            if ($actor !== null && ! $actor->isSuperAdmin() && $actor->is($user) && $this->has('roles')) {
+                $currentRoles = $user->roles->pluck('name')->sort()->values()->all();
+                $requestedRoles = collect((array) $this->input('roles', []))
+                    ->map(fn ($role): string => (string) $role)
+                    ->sort()
+                    ->values()
+                    ->all();
+
+                if ($currentRoles !== $requestedRoles) {
+                    $validator->errors()->add('roles', 'You cannot modify your own roles.');
+                }
+            }
+
             if (! $this->hasSupplierRole() || blank($this->input('supplier_name'))) {
                 return;
             }
-
-            /** @var User $user */
-            $user = $this->route('user');
 
             $conflicts = DuplicateCheckService::liveConflicts(Supplier::class, [
                 'name' => $this->input('supplier_name'),

@@ -58,8 +58,12 @@ class AccountTransactionPolicy
 
     public function update(User $user, AccountTransaction $accountTransaction): bool
     {
-        // Cancelled entries are frozen; completed ones are editable but their
-        // balance effect is reversed and re-applied by the service layer.
+        // Cancelled entries are frozen. Completed entries may only be edited
+        // by a Super Admin so branch users cannot alter approved amounts.
+        if ($accountTransaction->status === AccountEntryStatus::Completed && ! $user->isSuperAdmin()) {
+            return false;
+        }
+
         return $accountTransaction->status !== AccountEntryStatus::Cancelled
             && $this->canManage($user, $accountTransaction->type)
             && BranchScope::canAccess($user, $accountTransaction->location_id);
@@ -67,6 +71,10 @@ class AccountTransactionPolicy
 
     public function delete(User $user, AccountTransaction $accountTransaction): bool
     {
+        if ($accountTransaction->status === AccountEntryStatus::Completed && ! $user->isSuperAdmin()) {
+            return false;
+        }
+
         return $this->canManage($user, $accountTransaction->type)
             && BranchScope::canAccess($user, $accountTransaction->location_id);
     }

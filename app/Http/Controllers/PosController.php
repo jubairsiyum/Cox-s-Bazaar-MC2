@@ -26,6 +26,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -77,12 +78,19 @@ class PosController extends Controller
         }
 
         try {
-            [$invoice, $change] = DB::transaction(function () use ($request, $validated, $locationId) {
+            [$invoice, $change] = DB::transaction(function () use ($request, $validated, $locationId, $user) {
 
                 // Concurrency: sort unit IDs and lock rows in consistent order to prevent deadlocks & race conditions
                 $unitIds = collect($validated['items'])->pluck('unit_id')->map(fn ($id) => (int) $id)->sort()->values()->all();
-                Unit::query()->whereIn('id', $unitIds)->orderBy('id')->lockForUpdate()->get();
+                $lockedUnits = Unit::query()
+                    ->with('product:id,sale_price')
+                    ->whereIn('id', $unitIds)
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('id');
 
+                $canOverridePrice = $user->isSuperAdmin() || $user->can('pos.override-price');
                 $cartDiscount = MoneyMath::clean((string) ($validated['cart_discount'] ?? '0.00'));
                 $taxRate = MoneyMath::clean((string) ($validated['tax_rate'] ?? '0.00'));
 
@@ -99,18 +107,40 @@ class PosController extends Controller
                     'created_by' => $request->user()?->id,
                 ]);
 
-                foreach ($validated['items'] as $item) {
+                $runningSubtotal = '0.00';
+
+                foreach ($validated['items'] as $index => $item) {
+                    $unitId = (int) $item['unit_id'];
                     $quantity = (int) $item['quantity'];
-                    $unitPrice = MoneyMath::clean((string) $item['unit_price']);
+                    $catalogPrice = (float) ($lockedUnits->get($unitId)?->product?->sale_price ?? 0);
+                    $unitPrice = (! $canOverridePrice && $catalogPrice > 0)
+                        ? MoneyMath::clean((string) $catalogPrice)
+                        : MoneyMath::clean((string) $item['unit_price']);
+
+                    $lineGross = MoneyMath::mul($quantity, $unitPrice);
                     $itemDiscount = MoneyMath::clean((string) ($item['discount'] ?? '0.00'));
-                    $itemSubtotal = MoneyMath::max('0.00', MoneyMath::sub(MoneyMath::mul($quantity, $unitPrice), $itemDiscount));
+
+                    if (! $canOverridePrice && MoneyMath::gt($itemDiscount, $lineGross)) {
+                        throw ValidationException::withMessages([
+                            "items.{$index}.discount" => 'Line discount cannot exceed the line amount.',
+                        ]);
+                    }
+
+                    $itemSubtotal = MoneyMath::max('0.00', MoneyMath::sub($lineGross, $itemDiscount));
+                    $runningSubtotal = MoneyMath::add($runningSubtotal, $itemSubtotal);
 
                     $invoice->items()->create([
-                        'unit_id' => (int) $item['unit_id'],
+                        'unit_id' => $unitId,
                         'quantity' => $quantity,
                         'unit_price' => $unitPrice,
                         'discount' => $itemDiscount,
                         'subtotal' => $itemSubtotal,
+                    ]);
+                }
+
+                if (! $canOverridePrice && MoneyMath::gt($cartDiscount, $runningSubtotal)) {
+                    throw ValidationException::withMessages([
+                        'cart_discount' => 'Cart discount cannot exceed the sale subtotal.',
                     ]);
                 }
 
