@@ -7,6 +7,7 @@ use App\Models\Setting;
 use App\Models\Unit;
 use App\Services\StockService;
 use Database\Seeders\SettingsSeeder;
+use Illuminate\Support\Facades\Schema;
 
 beforeEach(function () {
     $this->seed(SettingsSeeder::class);
@@ -151,4 +152,8 @@ it('records stock changes in the audit log', function () {
         'auditable_id' => $unit->id,
         'description' => "Sold 3 Pcs of '{$unit->displayName()}' (7 remaining).",
     ]);
+});
+
+it('has the composite (location_id, unit_id) index on stock_movements', function () {
+    expect(Schema::hasIndex('stock_movements', ['location_id', 'unit_id']))->toBeTrue();
 });

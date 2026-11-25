@@ -4,7 +4,22 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Models\AccountTransaction;
+use App\Models\AccountTransfer;
+use App\Models\BranchTarget;
+use App\Models\Brand;
+use App\Models\Customer;
+use App\Models\CustomerCollection;
+use App\Models\DayClosing;
+use App\Models\Location;
+use App\Models\Product;
+use App\Models\SalesInvoice;
+use App\Models\StockMovement;
+use App\Models\StockTransfer;
+use App\Models\Unit;
 use App\Policies\RolePolicy;
+use App\Services\DashboardMetricsService;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Cache;
@@ -36,6 +51,7 @@ class AppServiceProvider extends ServiceProvider
         $this->registerPasswordDefaults();
         $this->registerPolicies();
         $this->registerTailAdminComponents();
+        $this->registerDashboardCacheInvalidation();
         $this->enforceHttpsInProduction();
         Blade::directive('bdt', fn (string $expression): string => "<?php echo \App\Helpers\Money::format({$expression}); ?>");
     }
@@ -124,5 +140,38 @@ class AppServiceProvider extends ServiceProvider
     private function registerPasswordDefaults(): void
     {
         Password::defaults(fn () => Password::min(8)->letters()->numbers()->symbols());
+    }
+
+    /**
+     * Invalidate cached dashboard snapshots whenever metrics-backing models mutate.
+     */
+    private function registerDashboardCacheInvalidation(): void
+    {
+        $flush = static function (): void {
+            DashboardMetricsService::flushCache();
+        };
+
+        foreach ([
+            AccountTransaction::class,
+            AccountTransfer::class,
+            BranchTarget::class,
+            Brand::class,
+            Customer::class,
+            CustomerCollection::class,
+            DayClosing::class,
+            Location::class,
+            Product::class,
+            SalesInvoice::class,
+            StockMovement::class,
+            StockTransfer::class,
+            Unit::class,
+        ] as $modelClass) {
+            $modelClass::saved($flush);
+            $modelClass::deleted($flush);
+
+            if (in_array(SoftDeletes::class, class_uses_recursive($modelClass), true)) {
+                $modelClass::restored($flush);
+            }
+        }
     }
 }

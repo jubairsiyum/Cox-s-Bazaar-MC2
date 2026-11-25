@@ -17,6 +17,8 @@ use App\Models\TransactionCategory;
 use App\Services\AccountBalanceService;
 use App\Services\AuditService;
 use App\Services\BranchScope;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -46,30 +48,32 @@ class AccountTransactionController extends Controller
         }
 
         $type = $request->string('type')->toString();
+        $dateFrom = $request->filled('date_from') ? $request->string('date_from')->toString() : null;
+        $dateToExclusive = $request->filled('date_to')
+            ? Carbon::parse($request->string('date_to')->toString())->addDay()->toDateString()
+            : null;
 
-        $txQuery = BranchScope::scopeQuery(AccountTransaction::query(), $user)
-            ->with(['account', 'creator', 'approver'])
+        $txBase = BranchScope::scopeQuery(AccountTransaction::query(), $user)
             ->search($request->string('search')->toString())
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')->toString()))
             ->when($request->filled('account_id'), fn ($q) => $q->where('account_id', (int) $request->input('account_id')))
             ->when($request->filled('category'), fn ($q) => $q->where('category', $request->string('category')->toString()))
-            ->when($request->filled('date_from'), fn ($q) => $q->whereDate('transaction_date', '>=', $request->input('date_from')))
-            ->when($request->filled('date_to'), fn ($q) => $q->whereDate('transaction_date', '<=', $request->input('date_to')));
+            ->when($dateFrom !== null, fn ($q) => $q->where('transaction_date', '>=', $dateFrom))
+            ->when($dateToExclusive !== null, fn ($q) => $q->where('transaction_date', '<', $dateToExclusive));
 
-        $trQuery = AccountTransfer::query()
-            ->with(['fromAccount', 'toAccount', 'creator', 'approver'])
+        $trBase = AccountTransfer::query()
             ->search($request->string('search')->toString())
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')->toString()))
             ->when($request->filled('account_id'), function ($q) use ($request) {
                 $accId = (int) $request->input('account_id');
                 $q->where(fn ($qq) => $qq->where('from_account_id', $accId)->orWhere('to_account_id', $accId));
             })
-            ->when($request->filled('date_from'), fn ($q) => $q->whereDate('transfer_date', '>=', $request->input('date_from')))
-            ->when($request->filled('date_to'), fn ($q) => $q->whereDate('transfer_date', '<=', $request->input('date_to')));
+            ->when($dateFrom !== null, fn ($q) => $q->where('transfer_date', '>=', $dateFrom))
+            ->when($dateToExclusive !== null, fn ($q) => $q->where('transfer_date', '<', $dateToExclusive));
 
         if (BranchScope::isRestricted($user)) {
             $branchId = BranchScope::locationId($user);
-            $trQuery->where(function ($q) use ($branchId) {
+            $trBase->where(function ($q) use ($branchId) {
                 if ($branchId !== null) {
                     $q->where('location_id', $branchId)
                         ->orWhereHas('toAccount', fn ($tq) => $tq->where('location_id', $branchId));
@@ -78,33 +82,22 @@ class AccountTransactionController extends Controller
         }
 
         if ($type === 'transfer') {
-            $transactions = $trQuery->orderByDesc('transfer_date')->orderByDesc('id')->paginate($perPage)->withQueryString();
+            $transactions = (clone $trBase)
+                ->with(['fromAccount', 'toAccount', 'creator', 'approver'])
+                ->orderByDesc('transfer_date')
+                ->orderByDesc('id')
+                ->paginate($perPage)
+                ->withQueryString();
         } elseif ($type === 'income' || $type === 'expense') {
-            $transactions = $txQuery->where('type', $type)->orderByDesc('transaction_date')->orderByDesc('id')->paginate($perPage)->withQueryString();
+            $transactions = (clone $txBase)
+                ->with(['account', 'creator', 'approver'])
+                ->where('type', $type)
+                ->orderByDesc('transaction_date')
+                ->orderByDesc('id')
+                ->paginate($perPage)
+                ->withQueryString();
         } else {
-            // Unified feed: all transactions (income, expense, and transfers)
-            $page = (int) $request->input('page', 1);
-            $totalCount = $txQuery->count() + $trQuery->count();
-
-            $fetchLimit = max(100, $page * $perPage + $perPage);
-            $txList = $txQuery->latest('transaction_date')->latest('id')->take($fetchLimit)->get();
-            $trList = $trQuery->latest('transfer_date')->latest('id')->take($fetchLimit)->get();
-
-            $combined = $txList->concat($trList)->sortByDesc(function ($item) {
-                $date = $item instanceof AccountTransfer ? $item->transfer_date : $item->transaction_date;
-
-                return ($date ? $date->toDateString() : '').'_'.str_pad((string) $item->id, 10, '0', STR_PAD_LEFT);
-            })->values();
-
-            $pagedItems = $combined->slice(($page - 1) * $perPage, $perPage)->values();
-
-            $transactions = new LengthAwarePaginator(
-                $pagedItems,
-                $totalCount,
-                $perPage,
-                $page,
-                ['path' => route('transactions.index'), 'query' => $request->query()]
-            );
+            $transactions = $this->paginateUnifiedLedger($txBase, $trBase, $request, $perPage);
         }
 
         $monthTotals = BranchScope::scopeQuery(AccountTransaction::query(), $user)
@@ -116,13 +109,13 @@ class AccountTransactionController extends Controller
             ->whereBetween('transaction_date', [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()])
             ->first();
 
-        $monthTransfers = (float) (clone $trQuery)
+        $monthTransfers = (float) (clone $trBase)
             ->where('status', 'completed')
             ->whereBetween('transfer_date', [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()])
             ->sum('amount');
 
         $pendingTxCount = BranchScope::scopeQuery(AccountTransaction::query(), $user)->where('status', 'pending')->count();
-        $pendingTrCount = (clone $trQuery)->where('status', 'pending')->count();
+        $pendingTrCount = (clone $trBase)->where('status', 'pending')->count();
         $pendingCount = $pendingTxCount + $pendingTrCount;
 
         return view('transactions.index', [
@@ -135,6 +128,61 @@ class AccountTransactionController extends Controller
             'monthTransfers' => $monthTransfers,
             'pendingCount' => $pendingCount,
         ]);
+    }
+
+    /**
+     * Paginate unified transactions and transfers using SQL UNION ALL instead of PHP memory merges.
+     */
+    private function paginateUnifiedLedger(
+        Builder $txBase,
+        Builder $trBase,
+        Request $request,
+        int $perPage,
+    ): LengthAwarePaginator {
+        $txSelect = (clone $txBase)
+            ->selectRaw("id, 'transaction' as entry_kind, transaction_date as entry_date")
+            ->toBase();
+
+        $trSelect = (clone $trBase)
+            ->when($request->filled('category'), fn ($q) => $q->whereRaw('1 = 0'))
+            ->selectRaw("id, 'transfer' as entry_kind, transfer_date as entry_date")
+            ->toBase();
+
+        $paginator = DB::query()
+            ->fromSub($txSelect->unionAll($trSelect), 'unified_ledger')
+            ->orderByDesc('entry_date')
+            ->orderByDesc('id')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        $pageRows = $paginator->getCollection();
+        $txIds = $pageRows->where('entry_kind', 'transaction')->pluck('id')->map(fn ($id): int => (int) $id)->all();
+        $trIds = $pageRows->where('entry_kind', 'transfer')->pluck('id')->map(fn ($id): int => (int) $id)->all();
+
+        $txModels = $txIds === []
+            ? collect()
+            : AccountTransaction::with(['account', 'creator', 'approver'])
+                ->whereIn('id', $txIds)
+                ->get()
+                ->keyBy('id');
+
+        $trModels = $trIds === []
+            ? collect()
+            : AccountTransfer::with(['fromAccount', 'toAccount', 'creator', 'approver'])
+                ->whereIn('id', $trIds)
+                ->get()
+                ->keyBy('id');
+
+        $hydrated = $pageRows
+            ->map(static fn (object $row) => $row->entry_kind === 'transfer'
+                ? $trModels->get((int) $row->id)
+                : $txModels->get((int) $row->id))
+            ->filter()
+            ->values();
+
+        $paginator->setCollection($hydrated);
+
+        return $paginator;
     }
 
     /**

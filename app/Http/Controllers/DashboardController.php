@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
+use App\Services\DashboardMetricsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
-use Spatie\Permission\Models\Role;
 
 class DashboardController extends Controller
 {
+    public function __construct(
+        private readonly DashboardMetricsService $metrics,
+    ) {}
+
     /**
      * Display the application dashboard. Supplier logins land on their own
      * supplier profile instead: the dashboard is not theirs.
@@ -22,11 +25,8 @@ class DashboardController extends Controller
             return redirect()->route('suppliers.my-profile');
         }
 
-        return view('dashboard.index', [
-            'totalUsers' => User::count(),
-            'activeUsers' => User::where('status', 'active')->count(),
-            'totalRoles' => Role::count(),
-            'recentUsers' => User::with('roles')->latest()->take(5)->get(),
-        ]);
+        $requestedLocationId = $request->filled('location_id') ? (int) $request->input('location_id') : null;
+
+        return view('dashboard.index', $this->metrics->forUser($request->user(), $requestedLocationId));
     }
 }

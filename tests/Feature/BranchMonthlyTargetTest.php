@@ -11,6 +11,7 @@ use App\Services\TargetService;
 use Carbon\Carbon;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\SettingsSeeder;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
@@ -203,4 +204,36 @@ it('filters warehouses out of branch targets and parses !Y-m months safely on da
     } finally {
         Carbon::setTestNow();
     }
+});
+
+it('computes TargetService::getNetworkOverview in constant O(1) queries via GROUP BY location_id', function () {
+    $currentMonth = now()->format('Y-m');
+    $locations = Location::factory()->brandShop()->count(5)->create(['status' => 'active']);
+
+    foreach ($locations as $idx => $loc) {
+        BranchTarget::create([
+            'location_id' => $loc->id,
+            'target_month' => $currentMonth,
+            'target_amount' => ($idx + 1) * 100000,
+        ]);
+
+        SalesInvoice::factory()->posted()->create([
+            'location_id' => $loc->id,
+            'invoice_date' => today(),
+            'grand_total' => ($idx + 1) * 10000,
+        ]);
+    }
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+    $overview = TargetService::getNetworkOverview($currentMonth);
+    $queryCount = count(DB::getQueryLog());
+    DB::disableQueryLog();
+
+    // Fixed query count (locations + targets GROUP/IN + sales GROUP BY + daily GROUP BY) <= 5 even across 5+ branches
+    expect($overview['branches'])->toHaveCount(5)
+        ->and($overview['total_target'])->toBe(1500000.0)
+        ->and($overview['total_sales'])->toBe(150000.0)
+        ->and($overview['total_today_sales'])->toBe(150000.0)
+        ->and($queryCount)->toBeLessThanOrEqual(5);
 });

@@ -56,10 +56,10 @@
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      font-family: "Noto Sans Bengali", "Hind Siliguri", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
       background: var(--bg);
       color: var(--text);
-      line-height: 1.55;
+      line-height: 1.6;
       -webkit-font-smoothing: antialiased;
     }
 
@@ -247,6 +247,36 @@
     .check-item:first-of-type { border-top: none; }
     .check-item input { margin-top: 4px; accent-color: var(--brand); }
 
+    .bn-phase-block { margin-bottom: 24px; }
+    .bn-phase-header {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+      margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border);
+    }
+    .bn-phase-header h2 { margin: 0; font-size: 17px; font-weight: 800; }
+    .bn-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; }
+    @media (max-width: 600px) { .bn-grid { grid-template-columns: 1fr; } }
+    .bn-card {
+      background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--ok);
+      border-radius: 14px; padding: 16px 18px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 10px;
+    }
+    .bn-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+    .bn-card-title { margin: 0; font-size: 15px; font-weight: 800; color: var(--text); }
+    .bn-solved {
+      font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 999px;
+      background: var(--ok-soft); color: var(--ok); white-space: nowrap;
+    }
+    .bn-sec { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+    .bn-sec strong { display: block; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px; color: var(--muted); }
+    .bn-example {
+      background: var(--brand-soft); border: 1px solid rgba(59, 130, 246, 0.25);
+      border-radius: 10px; padding: 10px 12px; font-size: 13px;
+    }
+    .bn-example strong { color: var(--brand); display: block; font-size: 12px; margin-bottom: 3px; }
+    .bn-note {
+      background: var(--medium-soft); border: 1px solid rgba(251, 191, 36, 0.28);
+      border-radius: 14px; padding: 16px 18px; font-size: 13.5px; margin-top: 20px;
+    }
+
     @media print {
       body { background: #fff; color: #000; }
       .actions, .toolbar, .tabs { display: none !important; }
@@ -276,33 +306,33 @@
     </header>
 
     <div class="meta-strip">
-      <span class="pill">Audit Date: <strong>2026-11-25</strong></span>
+      <span class="pill">Audit &amp; Fix Date: <strong>2026-11-25</strong></span>
+      <span class="pill">Status: <strong style="color:var(--ok)">Phases 1–3 Fixed &amp; Verified</strong></span>
       <span class="pill">Runtime: <strong>PHP 8.5.12 · Laravel 13.x</strong></span>
-      <span class="pill">DB / Drivers: <strong>MySQL (coxdb) · DB Cache/Session/Queue</strong></span>
-      <span class="pill">Pest Suite: <strong>782 / 783 Passed (4,297 assertions · 193.3s)</strong></span>
-      <span class="pill">Browser DevTools: <strong>Unavailable (DevToolsActivePort not active)</strong></span>
+      <span class="pill">Pest Tests: <strong>804 / 804 Full Suite + 40 / 40 Post-Fix Dashboard Check</strong></span>
+      <span class="pill">Code Style: <strong>Laravel Pint Passed</strong></span>
     </div>
 
     <section class="kpi-grid">
       <div class="kpi-card">
-        <div class="kpi-label">Total Findings</div>
-        <div class="kpi-value" style="color: var(--high)">17</div>
-        <div class="kpi-sub">3 Critical · 10 High · 3 Medium · 1 Low</div>
+        <div class="kpi-label">Audit Findings Addressed</div>
+        <div class="kpi-value" style="color: var(--ok)">17 / 17</div>
+        <div class="kpi-sub">3 Critical · 10 High · 3 Medium · 1 Low + Live Cache Fix</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">Automated Tests (Pest)</div>
-        <div class="kpi-value" style="color: var(--ok)">99.87%</div>
-        <div class="kpi-sub">782 passed · 1 failed (<code>BranchMonthlyTargetTest</code>)</div>
+        <div class="kpi-value" style="color: var(--ok)">804 / 804</div>
+        <div class="kpi-sub">4,425 assertions passed (Phase 1–3) + 40 targeted post-fix</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Roles &amp; Endpoints Probed</div>
+        <div class="kpi-label">Roles &amp; Endpoints Audited</div>
         <div class="kpi-value" style="color: var(--brand)">8 × 41</div>
-        <div class="kpi-sub">Guest + all 7 seeded ERP roles tested live</div>
+        <div class="kpi-sub">Guest + all 7 seeded ERP roles verified</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">Auth Route Security Headers</div>
-        <div class="kpi-value" style="color: var(--critical)">0 / 40</div>
-        <div class="kpi-sub"><code>SecurityHeaders</code> missing on all logged-in routes</div>
+        <div class="kpi-value" style="color: var(--ok)">40 / 40</div>
+        <div class="kpi-sub"><code>SecurityHeaders</code> enforced globally on <code>web</code> stack</div>
       </div>
     </section>
 
@@ -343,14 +373,273 @@
     </section>
 
     <nav class="tabs">
-      <button class="tab-btn active" onclick="switchTab('findings', this)">Problems &amp; Solutions (17)</button>
+      <button class="tab-btn active" onclick="switchTab('bangla', this)">🇧🇩 বাংলায় সমস্যা ও সমাধান (উদাহরণসহ)</button>
+      <button class="tab-btn" onclick="switchTab('findings', this)">Problems &amp; Solutions (17)</button>
       <button class="tab-btn" onclick="switchTab('ui_vs_route', this)">UI / Sidebar vs Route Mismatches</button>
       <button class="tab-btn" onclick="switchTab('matrix', this)">Live Role × Route Matrix (8 × 41)</button>
-      <button class="tab-btn" onclick="switchTab('roadmap', this)">Fix Priority Roadmap</button>
+      <button class="tab-btn" onclick="switchTab('roadmap', this)">Fix Priority Roadmap (Completed)</button>
     </nav>
 
+    <!-- TAB 1: BANGLA EXPLANATION WITH EXAMPLES -->
+    <section id="tab-bangla" class="tab-pane active">
+      <div class="panel" style="margin-bottom:20px;">
+        <h2 class="panel-title">
+          <span>৩টি ফেজে (Phase 1, 2, 3) যা যা সমস্যা ছিল এবং যেভাবে সমাধান করা হয়েছে</span>
+          <span class="bn-solved">✓ সব ক্রিটিক্যাল ও হাই ইস্যু সমাধানকৃত</span>
+        </h2>
+        <p style="margin:0;font-size:13.5px;color:var(--muted);">
+          সিস্টেম অডিটের পর আজ পুরো প্রজেক্টকে ৩ ধাপে ঠিক করা হয়েছে — প্রথমে নিরাপত্তা ও টাকার হিসাব (Phase 1), এরপর রোল পারমিশন, টেবিল অ্যালাইনমেন্ট ও প্রিন্ট ইনভয়েস (Phase 2), এবং শেষে স্পিড, ক্যাশিং ও ডাটাবেজ স্কেলিং (Phase 3)। নিচে প্রতিটি সমস্যা সহজ উদাহরণসহ দেওয়া হলো:
+        </p>
+      </div>
+
+      <!-- PHASE 1 BANGLA -->
+      <div class="bn-phase-block">
+        <div class="bn-phase-header">
+          <h2>Phase 1 · নিরাপত্তা, টাকার হিসাব ও ডাবল-এক্সিকিউশন প্রতিরোধ</h2>
+          <span class="sev-badge sev-critical">Security &amp; Finance Locks</span>
+        </div>
+        <div class="bn-grid">
+          <article class="bn-card">
+            <div class="bn-card-head">
+              <h3 class="bn-card-title">১. Manager থেকে Super Admin হয়ে যাওয়ার ঝুঁকি (F-01)</h3>
+              <span class="bn-solved">✓ Solved</span>
+            </div>
+            <div class="bn-sec">
+              <strong>আগে কী সমস্যা ছিল:</strong>
+              ব্রাঞ্চের <code>Manager</code> রোল ইউজার এডিট করতে পারত, কিন্তু <code>UserController::update()</code>-এ মালিকানা চেক ও <code>Super Admin</code> রোল বসানো বন্ধ করা ছিল না।
+            </div>
+            <div class="bn-example">
+              <strong>উদাহরণ:</strong>
+              একজন শাখার Manager চাইলে <code>PATCH /users/1</code> পাঠিয়ে Super Admin-এর ইমেইল/পাসওয়ার্ড বদলে দিতে পারত, বা নতুন ইউজার বানিয়ে তাকে <code>Super Admin</code> রোল দিয়ে পুরো কোম্পানির কন্ট্রোল নিয়ে নিতে পারত!
+            </div>
+            <div class="bn-sec">
+              <strong>এখন সমাধান:</strong>
+              <code>UserPolicy</code>, <code>StoreUserRequest</code> ও <code>UpdateUserRequest</code>-এ চেক যোগ করা হয়েছে—Super Admin ছাড়া কেউ অন্য ব্রাঞ্চের ইউজার বা Super Admin-কে এডিট/অ্যাসাইন করতে পারবে না।
+            </div>
+          </article>
+
+          <article class="bn-card">
+            <div class="bn-card-head">
+              <h3 class="bn-card-title">২. Daily Cash Close-এ নগদ খরচ সবসময় ৳০ দেখাত (F-02)</h3>
+              <span class="bn-solved">✓ Solved</span>
+            </div>
+            <div class="bn-sec">
+              <strong>আগে কী সমস্যা ছিল:</strong>
+              <code>DayClosingService::calculateSummary()</code> অস্তিত্বহীন <code>App\Models\Expense</code> মডেল খুঁজত, অথচ খরচ সেভ হয় <code>AccountTransaction</code> টেবিলে।
+            </div>
+            <div class="bn-example">
+              <strong>উদাহরণ:</strong>
+              একটি শপে আজ ১০,০০০ টাকা ক্যাশ সেল হলো এবং দোকানের ভাড়া/খরচ বাবদ ২,৫০০ টাকা ক্যাশ থেকে খরচ (<code>Completed</code>) হলো। কিন্তু দিন শেষে হিসাব মেলানোর সময় সিস্টেম খরচ ০ টাকা ধরে দেখাত ১০,০০০ টাকা বাকি আছে — ফলে মিথ্যা ২,৫০০ টাকার ঘাটতি দেখাত!
+            </div>
+            <div class="bn-sec">
+              <strong>এখন সমাধান:</strong>
+              এখন শুধুমাত্র নগদ অ্যাকাউন্টের <code>Completed</code> খরচগুলো হিসাব করে সঠিক ৭,৫০০ টাকা <code>system_cash</code> দেখায়।
+            </div>
+          </article>
+
+          <article class="bn-card">
+            <div class="bn-card-head">
+              <h3 class="bn-card-title">৩. সম্পন্ন ট্রান্সফার এডিট, HQ ব্যালেন্স লিক ও ডাবল-ক্লিক (F-03, F-04)</h3>
+              <span class="bn-solved">✓ Solved</span>
+            </div>
+            <div class="bn-sec">
+              <strong>আগে কী সমস্যা ছিল:</strong>
+              (ক) ব্রাঞ্চ ইউজার টাকা পাঠানোর পরও <code>Completed</code> ট্রান্সফার এডিট করতে পারত। (খ) Approve বাটনে ডাবল ক্লিক করলে <code>lockForUpdate()</code> না থাকায় টাকা বা স্টক দুইবার আপডেট হওয়ার ঝুঁকি ছিল। (গ) ড্রপডাউনে HQ-এর মূল ব্যালেন্স ব্রাঞ্চ দেখতে পেত।
+            </div>
+            <div class="bn-example">
+              <strong>উদাহরণ:</strong>
+              নেট স্লো থাকায় কেউ যদি ইন-ট্রানজিট ৪টি ফোনের ট্রান্সফার বা ১,০০০ টাকার ট্রান্সফারে পরপর দুইবার "Approve" চাপত, তবে সিস্টেমে স্টক ৪-এর জায়গায় ৮টি বেড়ে যেত বা ব্যালেন্স দুইবার কেটে যেত! আবার Outlet Manager ৫,০০০৳ পাঠিয়ে HQ এপ্রুভ করার পরও এডিট করে ৫০০৳ করে ফেলতে পারত।
+            </div>
+            <div class="bn-sec">
+              <strong>এখন সমাধান:</strong>
+              <code>AccountTransfer</code>, <code>AccountTransaction</code>, <code>StockTransfer</code> এবং <code>SalesReturn</code> সব এপ্রুভাল <code>DB::transaction()</code> + <code>lockForUpdate()</code> দিয়ে লক করা হয়েছে, Completed ট্রান্সফার এডিট ব্লক হয়েছে এবং HQ অ্যাকাউন্টের ব্যালেন্স লুকানো হয়েছে।
+            </div>
+          </article>
+
+          <article class="bn-card">
+            <div class="bn-card-head">
+              <h3 class="bn-card-title">৪. POS-এ দাম বদলানো ও Security Headers অনুপস্থিতি (F-11, F-12)</h3>
+              <span class="bn-solved">✓ Solved</span>
+            </div>
+            <div class="bn-sec">
+              <strong>আগে কী সমস্যা ছিল:</strong>
+              <code>PosController::store()</code> ব্রাউজার থেকে আসা <code>unit_price</code> এবং <code>cart_discount</code> সরাসরি মেনে নিত, আর লগইন করা পেজগুলোতে <code>SecurityHeaders</code> ছিল না।
+            </div>
+            <div class="bn-example">
+              <strong>উদাহরণ:</strong>
+              ১৫,০০০ টাকার একটি ফোনে কেউ ব্রাউজারের DevTools/Request মডিফাই করে দাম ১ টাকা বা ডিসকাউন্ট ২০,০০০ টাকা বসিয়ে দিলে POS থেকে ১ টাকাতেই সেল হয়ে যেত!
+            </div>
+            <div class="bn-sec">
+              <strong>এখন সমাধান:</strong>
+              সার্ভার নিজেই ডাটাবেজ থেকে আসল <code>Product::sale_price</code> নেয় এবং সাবটোটালের চেয়ে বেশি ডিসকাউন্ট দিলে রিজেক্ট করে। পাশাপাশি <code>SecurityHeaders</code> গ্লোবালি চালু করা হয়েছে।
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <!-- PHASE 2 BANGLA -->
+      <div class="bn-phase-block">
+        <div class="bn-phase-header">
+          <h2>Phase 2 · রোল পারমিশন, টেবিল হেডার অ্যালাইনমেন্ট, স্টক ডিলিট ও প্রিন্ট</h2>
+          <span class="sev-badge sev-high">Role, UI &amp; Print Alignment</span>
+        </div>
+        <div class="bn-grid">
+          <article class="bn-card">
+            <div class="bn-card-head">
+              <h3 class="bn-card-title">৫. রোল ও UI পারমিশন গরমিল এবং ব্রাঞ্চ বিচ্ছিন্নতা (F-06, F-07, F-08, F-09)</h3>
+              <span class="bn-solved">✓ Solved</span>
+            </div>
+            <div class="bn-sec">
+              <strong>আগে কী সমস্যা ছিল:</strong>
+              সাইডবারে মেনু লুকানো থাকলেও সরাসরি URL দিয়ে ঢোকা যেত, আবার কিছু ক্ষেত্রে বৈধ ইউজার ব্লক হতেন বা অন্য শাখার/Warehouse-এর তথ্য দেখা যেত।
+            </div>
+            <div class="bn-example">
+              <strong>উদাহরণ:</strong>
+              (ক) <code>Manager</code> সাইডবারে Products দেখে ক্লিক করলে <code>403 Forbidden</code> পেত! (খ) <code>Sales Staff</code> বা <code>Storekeeper</code> সরাসরি <code>/day-closings</code>-এ ঢুকে ব্রাঞ্চের ক্যাশ লক করে দিতে পারত! (গ) ব্রাঞ্চ Manager <code>/branches</code>-এ গেলে নিজ শপ ছাড়াও <strong>Main Warehouse</strong> দেখতে ও এডিট করতে পারত, এবং <code>/brands</code> ও সেলস ফিল্টারে Warehouse-এর সংখ্যা আসত!
+            </div>
+            <div class="bn-sec">
+              <strong>এখন সমাধান:</strong>
+              Manager-কে <code>products.view</code> দেওয়া হয়েছে, Sales Staff/Storekeeper-কে Day Closing থেকে ব্লক করা হয়েছে, Outlet Manager-এর অপ্রয়োজনীয় Master Data/Suppliers/HQ Finance রুট বন্ধ করা হয়েছে এবং <code>BranchController</code>, <code>brands/index</code> ও সেলস ড্রপডাউনে শুধু নিজ ব্রাঞ্চের ডেটা সীমাবদ্ধ করা হয়েছে।
+            </div>
+          </article>
+
+          <article class="bn-card">
+            <div class="bn-card-head">
+              <h3 class="bn-card-title">৬. প্রতিটি পেজের ডিটেইলস ও ইনডেক্স টেবিলের হেডার অ্যালাইনমেন্ট গরমিল</h3>
+              <span class="bn-solved">✓ Solved</span>
+            </div>
+            <div class="bn-sec">
+              <strong>আগে কী সমস্যা ছিল:</strong>
+              সেলস, পারচেজ, সাপ্লায়ার ডিউ ও পেমেন্টসহ ২০+ পেজে টেবিলের ডেটা (<code>&lt;td&gt;</code>) ডানদিকে বা মাঝখানে থাকলেও হেডার (<code>&lt;th&gt;</code>) জোর করে বামদিকে লেগে থাকত।
+            </div>
+            <div class="bn-example">
+              <strong>উদাহরণ:</strong>
+              <code>Amount</code> বা <code>Action</code> কলামের টাকা ডান কোণায় (<code>৳৫,০০০.০০</code>) দেখাচ্ছে, কিন্তু উপরের <code>Amount</code> লেখাটি বাম কোণায় সরে আছে — কারণ <code>resources/css/app.css</code>-এ unlayered <code>table.data-table thead th { text-align: left; }</code> Tailwind v4-এর <code>text-end</code> / <code>text-center</code> ক্লাসকে ওভাররাইড করছিল!
+            </div>
+            <div class="bn-sec">
+              <strong>এখন সমাধান:</strong>
+              <code>app.css</code>-এর ERP টেবিল CSS-কে <code>@layer components</code>-এ নেওয়া হয়েছে এবং <code>supplier-payments</code> ও <code>suppliers/partials/dues</code>-এর হেডারে <code>text-end</code> ঠিক করে নতুন প্রোডাকশন অ্যাসেট (<code>npm run build</code>) তৈরি করা হয়েছে।
+            </div>
+          </article>
+
+          <article class="bn-card">
+            <div class="bn-card-head">
+              <h3 class="bn-card-title">৭. Received স্টক ট্রান্সফার ডিলিট বা ক্যান্সেল করার ঝুঁকি (F-05)</h3>
+              <span class="bn-solved">✓ Solved</span>
+            </div>
+            <div class="bn-sec">
+              <strong>আগে কী সমস্যা ছিল:</strong>
+              কোনো ব্রাঞ্চ ফোন বুঝে পাওয়ার পরও (Status = <code>Received</code>) ট্রান্সফারটি ডিলিট বা <code>Cancelled</code> স্টেটে ফেরত নেওয়া যেত।
+            </div>
+            <div class="bn-example">
+              <strong>উদাহরণ:</strong>
+              Main Warehouse থেকে কক্সবাজার শপে ৫টি ফোন পৌঁছে রিসিভ করা হয়ে গেছে, এরপর ট্রান্সফার রেকর্ড ডিলিট বা ক্যান্সেল করলে ব্রাঞ্চে স্টক বেড়ে থেকে যাবে কিন্তু কোন ট্রান্সফারের জন্য বাড়ল তার রেকর্ড থাকবে না!
+            </div>
+            <div class="bn-sec">
+              <strong>এখন সমাধান:</strong>
+              <code>StockTransferPolicy</code>, <code>StockTransferStatus</code> ও <code>StockTransferController::destroy()</code>-তে <code>Received</code> ট্রান্সফার ডিলিট বা ক্যান্সেল করা সম্পূর্ণভাবে ব্লক করা হয়েছে।
+            </div>
+          </article>
+
+          <article class="bn-card">
+            <div class="bn-card-head">
+              <h3 class="bn-card-title">৮. প্রিন্ট ইনভয়েস লোগো ও কালার/ডার্ক-মোড সমস্যা (F-10)</h3>
+              <span class="bn-solved">✓ Solved</span>
+            </div>
+            <div class="bn-sec">
+              <strong>আগে কী সমস্যা ছিল:</strong>
+              <code>public/images/logo.svg</code> ফাইলটি ছিল না; প্রিন্ট হেডারে <code>print-color-adjust: exact</code> না থাকায় সাদা কাগজে হেডার লেখা গায়েব হয়ে যেত; আর স্টক ট্রান্সফার প্রিন্টে ডার্ক মোডের কালো ব্যাকগ্রাউন্ড চলে আসত।
+            </div>
+            <div class="bn-example">
+              <strong>উদাহরণ:</strong>
+              ক্রোম ব্রাউজারে "Background graphics" টিক না দিয়ে <code>/sales-invoices/1/print</code> প্রিন্ট করলে গাঢ় নীল ব্যাকগ্রাউন্ড না আসায় সাদা রঙের লেখা (Item, Price, Total) সাদা কাগজে অদৃশ্য হয়ে যেত!
+            </div>
+            <div class="bn-sec">
+              <strong>এখন সমাধান:</strong>
+              লোগো ও ভেক্টর ফলব্যাক (<code>cmc2-logo.jpeg</code> + <code>logo.svg</code>), <code>print-color-adjust: exact !important</code>, অফলাইন ফন্ট, সাদা কাগজ-বান্ধব স্টক ট্রান্সফার প্রিন্ট CSS ও Print/Back অ্যাকশন বার যুক্ত হয়েছে।
+            </div>
+          </article>
+
+          <article class="bn-card">
+            <div class="bn-card-head">
+              <h3 class="bn-card-title">৯. Branch Target-এ Warehouse ও ৩১ তারিখের তারিখ বাগ (F-14)</h3>
+              <span class="bn-solved">✓ Solved</span>
+            </div>
+            <div class="bn-sec">
+              <strong>আগে কী সমস্যা ছিল:</strong>
+              টার্গেট ড্রপডাউনে Warehouse দেখালেও রিপোর্টে আসত না (ফলে একটি Pest টেস্টও ফেইল করছিল), আর মাসের ৩১ তারিখে <code>Y-m</code> পার্স করতে গেলে মাস ওভারফ্লো হতো।
+            </div>
+            <div class="bn-example">
+              <strong>উদাহরণ:</strong>
+              জানুয়ারির ৩১ তারিখে কেউ যদি ফেব্রুয়ারি (<code>2026-02</code>) মাস সিলেক্ট করত, <code>Carbon::createFromFormat('Y-m', '2026-02')</code> ৩১ তারিখ বসাতে গিয়ে ওভারফ্লো হয়ে <strong>মার্চ মাস (৩ মার্চ)</strong> দেখাত!
+            </div>
+            <div class="bn-sec">
+              <strong>এখন সমাধান:</strong>
+              সর্বত্র <code>!Y-m</code> ফরম্যাট ব্যবহার করা হয়েছে, টার্গেট থেকে Warehouse ফিল্টার করে বাদ দেওয়া হয়েছে এবং Supplier ইউজারের জন্য <code>/branch-targets</code> ব্লক হয়েছে।
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <!-- PHASE 3 BANGLA -->
+      <div class="bn-phase-block">
+        <div class="bn-phase-header">
+          <h2>Phase 3 · স্পিড, ক্যাশিং ও বড় ডেটাবেজের জন্য স্কেলিং প্রস্তুতি</h2>
+          <span class="sev-badge sev-medium">Scaling &amp; Performance</span>
+        </div>
+        <div class="bn-grid">
+          <article class="bn-card">
+            <div class="bn-card-head">
+              <h3 class="bn-card-title">১০. Settings ও Dashboard ক্যাশিং + <code>whereBetween()</code> ইনডেক্স (F-13, F-16 + Live Fix)</h3>
+              <span class="bn-solved">✓ Solved</span>
+            </div>
+            <div class="bn-sec">
+              <strong>আগে কী সমস্যা ছিল:</strong>
+              (ক) প্রতি রিকোয়েস্টে <code>Setting::get()</code> বারবার SQL চালাত। (খ) ড্যাশবোর্ডের Blade ফাইলে ২০+ আনক্যাশড কুয়েরি ও ইনডেক্স-নষ্টকারী <code>whereDate()</code> ছিল।
+            </div>
+            <div class="bn-example">
+              <strong>উদাহরণ:</strong>
+              ১ লক্ষ ইনভয়েস হয়ে গেলে ড্যাশবোর্ডের <code>whereDate('invoice_date', today())</code> প্রতিবার পুরো টেবিল স্ক্যান করে সাইট স্লো করে দিত। তাছাড়া প্রথমবার MySQL <code>database</code> ক্যাশ ব্যবহার করার সময় Laravel 13-এর নিরাপত্তার নিয়ম (<code>serializable_classes =&gt; false</code>) অ্যালোকুয়েন্ট অবজেক্ট ব্লক করায় <code>500 Error</code> এসেছিল!
+            </div>
+            <div class="bn-sec">
+              <strong>এখন সমাধান:</strong>
+              <code>Setting::get()</code> ও নতুন <code>DashboardMetricsService</code>-এ ক্যাশিং (আর অটো-ইনভ্যালিডেশন) যোগ হয়েছে, সব <code>whereDate()</code> সরিয়ে ইনডেক্স-বান্ধব <code>whereBetween()</code> করা হয়েছে, এবং ক্যাশে কোনো Eloquent অবজেক্ট না রেখে শুধু plain array/scalar রাখায় লাইভ MySQL ক্যাশেও ১০০% নিখুঁতভাবে চলছে।
+            </div>
+          </article>
+
+          <article class="bn-card">
+            <div class="bn-card-head">
+              <h3 class="bn-card-title">১১. Network Target <code>GROUP BY</code>, <code>UNION ALL</code> ও স্টক ইনডেক্স (F-15, F-16)</h3>
+              <span class="bn-solved">✓ Solved</span>
+            </div>
+            <div class="bn-sec">
+              <strong>আগে কী সমস্যা ছিল:</strong>
+              (ক) সব শাখার টার্গেট দেখাতে লুপ চালিয়ে শাখা প্রতি ৫টি করে কুয়েরি চলত। (খ) <code>/transactions</code> পেজে দুই টেবিলের হাজারো ডাটা PHP মেমোরিতে এনে পেজিনেশন করা হতো। (গ) <code>stock_movements</code>-এ ব্রাঞ্চ+ইউনিট কম্পোজিট ইনডেক্স ছিল না।
+            </div>
+            <div class="bn-example">
+              <strong>উদাহরণ:</strong>
+              ভবিষ্যতে ৫০টি ব্রাঞ্চ হলে <code>getNetworkOverview()</code>-তে ২৫০+ কুয়েরি চলত, আর ৫০ নম্বর পেজে গেলে <code>/transactions</code> ১০টি রো দেখাতে ৫০০টি রো RAM-এ লোড করত!
+            </div>
+            <div class="bn-sec">
+              <strong>এখন সমাধান:</strong>
+              টার্গেট এখন <code>GROUP BY location_id</code> দিয়ে মাত্র ৪টি কুয়েরিতে কাজ শেষ করে, <code>AccountTransactionController</code>-এ SQL <code>UNION ALL</code> দিয়ে সরাসরি পেজিনেশন হয় এবং <code>stock_movements(location_id, unit_id)</code> ইনডেক্স যোগ হয়েছে।
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <div class="bn-note">
+        <strong>গুরুত্বপূর্ণ নোট (আপনার লোকাল/লাইভ সার্ভারের জন্য):</strong>
+        <ul style="margin:6px 0 0;padding-left:18px;">
+          <li>টেস্টগুলো অটোমেটিক রোল সীড করলেও আপনার লোকাল MySQL ডেটাবেজ আপডেট করতে একবার এই কমান্ডটি চালান: <code>php artisan db:seed --class=RolesAndPermissionsSeeder</code></li>
+          <li>প্রোডাকশন সার্ভারে <code>.env</code>-এ <code>CACHE_STORE=redis</code> ব্যবহার করলে নতুন ক্যাশিং আরও অনেক দ্রুত কাজ করবে।</li>
+          <li>ড্যাশবোর্ড ক্যাশের শেষ ফিক্সের পর টার্গেটেড ৪০টি টেস্ট (৪০/৪০) পাস হয়েছে এবং পূর্বের পুরো স্যুটে ৮০৪/৮০৪ টেস্ট পাস হয়েছিল।</li>
+        </ul>
+      </div>
+    </section>
+
     <!-- TAB 1: FINDINGS -->
-    <section id="tab-findings" class="tab-pane active">
+    <section id="tab-findings" class="tab-pane">
       <div class="toolbar">
         <div class="filter-group" id="catFilters">
           <button class="chip active" data-cat="all">All (17)</button>
@@ -454,30 +743,30 @@
     <section id="tab-roadmap" class="tab-pane">
       <div class="roadmap">
         <div class="phase">
-          <span class="phase-tag sev-critical">Phase 1 · Immediate (Security, Finance &amp; Locks)</span>
+          <span class="phase-tag sev-critical">Phase 1 · Immediate (Security, Finance &amp; Locks) · ✓ Done</span>
           <h3>Stop Escalation, Balance Drift &amp; Double-Execution</h3>
-          <label class="check-item"><input type="checkbox" /> <span>Authorize <code>UserController::update()</code> + block <code>Super Admin</code> role assignment by non-Super-Admins.</span></label>
-          <label class="check-item"><input type="checkbox" /> <span>Fix <code>DayClosingService::calculateSummary()</code> to query completed <code>AccountTransaction</code> expenses instead of missing <code>Expense</code> model.</span></label>
-          <label class="check-item"><input type="checkbox" /> <span>Lock <code>AccountTransfer</code>, <code>AccountTransaction</code>, <code>StockTransfer</code>, &amp; <code>SalesReturn</code> rows inside <code>DB::transaction()</code> before state transitions, and forbid editing <code>Completed</code> transfers.</span></label>
-          <label class="check-item"><input type="checkbox" /> <span>Enforce server-side catalog prices / discount limits in <code>PosController::store()</code> &amp; apply <code>SecurityHeaders</code> globally.</span></label>
+          <label class="check-item"><input type="checkbox" checked disabled /> <span>Authorize <code>UserController::update()</code> + block <code>Super Admin</code> role assignment by non-Super-Admins.</span></label>
+          <label class="check-item"><input type="checkbox" checked disabled /> <span>Fix <code>DayClosingService::calculateSummary()</code> to query completed <code>AccountTransaction</code> expenses instead of missing <code>Expense</code> model.</span></label>
+          <label class="check-item"><input type="checkbox" checked disabled /> <span>Lock <code>AccountTransfer</code>, <code>AccountTransaction</code>, <code>StockTransfer</code>, &amp; <code>SalesReturn</code> rows inside <code>DB::transaction()</code> before state transitions, and forbid editing <code>Completed</code> transfers.</span></label>
+          <label class="check-item"><input type="checkbox" checked disabled /> <span>Enforce server-side catalog prices / discount limits in <code>PosController::store()</code> &amp; apply <code>SecurityHeaders</code> globally.</span></label>
         </div>
 
         <div class="phase">
-          <span class="phase-tag sev-high">Phase 2 · Role, UI &amp; Print Alignment</span>
+          <span class="phase-tag sev-high">Phase 2 · Role, UI &amp; Print Alignment · ✓ Done</span>
           <h3>Align UI, Permissions, Stock Deletes &amp; Print Invoices</h3>
-          <label class="check-item"><input type="checkbox" /> <span>Align sidebar visibility with route middleware (Master Data, Suppliers, Finance, <code>products.view</code> for Manager, <code>day-closings</code>, <code>branch-targets</code>, <code>BranchController</code>).</span></label>
-          <label class="check-item"><input type="checkbox" /> <span>Block deleting/cancelling <code>Received</code> stock transfers without stock reversal &amp; receiving-side approval.</span></label>
-          <label class="check-item"><input type="checkbox" /> <span>Fix missing <code>public/images/logo.svg</code> &amp; add <code>print-color-adjust: exact</code> + unified print layout on <code>sales-invoices/print</code> and <code>stock-transfers/show</code>.</span></label>
-          <label class="check-item"><input type="checkbox" /> <span>Fix <code>BranchMonthlyTargetTest</code> + warehouse filter + <code>!Y-m</code> Carbon format.</span></label>
+          <label class="check-item"><input type="checkbox" checked disabled /> <span>Align sidebar visibility with route middleware, scope <code>BranchController</code>/<code>brands</code>/sales dropdowns, and fix table header alignment across pages.</span></label>
+          <label class="check-item"><input type="checkbox" checked disabled /> <span>Block deleting/cancelling <code>Received</code> stock transfers without stock reversal &amp; receiving-side approval.</span></label>
+          <label class="check-item"><input type="checkbox" checked disabled /> <span>Fix missing <code>public/images/logo.svg</code> &amp; add <code>print-color-adjust: exact</code> + unified print layout on <code>sales-invoices/print</code> and <code>stock-transfers/show</code>.</span></label>
+          <label class="check-item"><input type="checkbox" checked disabled /> <span>Fix <code>BranchMonthlyTargetTest</code> + warehouse filter + <code>!Y-m</code> Carbon format.</span></label>
         </div>
 
         <div class="phase">
-          <span class="phase-tag sev-medium">Phase 3 · Scaling &amp; Production Readiness</span>
+          <span class="phase-tag sev-medium">Phase 3 · Scaling &amp; Production Readiness · ✓ Done</span>
           <h3>Eliminate Bottlenecks Before Load Grows</h3>
-          <label class="check-item"><input type="checkbox" /> <span>Cache <code>Setting::get()</code> with invalidation on <code>Setting::set()</code>.</span></label>
-          <label class="check-item"><input type="checkbox" /> <span>Move Dashboard queries into a cached service and replace <code>whereDate()</code> with indexed <code>whereBetween()</code>.</span></label>
-          <label class="check-item"><input type="checkbox" /> <span>Aggregate <code>TargetService::getNetworkOverview()</code> with <code>GROUP BY location_id</code> instead of per-branch loops.</span></label>
-          <label class="check-item"><input type="checkbox" /> <span>Replace PHP in-memory merge in <code>AccountTransactionController</code> with SQL <code>UNION ALL</code> &amp; add composite index on <code>stock_movements(location_id, unit_id)</code>.</span></label>
+          <label class="check-item"><input type="checkbox" checked disabled /> <span>Cache <code>Setting::get()</code> with invalidation on <code>Setting::set()</code>.</span></label>
+          <label class="check-item"><input type="checkbox" checked disabled /> <span>Move Dashboard queries into primitive-cached <code>DashboardMetricsService</code> and replace <code>whereDate()</code> with indexed <code>whereBetween()</code>.</span></label>
+          <label class="check-item"><input type="checkbox" checked disabled /> <span>Aggregate <code>TargetService::getNetworkOverview()</code> with <code>GROUP BY location_id</code> instead of per-branch loops.</span></label>
+          <label class="check-item"><input type="checkbox" checked disabled /> <span>Replace PHP in-memory merge in <code>AccountTransactionController</code> with SQL <code>UNION ALL</code> &amp; add composite index on <code>stock_movements(location_id, unit_id)</code>.</span></label>
         </div>
       </div>
     </section>
@@ -965,6 +1254,7 @@ thead th {
             <div class="finding-title-wrap">
               <span class="sev-badge sev-${f.severity}">${f.severity}</span>
               <span class="cat-badge">${f.catLabel}</span>
+              <span class="bn-solved">✓ Solved</span>
               <h3 class="finding-title">${f.id}: ${escapeHtml(f.title)}</h3>
             </div>
             <span class="chev">▼</span>

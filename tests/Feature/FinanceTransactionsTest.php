@@ -6,6 +6,7 @@ use App\Enums\AccountEntryStatus;
 use App\Enums\AccountTransactionType;
 use App\Models\Account;
 use App\Models\AccountTransaction;
+use App\Models\AccountTransfer;
 use App\Models\Location;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -310,4 +311,46 @@ it('blocks branch accountants from editing or deleting completed transactions', 
 
     $this->actingAs($accountant)->delete(route('transactions.destroy', $completedTx))
         ->assertForbidden();
+});
+
+it('paginates unified transactions and transfers across pages via SQL UNION ALL and filters accurately', function () {
+    actingAsSuperAdmin();
+
+    $cash = Account::factory()->cash()->withBalance(50000)->create(['name' => 'Union Cash']);
+    $bank = Account::factory()->bank()->withBalance(50000)->create(['name' => 'Union Bank']);
+
+    for ($i = 1; $i <= 7; $i++) {
+        AccountTransaction::factory()->completed()->create([
+            'account_id' => $cash->id,
+            'type' => AccountTransactionType::Expense,
+            'category' => 'Rent',
+            'amount' => 100 * $i,
+            'reference_no' => sprintf('EXP-UNION-%02d', $i),
+            'transaction_date' => now()->subDays(15 - ($i * 2))->toDateString(),
+        ]);
+
+        AccountTransfer::factory()->completed()->create([
+            'from_account_id' => $cash->id,
+            'to_account_id' => $bank->id,
+            'amount' => 200 * $i,
+            'reference_no' => sprintf('TRF-UNION-%02d', $i),
+            'transfer_date' => now()->subDays(14 - ($i * 2))->toDateString(),
+        ]);
+    }
+
+    // Total unified records = 14 -> Page 2 with per_page=10 must show the oldest 4 rows
+    $page1 = $this->get(route('transactions.index', ['per_page' => 10, 'page' => 1]))->assertOk();
+    $page1->assertSee('TRF-UNION-07')
+        ->assertDontSee('EXP-UNION-01');
+
+    $page2 = $this->get(route('transactions.index', ['per_page' => 10, 'page' => 2]))->assertOk();
+    $page2->assertSee('EXP-UNION-01')
+        ->assertSee('TRF-UNION-01')
+        ->assertDontSee('TRF-UNION-07');
+
+    // Category filter excludes transfers when a transaction category is chosen
+    $this->get(route('transactions.index', ['category' => 'Rent']))
+        ->assertOk()
+        ->assertSee('EXP-UNION-07')
+        ->assertDontSee('TRF-UNION-07');
 });
