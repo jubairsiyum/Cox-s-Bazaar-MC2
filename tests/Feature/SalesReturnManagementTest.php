@@ -514,3 +514,34 @@ it('leaves a salesman return unprocessed when the manager rejects it', function 
         ->and($unit->fresh()->quantity)->toBe(50)
         ->and((float) $invoice->fresh()->credit_amount)->toBe(0.0);
 });
+
+it('prevents double credit or double restocking when sales return approval is submitted twice', function () {
+    actingAsSuperAdmin();
+
+    $dst = Location::factory()->brandShop()->create();
+    $unit = Unit::factory()->create(['quantity' => 14]);
+    stockAtLocation($unit, 14, $dst->id);
+
+    $invoice = salesReturnParentInvoice($unit, 5, 400.0, [
+        'location_id' => $dst->id,
+        'paid_amount' => 2000,
+        'due_amount' => 0,
+    ]);
+    $salesReturn = SalesReturn::factory()->forInvoice($invoice)->create([
+        'refund_amount' => 1000,
+    ]);
+    $salesReturn->items()->create([
+        'unit_id' => $unit->id,
+        'quantity' => 1,
+        'unit_price' => 1000,
+        'subtotal' => 1000,
+        'condition' => 'good',
+        'restock' => true,
+    ]);
+
+    $this->patch(route('sales-returns.approve', $salesReturn))->assertRedirect(route('sales-returns.index'));
+    $this->patch(route('sales-returns.approve', $salesReturn))->assertSessionHas('error');
+
+    expect((float) $invoice->fresh()->credit_amount)->toBe(1000.0)
+        ->and($unit->fresh()->quantity)->toBe(15);
+});

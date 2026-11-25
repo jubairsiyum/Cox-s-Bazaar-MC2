@@ -18,18 +18,18 @@
         .doc-title { font-size: 16px; font-weight: 800; color: #15803d; text-transform: uppercase; letter-spacing: 0.03em; }
         .doc-detail { font-size: 10px; color: #64748b; margin-top: 2px; }
         .doc-detail strong { color: #0f172a; }
-        .amount-banner { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px 18px; text-align: center; margin: 16px 0; }
+        .amount-banner { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px 18px; text-align: center; margin: 16px 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         .amount-banner .label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #15803d; }
         .amount-banner .value { font-size: 26px; font-weight: 800; color: #15803d; margin-top: 4px; }
-        .party-box { display: flex; justify-content: space-between; gap: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; }
+        .party-box { display: flex; justify-content: space-between; gap: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         .party-box .label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; }
         .party-box .value { font-size: 12px; font-weight: 700; margin-top: 2px; }
         .party-box .sub { font-size: 10px; color: #64748b; margin-top: 1px; }
         table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
-        thead th { background-color: #1e293b !important; color: #fff; padding: 8px 10px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+        thead th { background-color: #1e293b !important; color: #fff !important; padding: 8px 10px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         thead th.right { text-align: right; }
         tbody td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; }
-        tbody tr:nth-child(even) { background-color: #f8fafc; }
+        tbody tr:nth-child(even) { background-color: #f8fafc; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         td.right { text-align: right; }
         .signature-row { display: flex; justify-content: space-between; gap: 40px; margin-top: 48px; }
         .signature { flex: 1; text-align: center; }

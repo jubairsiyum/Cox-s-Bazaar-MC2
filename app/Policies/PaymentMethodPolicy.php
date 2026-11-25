@@ -23,6 +23,10 @@ class PaymentMethodPolicy
 
     public function viewAny(User $user): bool
     {
+        if ($user->hasRole('Outlet Manager') && ! $user->hasAnyPermission(self::MANAGE_PERMISSIONS)) {
+            return false;
+        }
+
         return $user->hasAnyPermission(array_merge(['finance.view'], self::MANAGE_PERMISSIONS));
     }
 

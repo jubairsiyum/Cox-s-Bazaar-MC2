@@ -323,3 +323,28 @@ it('completes purchase due payments the outlet manager records for their own out
         ->and((float) $supplier->fresh()->purchase_due)->toBe(0.0)
         ->and($manager->fresh()->notifications()->count())->toBe(0);
 });
+
+it('aligns Outlet Manager route access with sidebar visibility on Master Data, Suppliers, and HQ Finance', function () {
+    $branch = Location::factory()->brandShop()->create(['name' => 'Outlet Beta']);
+    $outletManager = User::factory()->create(['email_verified_at' => now(), 'status' => 'active', 'branch_id' => $branch->id]);
+    $outletManager->assignRole('Outlet Manager');
+
+    foreach ([
+        'brands.index',
+        'categories.index',
+        'units.index',
+        'suppliers.index',
+        'cash-accounts.index',
+        'bank-accounts.index',
+        'transactions.index',
+        'transaction-categories.index',
+        'payment-methods.index',
+    ] as $routeName) {
+        $this->actingAs($outletManager)->get(route($routeName))->assertForbidden();
+    }
+
+    // Operational branch screens remain accessible
+    $this->actingAs($outletManager)->get(route('account-transfers.index'))->assertOk();
+    $this->actingAs($outletManager)->get(route('day-closings.index'))->assertOk();
+    $this->actingAs($outletManager)->get(route('purchase-invoices.index'))->assertOk();
+});

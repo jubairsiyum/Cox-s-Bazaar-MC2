@@ -12,6 +12,10 @@ class AccountPolicy
 {
     public function viewAny(User $user): bool
     {
+        if ($user->hasRole('Outlet Manager') && ! $user->hasAnyPermission(['finance.manage', 'cash-accounts.manage', 'bank-accounts.manage'])) {
+            return false;
+        }
+
         return $user->hasAnyPermission([
             'finance.view', 'finance.manage', 'cash-accounts.manage', 'bank-accounts.manage',
         ]);

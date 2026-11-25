@@ -54,8 +54,8 @@ class BranchTarget extends Model
      */
     public function achievedSales(): float
     {
-        $startDate = Carbon::createFromFormat('Y-m', $this->target_month)->startOfMonth();
-        $endDate = Carbon::createFromFormat('Y-m', $this->target_month)->endOfMonth();
+        $startDate = Carbon::createFromFormat('!Y-m', $this->target_month)->startOfMonth();
+        $endDate = Carbon::createFromFormat('!Y-m', $this->target_month)->endOfMonth();
 
         return (float) SalesInvoice::query()
             ->where('location_id', $this->location_id)

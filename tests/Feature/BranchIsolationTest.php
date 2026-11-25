@@ -369,3 +369,25 @@ it('assigns the seeded demo accounts to the flagship demo branch', function () {
             ->toBe($demoBranch->id);
     }
 });
+
+it('isolates BranchController index, edit, update, and destroy to the user own branch', function () {
+    $warehouse = Location::factory()->warehouse()->create(['name' => 'Main Warehouse']);
+    $ownBranch = Location::factory()->brandShop()->create(['name' => 'Cox Brand Shop']);
+
+    $manager = branchUserAt($ownBranch, 'Manager', 'Branch Cox Manager');
+
+    $this->actingAs($manager)
+        ->get(route('branches.index'))
+        ->assertOk()
+        ->assertSee('Cox Brand Shop')
+        ->assertDontSee('Main Warehouse');
+
+    $this->actingAs($manager)->get(route('branches.edit', $warehouse))->assertForbidden();
+    $this->actingAs($manager)->patch(route('branches.update', $warehouse), [
+        'name' => 'Hijacked Warehouse',
+        'type' => 'warehouse',
+    ])->assertForbidden();
+    $this->actingAs($manager)->delete(route('branches.destroy', $warehouse))->assertForbidden();
+
+    expect($warehouse->fresh()->name)->toBe('Main Warehouse');
+});

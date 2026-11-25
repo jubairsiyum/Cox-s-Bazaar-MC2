@@ -194,7 +194,7 @@ Route::middleware('auth')->group(function () {
     | Product Management (Master Data)
     |--------------------------------------------------------------------------
     */
-    Route::middleware(['verified', 'permission:products.view'])->group(function () {
+    Route::middleware(['verified', 'permission:products.view|products.manage'])->group(function () {
         Route::get('products', [ProductController::class, 'index'])->name('products.index');
     });
 
@@ -607,7 +607,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('account-transfers/{accountTransfer}/reject', [AccountTransferController::class, 'reject'])->name('account-transfers.reject');
     });
 
-    Route::middleware('permission:finance.view|finance.manage|dashboard.view')->group(function () {
+    Route::middleware('permission:finance.view|finance.manage|account-transfers.manage')->group(function () {
         Route::get('day-closings', [DayClosingController::class, 'index'])->name('day-closings.index');
         Route::get('day-closings/create', [DayClosingController::class, 'create'])->name('day-closings.create');
         Route::post('day-closings', [DayClosingController::class, 'store'])->name('day-closings.store');
@@ -744,7 +744,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     | Monthly Sales Targets — Super Admin sets per branch, branch managers track pacing & DoD
     */
     Route::get('branch-targets', [BranchTargetController::class, 'index'])
-        ->middleware('verified')
+        ->middleware(['verified', 'permission:sales-invoices.view|finance.view'])
         ->name('branch-targets.index');
     Route::post('branch-targets', [BranchTargetController::class, 'store'])
         ->middleware('verified')

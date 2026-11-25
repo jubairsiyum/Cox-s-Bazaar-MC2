@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\AccountEntryStatus;
+use App\Enums\AccountTransactionType;
 use App\Models\Account;
 use App\Models\AccountTransaction;
 use App\Models\Location;
@@ -279,4 +280,34 @@ it('freezes cancelled entries against edits', function () {
             'amount' => '100',
             'transaction_date' => now()->toDateString(),
         ])->assertForbidden();
+});
+
+it('blocks branch accountants from editing or deleting completed transactions', function () {
+    $branch = Location::factory()->brandShop()->create(['name' => 'Branch One']);
+    $accountant = User::factory()->create(['email_verified_at' => now(), 'status' => 'active', 'branch_id' => $branch->id]);
+    $accountant->assignRole('Accountant');
+
+    $branchCash = Account::factory()->cash()->withBalance(15000)->create([
+        'location_id' => $branch->id,
+        'name' => 'Till Branch One',
+    ]);
+
+    $completedTx = AccountTransaction::factory()->completed()->create([
+        'account_id' => $branchCash->id,
+        'location_id' => $branch->id,
+        'type' => AccountTransactionType::Expense,
+        'amount' => 500,
+        'created_by' => $accountant->id,
+    ]);
+
+    $this->actingAs($accountant)->patch(route('transactions.update', $completedTx), [
+        'account_id' => $branchCash->id,
+        'type' => 'expense',
+        'category' => 'Rent',
+        'amount' => '5000',
+        'transaction_date' => now()->toDateString(),
+    ])->assertForbidden();
+
+    $this->actingAs($accountant)->delete(route('transactions.destroy', $completedTx))
+        ->assertForbidden();
 });

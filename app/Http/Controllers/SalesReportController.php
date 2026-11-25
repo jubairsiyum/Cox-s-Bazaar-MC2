@@ -56,8 +56,8 @@ class SalesReportController extends Controller
             'paymentBreakdown' => $paymentBreakdown,
             'statusBreakdown' => $statusBreakdown,
             'customers' => Customer::query()->active()->orderBy('name')->get(['id', 'name']),
-            'locations' => Location::query()->active()->orderBy('name')->get(['id', 'name']),
-            'branches' => Branch::query()->orderBy('name')->get(['id', 'name']),
+            'locations' => SalesScope::scopeQuery(Location::query(), $request->user(), 'id')->active()->orderBy('name')->get(['id', 'name']),
+            'branches' => SalesScope::isRestricted($request->user()) ? collect() : Branch::query()->orderBy('name')->get(['id', 'name']),
         ]);
     }
 

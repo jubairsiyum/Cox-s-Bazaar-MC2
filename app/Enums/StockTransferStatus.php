@@ -52,7 +52,7 @@ enum StockTransferStatus: string
             self::Draft => [self::Draft, self::InTransit, self::Received, self::Cancelled],
             self::InTransit => [self::InTransit, self::Received, self::Cancelled],
             self::Requested => [self::Requested, self::InTransit, self::Received, self::Rejected],
-            self::Received => [self::Received, self::Cancelled],
+            self::Received => [self::Received],
             self::Rejected => [self::Rejected],
             self::Cancelled => [self::Cancelled],
         };

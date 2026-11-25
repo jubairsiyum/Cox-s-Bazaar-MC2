@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Enums\AccountTransactionType;
 use App\Enums\SalesInvoiceStatus;
 use App\Exceptions\DayClosedException;
+use App\Models\Account;
+use App\Models\AccountTransaction;
 use App\Models\DayClosing;
 use App\Models\Location;
 use App\Models\SalesInvoice;
@@ -403,4 +406,51 @@ it('sends in-app notification to branch managers when a day is reopened by Super
     expect($reopenNotification)->not->toBeNull()
         ->and($reopenNotification->data['title'])->toContain('Day Reopened')
         ->and($reopenNotification->data['body'])->toContain('Audit correction requested');
+});
+
+it('deducts completed cash-account expenses in DayClosingService calculations', function () {
+    $branch = Location::factory()->brandShop()->create(['name' => 'Cox Branch']);
+    $today = now()->toDateString();
+
+    $cashAccount = Account::factory()->cash()->withBalance(10000)->create(['location_id' => $branch->id]);
+    $bankAccount = Account::factory()->bank()->withBalance(10000)->create(['location_id' => $branch->id]);
+
+    SalesInvoice::factory()->posted()->create([
+        'location_id' => $branch->id,
+        'grand_total' => 10000,
+        'paid_amount' => 10000,
+        'due_amount' => 0,
+        'invoice_date' => $today,
+    ]);
+
+    // Only completed cash-account expenses count toward cash drawer deduction
+    AccountTransaction::factory()->completed()->create([
+        'account_id' => $cashAccount->id,
+        'location_id' => $branch->id,
+        'type' => AccountTransactionType::Expense,
+        'amount' => 2500,
+        'transaction_date' => $today,
+    ]);
+    AccountTransaction::factory()->pending()->create([
+        'account_id' => $cashAccount->id,
+        'location_id' => $branch->id,
+        'type' => AccountTransactionType::Expense,
+        'amount' => 500,
+        'transaction_date' => $today,
+    ]);
+    AccountTransaction::factory()->completed()->create([
+        'account_id' => $bankAccount->id,
+        'location_id' => $branch->id,
+        'type' => AccountTransactionType::Expense,
+        'amount' => 1000,
+        'transaction_date' => $today,
+    ]);
+
+    $summary = DayClosingService::calculateSummary($branch->id, $today);
+    $payable = DayClosingService::getPayableToHqSummary($branch->id);
+
+    expect((float) $summary['cash_sales'])->toBe(10000.0)
+        ->and((float) $summary['cash_expenses'])->toBe(2500.0)
+        ->and((float) $summary['system_cash'])->toBe(7500.0)
+        ->and($payable['cash_close_amount'])->toBe(7500.0);
 });

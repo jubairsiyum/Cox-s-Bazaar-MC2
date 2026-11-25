@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Cox's Bazaar Mobile Center">
+  <defs>
+    <linearGradient id="cmc2Bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e3a8a" />
+      <stop offset="100%" stop-color="#2563eb" />
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#cmc2Bg)" />
+  <rect x="17" y="12" width="30" height="40" rx="6" fill="none" stroke="#ffffff" stroke-width="3" />
+  <line x1="27" y1="18" x2="37" y2="18" stroke="#93c5fd" stroke-width="2.5" stroke-linecap="round" />
+  <circle cx="32" cy="45" r="2.2" fill="#ffffff" />
+  <path d="M24 31.5l5 5 11-11" fill="none" stroke="#34d399" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

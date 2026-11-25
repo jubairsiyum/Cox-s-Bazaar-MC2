@@ -24,7 +24,7 @@
                         <th class="py-3 px-4 text-end">Paid</th>
                         <th class="py-3 px-4 text-end">Due</th>
                         <th class="py-3 px-4">Status</th>
-                        <th class="py-3 pl-4"></th>
+                        <th class="py-3 pl-4 text-end">Details</th>
                     </tr>
                 </thead>
                 @foreach($branches as $branch)

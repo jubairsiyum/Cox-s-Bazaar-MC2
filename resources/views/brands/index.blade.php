@@ -22,13 +22,30 @@
         'direction' => $sort === $col && $direction === 'asc' ? 'desc' : 'asc',
     ]));
 
-    // Single lightweight aggregate query for product counts per brand (zero N+1)
-    $productStatsByBrand = \App\Models\Product::query()
-        ->whereNotNull('brand_id')
-        ->selectRaw("brand_id, COUNT(*) as total_count, SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_count")
-        ->groupBy('brand_id')
-        ->get()
-        ->keyBy('brand_id');
+    // Single lightweight aggregate query for product counts per brand (zero N+1, branch-scoped)
+    $currentUser = auth()->user();
+    $scopedLocationId = ($currentUser && \App\Services\BranchScope::isRestricted($currentUser))
+        ? \App\Services\BranchScope::locationId($currentUser)
+        : null;
+
+    if ($currentUser && \App\Services\BranchScope::isRestricted($currentUser)) {
+        $productStatsByBrand = $scopedLocationId === null
+            ? collect()
+            : \App\Models\Product::query()
+                ->whereNotNull('brand_id')
+                ->whereHas('units.locationStocks', fn ($q) => $q->where('location_id', $scopedLocationId)->where('quantity', '>', 0))
+                ->selectRaw("brand_id, COUNT(*) as total_count, SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_count")
+                ->groupBy('brand_id')
+                ->get()
+                ->keyBy('brand_id');
+    } else {
+        $productStatsByBrand = \App\Models\Product::query()
+            ->whereNotNull('brand_id')
+            ->selectRaw("brand_id, COUNT(*) as total_count, SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_count")
+            ->groupBy('brand_id')
+            ->get()
+            ->keyBy('brand_id');
+    }
 
     $totalBrandsCount = $brands->total();
     $totalLinkedProducts = (int) $productStatsByBrand->sum('total_count');

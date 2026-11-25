@@ -378,3 +378,61 @@ it('sends in-app notifications to Central HQ and creator on cash remittance life
         ->and($approvedNotif->data['title'])->toContain('Cash Remittance Approved')
         ->and($approvedNotif->data['body'])->toContain('30,000');
 });
+
+it('blocks branch users from editing completed transfers and hides HQ destination balances', function () {
+    $branch = Location::factory()->brandShop()->create(['name' => 'Branch One']);
+    $outletManager = User::factory()->create(['email_verified_at' => now(), 'status' => 'active', 'branch_id' => $branch->id]);
+    $outletManager->assignRole('Outlet Manager');
+
+    $branchCash = Account::factory()->cash()->withBalance(15000)->create([
+        'location_id' => $branch->id,
+        'name' => 'Till Branch One',
+    ]);
+    $hqBank = Account::factory()->bank()->withBalance(987654)->create([
+        'location_id' => null,
+        'name' => 'Central HQ Vault',
+    ]);
+
+    // Branch user cannot see HQ balance in To Account dropdown
+    $this->actingAs($outletManager)
+        ->get(route('account-transfers.create'))
+        ->assertOk()
+        ->assertSee('Till Branch One')
+        ->assertSee('Central HQ Vault')
+        ->assertDontSee('987,654.00');
+
+    // Completed transfer cannot be modified by branch users
+    $completedTransfer = AccountTransfer::factory()->completed()->create([
+        'from_account_id' => $branchCash->id,
+        'to_account_id' => $hqBank->id,
+        'location_id' => $branch->id,
+        'amount' => 5000,
+        'created_by' => $outletManager->id,
+    ]);
+
+    $this->actingAs($outletManager)->patch(route('account-transfers.update', $completedTransfer), [
+        'from_account_id' => $branchCash->id,
+        'to_account_id' => $hqBank->id,
+        'amount' => '100',
+        'transfer_date' => now()->toDateString(),
+    ])->assertForbidden();
+});
+
+it('keeps account transfer approvals idempotent across repeated requests', function () {
+    actingAsSuperAdmin();
+
+    $fromAcc = Account::factory()->cash()->withBalance(5000)->create();
+    $toAcc = Account::factory()->bank()->withBalance(1000)->create();
+    $transfer = AccountTransfer::factory()->pending()->create([
+        'from_account_id' => $fromAcc->id,
+        'to_account_id' => $toAcc->id,
+        'amount' => 1000,
+        'status' => AccountEntryStatus::Pending,
+    ]);
+
+    $this->patch(route('account-transfers.approve', $transfer))->assertSessionHas('success');
+    $this->patch(route('account-transfers.approve', $transfer))->assertSessionHas('error');
+
+    expect((float) $fromAcc->fresh()->current_balance)->toBe(4000.0)
+        ->and((float) $toAcc->fresh()->current_balance)->toBe(2000.0);
+});

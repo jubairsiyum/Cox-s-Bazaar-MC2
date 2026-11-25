@@ -288,7 +288,7 @@
                             <th class="py-3.5 px-5">Branch</th>
                             <th class="py-3.5 px-5">Purchase</th>
                             <th class="py-3.5 px-5">Message</th>
-                            <th class="py-3.5 px-5">Amount</th>
+                            <th class="py-3.5 px-5 text-end">Amount</th>
                             <th class="py-3.5 px-5">Status</th>
                             <th class="py-3.5 px-5 text-end">Action</th>
                         </tr>
@@ -312,7 +312,7 @@
                                     @endif
                                 </td>
                                 <td class="py-3.5 px-5 text-xs text-muted max-w-64 truncate" title="{{ $paymentRequest->message }}">{{ $paymentRequest->message }}</td>
-                                <td class="py-3.5 px-5 text-sm font-semibold text-ink tabular-nums">{{ $paymentRequest->amount !== null ? \App\Helpers\Money::format($paymentRequest->amount) : '—' }}</td>
+                                <td class="py-3.5 px-5 text-end text-sm font-semibold text-ink tabular-nums">{{ $paymentRequest->amount !== null ? \App\Helpers\Money::format($paymentRequest->amount) : '—' }}</td>
                                 <td class="py-3.5 px-5">
                                     @php
                                         $requestStatusKey = match ($paymentRequest->status->value) {

@@ -390,3 +390,16 @@ it('blocks sales invoice exports without the register permissions', function () 
         ->get(route('sales-invoices.export', ['format' => 'xlsx']))
         ->assertForbidden();
 });
+
+it('serves logo.svg fallback and renders unified print-color-adjust CSS on invoice print', function () {
+    actingAsSuperAdmin();
+
+    expect(file_exists(public_path('images/logo.svg')))->toBeTrue();
+
+    $invoice = SalesInvoice::factory()->posted()->create();
+    $this->get(route('sales-invoices.print', $invoice))
+        ->assertOk()
+        ->assertSee('print-color-adjust: exact !important;', false)
+        ->assertSee('Print / Save as PDF')
+        ->assertSee('cmc2-logo.jpeg', false);
+});

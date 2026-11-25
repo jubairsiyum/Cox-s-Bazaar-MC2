@@ -31,3 +31,13 @@ it('renders tailadmin showcase routes for authenticated users', function () {
     $this->actingAs($user)->get(route('alerts'))->assertOk();
     $this->actingAs($user)->get(route('buttons'))->assertOk();
 });
+
+it('attaches security headers to authenticated ERP responses', function () {
+    actingAsSuperAdmin();
+
+    $this->get(route('dashboard'))
+        ->assertOk()
+        ->assertHeader('X-Frame-Options', 'DENY')
+        ->assertHeader('X-Content-Type-Options', 'nosniff')
+        ->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+});

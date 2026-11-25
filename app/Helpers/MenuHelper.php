@@ -93,7 +93,7 @@ class MenuHelper
                     ['name' => 'Sales Invoices', 'path' => '/sales-invoices', 'canany' => ['sales-invoices.view', 'sales-invoices.manage', 'sales-invoices.post']],
                     ['name' => 'Sales Returns', 'path' => '/sales-returns', 'can' => 'sales-returns.manage'],
                     ['name' => 'Collections', 'path' => '/collections', 'canany' => ['sales-invoices.view', 'sales-invoices.manage', 'customer-collections.manage']],
-                    ['name' => 'Monthly Targets', 'path' => '/branch-targets', 'canany' => ['sales-invoices.view', 'dashboard.view']],
+                    ['name' => 'Monthly Targets', 'path' => '/branch-targets', 'canany' => ['sales-invoices.view', 'finance.view']],
                 ],
             ],
             [
@@ -118,7 +118,7 @@ class MenuHelper
                     ['name' => 'Transaction Category', 'path' => '/transaction-categories', 'canany' => ['finance.view', 'finance.manage', 'income-transactions.manage', 'expense-transactions.manage']],
                     ['name' => 'Method', 'path' => '/payment-methods', 'canany' => ['finance.view', 'finance.manage', 'income-transactions.manage', 'expense-transactions.manage']],
                     ['name' => 'Transfer', 'path' => '/account-transfers', 'canany' => ['finance.view', 'finance.manage', 'account-transfers.manage']],
-                    ['name' => 'Daily Cash Close', 'path' => '/day-closings', 'canany' => ['finance.view', 'finance.manage', 'dashboard.view']],
+                    ['name' => 'Daily Cash Close', 'path' => '/day-closings', 'canany' => ['finance.view', 'finance.manage', 'account-transfers.manage']],
                     ['name' => 'Supplier Payment', 'path' => '/supplier-payments', 'canany' => ['finance.view', 'finance.manage', 'supplier-payments.view', 'supplier-payments.manage']],
                 ],
             ],

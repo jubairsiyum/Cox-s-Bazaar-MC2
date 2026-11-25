@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\LocationType;
 use App\Models\BranchTarget;
 use App\Models\Location;
 use App\Services\BranchScope;
 use App\Services\TargetService;
 use Carbon\Carbon;
+use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -23,6 +25,8 @@ class BranchTargetController extends Controller
     public function index(Request $request): View
     {
         $user = $request->user();
+        abort_if($user->isSupplierPortalUser(), 403);
+
         $isSuperAdmin = $user->isSuperAdmin();
 
         $monthInput = $request->query('month');
@@ -30,11 +34,15 @@ class BranchTargetController extends Controller
             ? $monthInput
             : now()->format('Y-m');
 
-        $activeDate = Carbon::createFromFormat('Y-m', $month);
+        $activeDate = Carbon::createFromFormat('!Y-m', $month);
 
         if ($isSuperAdmin) {
             $overview = TargetService::getNetworkOverview($month);
-            $locations = Location::where('status', 'active')->orderBy('name')->get(['id', 'name', 'code', 'type']);
+            $locations = Location::query()
+                ->where('status', 'active')
+                ->where('type', '!=', LocationType::Warehouse)
+                ->orderBy('name')
+                ->get(['id', 'name', 'code', 'type']);
 
             return view('branch-targets.index', [
                 'isSuperAdmin' => true,
@@ -74,7 +82,17 @@ class BranchTargetController extends Controller
         }
 
         $validated = $request->validate([
-            'location_id' => ['required', 'integer', 'exists:locations,id'],
+            'location_id' => [
+                'required',
+                'integer',
+                'exists:locations,id',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    $location = Location::query()->find((int) $value);
+                    if ($location !== null && $location->type === LocationType::Warehouse) {
+                        $fail('Monthly sales targets apply to retail outlets and placements only.');
+                    }
+                },
+            ],
             'target_month' => ['required', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/'],
             'target_amount' => ['required', 'numeric', 'min:0', 'max:999999999999.99'],
             'notes' => ['nullable', 'string', 'max:500'],

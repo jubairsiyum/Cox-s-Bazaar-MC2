@@ -12,7 +12,7 @@ class DayClosingPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->hasAnyPermission(['finance.view', 'finance.manage', 'dashboard.view']);
+        return $user->hasAnyPermission(['finance.view', 'finance.manage', 'account-transfers.manage']);
     }
 
     public function view(User $user, DayClosing $dayClosing): bool
@@ -23,7 +23,7 @@ class DayClosingPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasAnyPermission(['finance.manage', 'dashboard.view'])
+        return $user->hasAnyPermission(['finance.manage', 'account-transfers.manage'])
             && (BranchScope::locationId($user) !== null || BranchScope::isUnrestricted($user));
     }
 

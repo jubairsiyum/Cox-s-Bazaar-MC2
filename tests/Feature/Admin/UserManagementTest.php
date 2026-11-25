@@ -3,6 +3,7 @@
 use App\Models\Location;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Database\Seeders\SettingsSeeder;
 
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
@@ -151,4 +152,73 @@ it('prevents deleting the Super Admin role holder', function () {
     $otherSuperAdmin->assignRole('Super Admin');
 
     $this->delete(route('users.destroy', $otherSuperAdmin))->assertForbidden();
+});
+
+it('blocks a branch manager from editing Super Admin or escalating roles', function () {
+    $this->seed(SettingsSeeder::class);
+
+    $branchA = Location::factory()->brandShop()->create(['name' => 'Branch A']);
+    $branchB = Location::factory()->brandShop()->create(['name' => 'Branch B']);
+
+    $superAdmin = User::factory()->create(['email_verified_at' => now(), 'status' => 'active']);
+    $superAdmin->assignRole('Super Admin');
+
+    $manager = User::factory()->create(['email_verified_at' => now(), 'status' => 'active', 'branch_id' => $branchA->id]);
+    $manager->assignRole('Manager');
+
+    $colleague = User::factory()->create(['email_verified_at' => now(), 'status' => 'active', 'branch_id' => $branchA->id]);
+    $colleague->assignRole('Sales Staff');
+
+    $otherBranchUser = User::factory()->create(['email_verified_at' => now(), 'status' => 'active', 'branch_id' => $branchB->id]);
+    $otherBranchUser->assignRole('Sales Staff');
+
+    // Manager does not see Super Admin role in create/edit UI
+    $this->actingAs($manager)->get(route('users.create'))
+        ->assertOk()
+        ->assertDontSee('value="Super Admin"', false);
+
+    // Manager cannot update Super Admin (IDOR) or another branch's user
+    $this->actingAs($manager)->patch(route('users.update', $superAdmin), [
+        'name' => 'Hacked Admin',
+        'email' => $superAdmin->email,
+        'status' => 'active',
+    ])->assertForbidden();
+
+    $this->actingAs($manager)->patch(route('users.update', $otherBranchUser), [
+        'name' => 'Other Staff',
+        'email' => $otherBranchUser->email,
+        'status' => 'active',
+    ])->assertForbidden();
+
+    // Manager cannot create a user with Super Admin role
+    $this->actingAs($manager)->post(route('users.store'), [
+        'name' => 'Rogue Admin',
+        'email' => 'rogue@example.com',
+        'password' => 'Password@123',
+        'password_confirmation' => 'Password@123',
+        'status' => 'active',
+        'branch_id' => $branchA->id,
+        'roles' => ['Super Admin'],
+    ])->assertSessionHasErrors('roles.0');
+
+    expect(User::where('email', 'rogue@example.com')->exists())->toBeFalse();
+
+    // Manager cannot promote colleague or self to Super Admin
+    $this->actingAs($manager)->patch(route('users.update', $colleague), [
+        'name' => $colleague->name,
+        'email' => $colleague->email,
+        'status' => 'active',
+        'roles' => ['Super Admin'],
+    ])->assertSessionHasErrors('roles.0');
+
+    expect($colleague->fresh()->hasRole('Super Admin'))->toBeFalse();
+
+    $this->actingAs($manager)->patch(route('users.update', $manager), [
+        'name' => $manager->name,
+        'email' => $manager->email,
+        'status' => 'active',
+        'roles' => ['Manager', 'Outlet Manager'],
+    ])->assertSessionHasErrors('roles');
+
+    expect($manager->fresh()->roles->pluck('name')->all())->toBe(['Manager']);
 });

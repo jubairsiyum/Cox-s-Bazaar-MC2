@@ -41,7 +41,7 @@ class BranchController extends Controller
             : 'name';
         $direction = $request->string('direction')->toString() === 'desc' ? 'desc' : 'asc';
 
-        $locations = Location::query()
+        $locations = BranchScope::scopeQuery(Location::query(), $request->user(), 'id')
             ->when($request->filled('search'), fn ($q) => $q->search($request->string('search')->toString()))
             ->orderBy($sort, $direction)
             ->paginate($perPage)
@@ -117,9 +117,10 @@ class BranchController extends Controller
     /**
      * Show the form for editing the specified location.
      */
-    public function edit(Location $location): View
+    public function edit(Request $request, Location $location): View
     {
         $this->authorize('update', $location);
+        abort_unless(BranchScope::canAccess($request->user(), $location->id), 403);
 
         return view('branches.edit', ['location' => $location]);
     }
@@ -129,6 +130,8 @@ class BranchController extends Controller
      */
     public function update(UpdateLocationRequest $request, Location $location): RedirectResponse
     {
+        abort_unless(BranchScope::canAccess($request->user(), $location->id), 403);
+
         $original = $location->getOriginal();
         $validated = $request->validated();
 
@@ -145,9 +148,10 @@ class BranchController extends Controller
     /**
      * Remove the specified location from storage.
      */
-    public function destroy(Location $location): RedirectResponse
+    public function destroy(Request $request, Location $location): RedirectResponse
     {
         $this->authorize('delete', $location);
+        abort_unless(BranchScope::canAccess($request->user(), $location->id), 403);
 
         $location->delete();
 

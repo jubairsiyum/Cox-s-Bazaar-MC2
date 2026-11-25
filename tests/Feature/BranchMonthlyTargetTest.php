@@ -8,6 +8,7 @@ use App\Models\Location;
 use App\Models\SalesInvoice;
 use App\Models\User;
 use App\Services\TargetService;
+use Carbon\Carbon;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\SettingsSeeder;
 
@@ -19,7 +20,7 @@ beforeEach(function () {
 it('allows Super Admin to view the branch targets index page with network metrics', function () {
     actingAsSuperAdmin();
 
-    $location = Location::factory()->create(['name' => 'Cox Bazar Flagship', 'status' => 'active']);
+    $location = Location::factory()->brandShop()->create(['name' => 'Cox Bazar Flagship', 'status' => 'active']);
 
     BranchTarget::create([
         'location_id' => $location->id,
@@ -39,7 +40,7 @@ it('allows Super Admin to view the branch targets index page with network metric
 
 it('allows Super Admin to store or update monthly targets for a branch', function () {
     $admin = actingAsSuperAdmin();
-    $location = Location::factory()->create(['name' => 'Teknaf Outlet', 'status' => 'active']);
+    $location = Location::factory()->brandShop()->create(['name' => 'Teknaf Outlet', 'status' => 'active']);
     $currentMonth = now()->format('Y-m');
 
     $response = $this->post(route('branch-targets.store'), [
@@ -76,7 +77,7 @@ it('allows Super Admin to store or update monthly targets for a branch', functio
 });
 
 it('blocks non-Super Admin from setting or altering branch targets', function () {
-    $location = Location::factory()->create(['status' => 'active']);
+    $location = Location::factory()->brandShop()->create(['status' => 'active']);
 
     $manager = User::factory()->create([
         'email_verified_at' => now(),
@@ -96,8 +97,8 @@ it('blocks non-Super Admin from setting or altering branch targets', function ()
 });
 
 it('allows Branch Manager to view their scoped monthly target and Day-over-Day pacing', function () {
-    $locationA = Location::factory()->create(['name' => 'Branch A', 'status' => 'active']);
-    $locationB = Location::factory()->create(['name' => 'Branch B', 'status' => 'active']);
+    $locationA = Location::factory()->brandShop()->create(['name' => 'Branch A', 'status' => 'active']);
+    $locationB = Location::factory()->brandShop()->create(['name' => 'Branch B', 'status' => 'active']);
 
     $currentMonth = now()->format('Y-m');
 
@@ -132,7 +133,7 @@ it('allows Branch Manager to view their scoped monthly target and Day-over-Day p
 });
 
 it('accurately computes target achievement, Day-over-Day growth, and daily required run-rate via TargetService', function () {
-    $location = Location::factory()->create(['status' => 'active']);
+    $location = Location::factory()->brandShop()->create(['status' => 'active']);
     $currentMonth = now()->format('Y-m');
 
     BranchTarget::create([
@@ -178,4 +179,28 @@ it('accurately computes target achievement, Day-over-Day growth, and daily requi
         ->and($perf['yesterday_sales'])->toBe(10000.0)
         ->and($perf['dod_diff_amount'])->toBe(5000.0)
         ->and($perf['dod_growth_pct'])->toBe(50.0); // (15000 - 10000)/10000 * 100 = 50%
+});
+
+it('filters warehouses out of branch targets and parses !Y-m months safely on day 31', function () {
+    actingAsSuperAdmin();
+
+    $warehouse = Location::factory()->warehouse()->create(['name' => 'Central Depot']);
+    $shop = Location::factory()->brandShop()->create(['name' => 'Teknaf Shop']);
+
+    Carbon::setTestNow('2026-01-31 12:00:00');
+    try {
+        $response = $this->get(route('branch-targets.index', ['month' => '2026-02']));
+
+        $response->assertOk()
+            ->assertViewHas('activeDate', fn (Carbon $d) => $d->format('Y-m') === '2026-02')
+            ->assertViewHas('locations', fn ($locs) => $locs->contains('id', $shop->id) && ! $locs->contains('id', $warehouse->id));
+
+        $this->post(route('branch-targets.store'), [
+            'location_id' => $warehouse->id,
+            'target_month' => '2026-02',
+            'target_amount' => 100000,
+        ])->assertSessionHasErrors('location_id');
+    } finally {
+        Carbon::setTestNow();
+    }
 });

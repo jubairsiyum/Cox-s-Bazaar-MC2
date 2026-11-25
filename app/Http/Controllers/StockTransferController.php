@@ -276,13 +276,29 @@ class StockTransferController extends Controller
     {
         $this->authorize('delete', $stockTransfer);
 
-        abort_if($stockTransfer->status === StockTransferStatus::Requested, 403, 'A pending stock request must be approved or rejected before it can be deleted.');
+        $blockedReason = DB::transaction(function () use ($stockTransfer): ?string {
+            $locked = StockTransfer::query()->whereKey($stockTransfer->id)->lockForUpdate()->firstOrFail();
 
-        if ($stockTransfer->status === StockTransferStatus::InTransit) {
-            return back()->with('error', "Stock transfer '{$stockTransfer->reference_no}' is in transit. Cancel it before deleting.");
+            if ($locked->status === StockTransferStatus::Requested) {
+                abort(403, 'A pending stock request must be approved or rejected before it can be deleted.');
+            }
+
+            if ($locked->status === StockTransferStatus::InTransit) {
+                return "Stock transfer '{$locked->reference_no}' is in transit. Cancel it before deleting.";
+            }
+
+            if ($locked->status === StockTransferStatus::Received) {
+                return "Received stock transfer '{$locked->reference_no}' cannot be deleted because stock has already been posted to the destination.";
+            }
+
+            $locked->delete();
+
+            return null;
+        });
+
+        if ($blockedReason !== null) {
+            return back()->with('error', $blockedReason);
         }
-
-        $stockTransfer->delete();
 
         AuditService::deleted($stockTransfer, "Stock transfer '{$stockTransfer->reference_no}' deleted.");
 

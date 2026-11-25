@@ -13,7 +13,7 @@
     ]));
 
     // Single lightweight aggregate query for KPI intelligence strip (zero N+1)
-    $locationStats = \App\Models\Location::query()
+    $locationStats = \App\Services\BranchScope::scopeQuery(\App\Models\Location::query(), auth()->user(), 'id')
         ->selectRaw("
             COUNT(*) as total_count,
             SUM(CASE WHEN type = 'warehouse' THEN 1 ELSE 0 END) as warehouse_count,

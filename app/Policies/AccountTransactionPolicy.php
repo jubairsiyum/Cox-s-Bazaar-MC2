@@ -42,6 +42,10 @@ class AccountTransactionPolicy
 
     public function viewAny(User $user): bool
     {
+        if ($user->hasRole('Outlet Manager') && ! $user->hasAnyPermission(['finance.manage', 'income-transactions.manage', 'expense-transactions.manage'])) {
+            return false;
+        }
+
         return $user->hasAnyPermission([
             'finance.view', 'finance.manage', 'income-transactions.manage', 'expense-transactions.manage',
         ]);

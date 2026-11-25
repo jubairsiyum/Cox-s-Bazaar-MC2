@@ -23,8 +23,7 @@ class RolesAndPermissionsSeeder extends Seeder
             // Roles
             'roles.view', 'roles.manage',
             // Products
-            'brands.manage', 'brands.view', 'categories.manage', 'categories.view', 'units.manage', 'units.view', 'products.manage',
-            'products.view',
+            'brands.manage', 'brands.view', 'categories.manage', 'categories.view', 'units.manage', 'units.view', 'products.manage', 'products.view',
             // Suppliers
             'suppliers.manage', 'suppliers.view',
             // Customers
@@ -72,7 +71,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'dashboard.view',
             'users.view', 'users.create', 'users.update',
             'manage-users',
-            'brands.manage', 'brands.view', 'categories.manage', 'categories.view', 'units.manage', 'units.view', 'products.manage',
+            'brands.manage', 'brands.view', 'categories.manage', 'categories.view', 'units.manage', 'units.view', 'products.manage', 'products.view',
             'suppliers.manage', 'suppliers.view',
             'customers.manage', 'customers.view',
             'branches.manage', 'inventory.view',
@@ -110,7 +109,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $salesStaff = Role::firstOrCreate(['name' => 'Sales Staff', 'guard_name' => 'web']);
         $salesStaff->syncPermissions([
             'dashboard.view',
-            'products.view', 'brands.view', 'categories.view', 'units.view', 'customers.view', 'inventory.view',
+            'products.view', 'brands.view', 'categories.view', 'customers.view', 'inventory.view',
             'sales-orders.manage', 'sales-invoices.manage',
             'sales-invoices.post', 'sales-invoices.view',
             'sales-returns.manage',
@@ -123,8 +122,8 @@ class RolesAndPermissionsSeeder extends Seeder
         $outletManager = Role::firstOrCreate(['name' => 'Outlet Manager', 'guard_name' => 'web']);
         $outletManager->syncPermissions([
             'dashboard.view',
-            'products.view', 'brands.view', 'categories.view', 'units.view',
-            'suppliers.view', 'customers.view', 'inventory.view',
+            'products.view',
+            'customers.view', 'inventory.view',
             'stock-adjustments.manage', 'stock-transfers.manage', 'stock-transfers.approve',
             'account-transfers.manage',
             'purchase-orders.manage', 'purchase-invoices.manage',

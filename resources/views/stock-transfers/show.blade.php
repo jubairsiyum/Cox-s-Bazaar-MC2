@@ -12,16 +12,75 @@
     $canApprove = auth()->user()?->can('approve', $transfer) && $canDecide;
     $canReject = auth()->user()?->can('reject', $transfer) && $canDecide;
     $canCancel = auth()->user()?->can('cancel', $transfer) && in_array($transfer->status, [\App\Enums\StockTransferStatus::Draft, \App\Enums\StockTransferStatus::InTransit], true);
+    $companyName = \App\Models\Setting::get('company_name', config('app.name', "Cox's Bazaar Mobile Center"));
+    $companyAddress = \App\Models\Setting::get('company_address', "Cox's Bazaar, Chittagong, Bangladesh");
+    $companyPhone = \App\Models\Setting::get('company_phone', '+880 1800-000000');
 @endphp
 
 <style>
+    .print-only { display: none; }
     @media print {
+        @page { margin: 12mm 15mm 15mm 15mm; size: A4 portrait; }
+        html, body, html.dark {
+            --canvas: #ffffff !important;
+            --shell: #ffffff !important;
+            --surface: #ffffff !important;
+            --soft: #f8fafc !important;
+            --ink: #0f172a !important;
+            --muted: #475569 !important;
+            --line: #cbd5e1 !important;
+            color-scheme: light !important;
+            background: #ffffff !important;
+            color: #0f172a !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
         header, aside, nav, .no-print { display: none !important; }
-        main { padding: 0 !important; }
+        main { padding: 0 !important; margin: 0 !important; background: #ffffff !important; }
+        .print-only { display: block !important; }
+        .print-sheet-reset, .rounded-3xl, .rounded-2xl {
+            box-shadow: none !important;
+            background: #ffffff !important;
+            color: #0f172a !important;
+            border-color: #cbd5e1 !important;
+        }
+        table.data-table thead th {
+            background-color: #1e293b !important;
+            color: #ffffff !important;
+            border: 1px solid #1e293b !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        table.data-table tbody td {
+            border-color: #e2e8f0 !important;
+            color: #0f172a !important;
+        }
     }
 </style>
 
 <div x-data="{ confirmModal: { open: false, kind: 'approve' } }" class="space-y-6">
+
+    {{-- Unified Light-Paper Letterhead (Print Mode Only) --}}
+    <div class="print-only" style="padding-bottom: 16px; border-bottom: 2px solid #1e3a8a; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
+            <div style="display: flex; align-items: center; gap: 14px;">
+                <img src="{{ asset('cmc2-logo.jpeg') }}" alt="{{ $companyName }}"
+                     onerror="this.onerror=null;this.src='{{ asset('images/logo.svg') }}'"
+                     style="width: 52px; height: 52px; border-radius: 10px; object-fit: contain; border: 1px solid #e2e8f0; padding: 2px; background: #fff;">
+                <div>
+                    <h1 style="font-size: 18px; font-weight: 800; color: #0f172a; margin: 0;">{{ $companyName }}</h1>
+                    <div style="font-size: 10px; font-weight: 700; color: #2563eb; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px;">Distribution &amp; Brand Shop Management</div>
+                    <div style="font-size: 10.5px; color: #475569; margin-top: 3px;">{{ $companyAddress }} · {{ $companyPhone }}</div>
+                </div>
+            </div>
+            <div style="text-align: right; border-left: 1px solid #e2e8f0; padding-left: 18px; font-size: 10.5px; color: #475569;">
+                <div style="font-size: 16px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.03em;">Stock Transfer Invoice</div>
+                <div style="margin-top: 2px;">Ref No: <strong style="color: #0f172a;">{{ $transfer->reference_no }}</strong></div>
+                <div style="margin-top: 2px;">Date: <strong style="color: #0f172a;">{{ $transfer->transfer_date->format('d/m/Y h:i A') }}</strong></div>
+                <div style="margin-top: 2px;">Status: <strong style="color: #0f172a;">{{ $transferStatus['label'] }}</strong></div>
+            </div>
+        </div>
+    </div>
 
     {{-- Executive Header & Action Bar --}}
     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between no-print">
@@ -402,6 +461,27 @@
                     </form>
                 @endif
             </div>
+        </div>
+    </div>
+
+    {{-- Print-Only Signature Block & Footer --}}
+    <div class="print-only" style="margin-top: 40px;">
+        <div style="display: flex; justify-content: space-between; gap: 36px;">
+            <div style="flex: 1; text-align: center;">
+                <div style="border-top: 1px dashed #94a3b8; margin-bottom: 6px;"></div>
+                <div style="font-size: 10px; font-weight: 700; color: #0f172a; text-transform: uppercase; letter-spacing: 0.05em;">Dispatched By</div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+                <div style="border-top: 1px dashed #94a3b8; margin-bottom: 6px;"></div>
+                <div style="font-size: 10px; font-weight: 700; color: #0f172a; text-transform: uppercase; letter-spacing: 0.05em;">Verified By</div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+                <div style="border-top: 1px dashed #94a3b8; margin-bottom: 6px;"></div>
+                <div style="font-size: 10px; font-weight: 700; color: #0f172a; text-transform: uppercase; letter-spacing: 0.05em;">Received By</div>
+            </div>
+        </div>
+        <div style="margin-top: 20px; padding-top: 10px; border-top: 1px solid #cbd5e1; text-align: center; font-size: 9.5px; color: #64748b;">
+            This is a computer-generated stock transfer record · {{ $companyName }} · Printed {{ now()->format('d/m/Y h:i A') }}
         </div>
     </div>
 

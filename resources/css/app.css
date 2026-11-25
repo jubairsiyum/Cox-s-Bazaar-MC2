@@ -1365,6 +1365,7 @@ pre[class*="language-"].line-numbers {
    ERP MODULE STYLES & DARK MODE COMPATIBILITY
 ═══════════════════════════════════════════════════════════ */
 
+@layer components {
 /* Cards */
 .card {
     background: var(--surface);
@@ -2103,6 +2104,7 @@ table.data-table tfoot td {
 .dark .avatar {
     background: var(--soft);
     color: var(--brand-500);
+}
 }
 
 @media (max-width: 768px) {

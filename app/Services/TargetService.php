@@ -21,7 +21,7 @@ class TargetService
     public static function getBranchPerformance(int $locationId, ?string $month = null): array
     {
         $targetMonth = $month ?? now()->format('Y-m');
-        $monthDate = Carbon::createFromFormat('Y-m', $targetMonth);
+        $monthDate = Carbon::createFromFormat('!Y-m', $targetMonth);
         $startOfMonth = $monthDate->copy()->startOfMonth();
         $endOfMonth = $monthDate->copy()->endOfMonth();
 
@@ -176,7 +176,7 @@ class TargetService
     public static function getDailySalesForMonth(?int $locationId = null, ?string $month = null): array
     {
         $targetMonth = $month ?? now()->format('Y-m');
-        $monthDate = Carbon::createFromFormat('Y-m', $targetMonth);
+        $monthDate = Carbon::createFromFormat('!Y-m', $targetMonth);
         $startOfMonth = $monthDate->copy()->startOfMonth();
         $endOfMonth = $monthDate->copy()->endOfMonth();
         $daysInMonth = (int) $monthDate->daysInMonth;

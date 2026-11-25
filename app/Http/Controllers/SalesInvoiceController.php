@@ -68,8 +68,8 @@ class SalesInvoiceController extends Controller
             'direction' => $direction,
             'totals' => $this->totals($request),
             'customers' => Customer::query()->active()->orderBy('name')->get(['id', 'name']),
-            'locations' => Location::query()->active()->orderBy('name')->get(['id', 'name']),
-            'branches' => Branch::query()->orderBy('name')->get(['id', 'name']),
+            'locations' => SalesScope::scopeQuery(Location::query(), $request->user(), 'id')->active()->orderBy('name')->get(['id', 'name']),
+            'branches' => SalesScope::isRestricted($request->user()) ? collect() : Branch::query()->orderBy('name')->get(['id', 'name']),
             'statusOptions' => SalesInvoiceStatus::options(),
         ]);
     }
@@ -108,7 +108,7 @@ class SalesInvoiceController extends Controller
 
         return view('sales-invoices.create', [
             'customers' => Customer::query()->active()->orderBy('name')->get(),
-            'locations' => Location::query()->active()->orderBy('name')->get(['id', 'name']),
+            'locations' => SalesScope::scopeQuery(Location::query(), $request->user(), 'id')->active()->orderBy('name')->get(['id', 'name']),
             'salesOrder' => $order,
             'rows' => $this->itemRows($order, $this->oldItems()),
             'defaultLocationId' => old('location_id') ?: Auth::user()?->branch_id,
@@ -185,7 +185,7 @@ class SalesInvoiceController extends Controller
     /**
      * Show the form for editing a draft invoice.
      */
-    public function edit(SalesInvoice $salesInvoice): View
+    public function edit(Request $request, SalesInvoice $salesInvoice): View
     {
         $this->authorize('update', $salesInvoice);
 
@@ -202,7 +202,7 @@ class SalesInvoiceController extends Controller
         return view('sales-invoices.edit', [
             'invoice' => $salesInvoice,
             'customers' => Customer::query()->active()->orderBy('name')->get(),
-            'locations' => Location::query()->active()->orderBy('name')->get(['id', 'name']),
+            'locations' => SalesScope::scopeQuery(Location::query(), $request->user(), 'id')->active()->orderBy('name')->get(['id', 'name']),
             'salesOrder' => $order,
             'rows' => $this->itemRows($order, $this->oldItems($salesInvoice)),
         ]);

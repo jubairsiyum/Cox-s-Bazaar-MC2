@@ -47,13 +47,14 @@ class StockTransferPolicy
     public function update(User $user, StockTransfer $stockTransfer): bool
     {
         return ! $stockTransfer->is_request
+            && $stockTransfer->status !== StockTransferStatus::Received
             && $user->can('stock-transfers.manage')
             && LocationScope::canAccess($user, $stockTransfer->from_location_id);
     }
 
     public function delete(User $user, StockTransfer $stockTransfer): bool
     {
-        return $stockTransfer->status !== StockTransferStatus::Requested
+        return ! in_array($stockTransfer->status, [StockTransferStatus::Requested, StockTransferStatus::InTransit, StockTransferStatus::Received], true)
             && $user->can('stock-transfers.manage')
             && LocationScope::canAccess($user, $stockTransfer->from_location_id);
     }
@@ -111,7 +112,8 @@ class StockTransferPolicy
      */
     public function cancel(User $user, StockTransfer $stockTransfer): bool
     {
-        return $user->can('stock-transfers.manage')
+        return in_array($stockTransfer->status, [StockTransferStatus::Draft, StockTransferStatus::InTransit], true)
+            && $user->can('stock-transfers.manage')
             && LocationScope::canAccess($user, $stockTransfer->from_location_id);
     }
 }

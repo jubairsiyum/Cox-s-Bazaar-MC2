@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\StockTransferStatus;
 use App\Models\Location;
 use App\Models\StockTransfer;
 use App\Models\Unit;
@@ -464,4 +465,90 @@ it('implements the proper in-transit lifecycle: dispatch takes stock from source
     expect($transfer->status->value)->toBe('received')
         ->and(StockService::quantityAt($unit, $from->id))->toBe(10)
         ->and(StockService::quantityAt($unit, $to->id))->toBe(10);
+});
+
+it('keeps stock transfer receipt approval idempotent and prevents double stock updates', function () {
+    actingAsSuperAdmin();
+
+    $src = Location::factory()->warehouse()->create();
+    $dst = Location::factory()->brandShop()->create();
+    $unit = Unit::factory()->create(['quantity' => 10]);
+    stockAtLocation($unit, 10, $src->id);
+
+    $stockTransfer = StockTransfer::factory()->inTransit()->create([
+        'from_location_id' => $src->id,
+        'to_location_id' => $dst->id,
+    ]);
+    $stockTransfer->items()->create([
+        'unit_id' => $unit->id,
+        'quantity' => 4,
+        'unit_price' => 1000,
+        'subtotal' => 4000,
+    ]);
+
+    $this->patch(route('stock-transfers.approve', $stockTransfer))->assertRedirect(route('stock-transfers.index'));
+    $this->patch(route('stock-transfers.approve', $stockTransfer))->assertSessionHas('error');
+
+    expect($stockTransfer->fresh()->status)->toBe(StockTransferStatus::Received)
+        ->and($unit->fresh()->quantity)->toBe(14);
+});
+
+it('blocks deleting or cancelling Received stock transfers without stock reversal and receiving approval', function () {
+    $admin = actingAsSuperAdmin();
+    $src = Location::factory()->warehouse()->create(['name' => 'Warehouse Src']);
+    $dst = Location::factory()->brandShop()->create(['name' => 'Shop Dst']);
+
+    $unit = Unit::factory()->create(['quantity' => 20]);
+    stockAtLocation($unit, 20, $src->id);
+
+    $sender = User::factory()->create(['email_verified_at' => now(), 'status' => 'active', 'branch_id' => $src->id]);
+    $sender->assignRole('Outlet Manager');
+
+    $transfer = StockTransfer::factory()->received()->create([
+        'from_location_id' => $src->id,
+        'to_location_id' => $dst->id,
+        'created_by' => $sender->id,
+    ]);
+    $transfer->items()->create([
+        'unit_id' => $unit->id,
+        'quantity' => 5,
+        'unit_price' => 1000,
+        'subtotal' => 5000,
+    ]);
+
+    StockService::transferOut($unit, 5, $transfer, 'Dispatched', $src->id);
+    StockService::transferIn($unit, 5, $transfer, 'Received', $dst->id);
+
+    // Sending manager cannot delete, cancel, or edit a Received transfer back to Cancelled
+    $this->actingAs($sender)->delete(route('stock-transfers.destroy', $transfer))->assertForbidden();
+    $this->actingAs($sender)->patch(route('stock-transfers.cancel', $transfer))->assertForbidden();
+    $this->actingAs($sender)->patch(route('stock-transfers.update', $transfer), [
+        'transfer_date' => now()->format('Y-m-d\TH:i'),
+        'status' => 'cancelled',
+        'from_location_id' => $src->id,
+        'to_location_id' => $dst->id,
+    ])->assertForbidden();
+
+    // Even Super Admin cannot silently delete or status-flip a Received transfer to Cancelled
+    $this->actingAs($admin)->delete(route('stock-transfers.destroy', $transfer))->assertSessionHas('error');
+    $this->actingAs($admin)->patch(route('stock-transfers.update', $transfer), [
+        'transfer_date' => now()->format('Y-m-d\TH:i'),
+        'status' => 'cancelled',
+        'from_location_id' => $src->id,
+        'to_location_id' => $dst->id,
+    ])->assertSessionHasErrors('status');
+
+    expect($transfer->fresh()->status)->toBe(StockTransferStatus::Received)
+        ->and($transfer->fresh()->deleted_at)->toBeNull();
+});
+
+it('renders unified print-color-adjust CSS on stock transfer show page', function () {
+    actingAsSuperAdmin();
+
+    $transfer = StockTransfer::factory()->inTransit()->create();
+
+    $this->get(route('stock-transfers.show', $transfer))
+        ->assertOk()
+        ->assertSee('print-color-adjust: exact !important;', false)
+        ->assertSee('Stock Transfer Invoice');
 });

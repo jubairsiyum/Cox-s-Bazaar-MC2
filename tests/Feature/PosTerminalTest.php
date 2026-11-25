@@ -267,3 +267,41 @@ it('blocks a restricted branch user from spoofing location_id to sell from anoth
 
     expect(SalesInvoice::count())->toBe(0);
 });
+
+it('enforces catalog unit price and discount bounds for branch staff on POS sales', function () {
+    $branch = Location::factory()->brandShop()->create();
+    $cashier = User::factory()->create(['email_verified_at' => now(), 'status' => 'active', 'branch_id' => $branch->id]);
+    $cashier->assignRole('Sales Staff');
+
+    $product = Product::factory()->create(['sale_price' => 15000]);
+    $unit = Unit::factory()->for($product)->create(['quantity' => 5]);
+    stockAtLocation($unit, 5, $branch->id);
+
+    // Attempt to tamper unit_price down to 1.00
+    $this->actingAs($cashier)
+        ->post(route('pos.store'), [
+            'location_id' => $branch->id,
+            'paid_amount' => 15000,
+            'items' => [
+                ['unit_id' => $unit->id, 'quantity' => 1, 'unit_price' => 1, 'discount' => 0],
+            ],
+        ])
+        ->assertRedirect(route('pos.index'));
+
+    $invoice = SalesInvoice::latest('id')->firstOrFail();
+
+    expect((float) $invoice->grand_total)->toBe(15000.0)
+        ->and((float) $invoice->items->first()->unit_price)->toBe(15000.0);
+
+    // Attempt to pass cart_discount > subtotal
+    $this->actingAs($cashier)
+        ->post(route('pos.store'), [
+            'location_id' => $branch->id,
+            'cart_discount' => 20000,
+            'paid_amount' => 0,
+            'items' => [
+                ['unit_id' => $unit->id, 'quantity' => 1, 'unit_price' => 15000, 'discount' => 0],
+            ],
+        ])
+        ->assertSessionHasErrors('cart_discount');
+});
