@@ -31,8 +31,6 @@
     <link rel="icon" href="/favicon.ico" sizes="any">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 
-    @include('layouts.head-meta')
-
     <!-- Scripts & Styles -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
@@ -186,11 +184,11 @@
                 x-transition:leave-start="opacity-100 translate-x-0"
                 x-transition:leave-end="opacity-0 translate-x-6"
                 class="pointer-events-auto flex items-start gap-3 rounded-xl border bg-surface p-4 shadow-xl"
-                :class="{ 'border-success-200 -500/30': toast.type === 'success', 'border-error-200 ': toast.type === 'error', 'border-warning-200 -500/30': toast.type === 'warning', }"
+                :class="{ 'border-success/30': toast.type === 'success', 'border-danger/30': toast.type === 'error', 'border-warning/30': toast.type === 'warning' }"
             >
                 <span
                     class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full"
-                    :class="{ 'bg-success-50 text-success-600 -500/15 -400': toast.type === 'success', 'bg-error-50 text-error-600 ': toast.type === 'error', 'bg-warning-50 text-warning-600 -500/15 -400': toast.type === 'warning', }"
+                    :class="{ 'bg-success/15 text-success': toast.type === 'success', 'bg-danger/15 text-danger': toast.type === 'error', 'bg-warning/15 text-warning': toast.type === 'warning' }"
                 >
                     <svg x-show="toast.type === 'success'" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>

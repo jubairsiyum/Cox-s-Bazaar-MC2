@@ -50,7 +50,6 @@ class AppServiceProvider extends ServiceProvider
         $this->registerSuperAdminGateBypass();
         $this->registerPasswordDefaults();
         $this->registerPolicies();
-        $this->registerTailAdminComponents();
         $this->registerDashboardCacheInvalidation();
         $this->enforceHttpsInProduction();
         Blade::directive('bdt', fn (string $expression): string => "<?php echo \App\Helpers\Money::format({$expression}); ?>");
@@ -88,28 +87,6 @@ class AppServiceProvider extends ServiceProvider
     {
         if ($this->app->environment('production')) {
             URL::forceScheme('https');
-        }
-    }
-
-    /**
-     * Register Blade component aliases for TailAdmin modules.
-     */
-    private function registerTailAdminComponents(): void
-    {
-        $componentPaths = [
-            'dashboard' => 'views/components/main/dashboard',
-            'ecommerce' => 'views/components/main/dashboard/ecommerce',
-            'form' => 'views/components/main/forms',
-            'profile' => 'views/components/main/profile',
-            'tables' => 'views/components/main/tables',
-            'calendar' => 'views/components/main/calendar',
-        ];
-
-        foreach ($componentPaths as $prefix => $path) {
-            $fullPath = resource_path($path);
-            if (is_dir($fullPath)) {
-                Blade::anonymousComponentPath($fullPath, $prefix);
-            }
         }
     }
 

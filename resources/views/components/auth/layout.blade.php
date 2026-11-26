@@ -8,7 +8,7 @@
     <title>{{ $title ? $title.' — ' : '' }}{{ config('app.name', "Cox's Bazaar MC2") }}</title>
 
     {{-- Same anti-flash logic as the main layout: saved dark mode + color theme before first paint. --}}
-    <script>
+    <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
         (function () {
             var root = document.documentElement, allowed = ['swift', 'ocean', 'aurora', 'ember', 'emerald', 'graphite'], theme = 'swift';
             try {

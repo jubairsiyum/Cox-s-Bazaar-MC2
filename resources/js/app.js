@@ -283,18 +283,8 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Map imports
-    if (document.querySelector("#mapOne")) {
-        import("./components/maps/world-map").then((module) => module.initMap());
-    }
-
     // Chart imports
     initCharts();
-
-    // Calendar init
-    if (document.querySelector("#calendar")) {
-        import("./components/calendar/init").then((module) => module.calendarInit());
-    }
 
     // Copy button helper
     const copyInput = document.getElementById("copy-input");

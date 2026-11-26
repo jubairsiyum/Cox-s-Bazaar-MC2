@@ -172,31 +172,20 @@ $currentPath = request()->path();
 $isDashboard = request()->routeIs('dashboard') || request()->is('dashboard') || $currentPath === 'dashboard' || $currentPath === '';
 
 $allMenuPaths = [];
-$isTailAdminActive = false;
 foreach ($menuGroups as $group) {
-$isGroupTailAdmin = ($group['title'] === 'TailAdmin Components');
 foreach ($group['items'] as $item) {
 if (!empty($item['path'])) {
 $allMenuPaths[] = $item['path'];
-if ($isGroupTailAdmin && MenuHelper::isActive($item['path'])) {
-$isTailAdminActive = true;
-}
 }
 if (!empty($item['subItems'])) {
 foreach ($item['subItems'] as $sub) {
 if (!empty($sub['path'])) {
 $allMenuPaths[] = $sub['path'];
-if ($isGroupTailAdmin && MenuHelper::isActive($sub['path'])) {
-$isTailAdminActive = true;
-}
 }
 if (!empty($sub['subItems'])) {
 foreach ($sub['subItems'] as $childSub) {
 if (!empty($childSub['path'])) {
 $allMenuPaths[] = $childSub['path'];
-if ($isGroupTailAdmin && MenuHelper::isActive($childSub['path'])) {
-$isTailAdminActive = true;
-}
 }
 }
 }
@@ -220,18 +209,9 @@ $isTailAdminActive = true;
   x-data="{
     openSubmenus: {},
     openChildSubmenus: {},
-    showTailAdmin: {{ $isTailAdminActive ? 'true' : 'false' }},
     allPaths: {{ \Illuminate\Support\Js::from(array_values(array_unique(array_filter($allMenuPaths)))) }},
     init() {
       const current = window.location.pathname.replace(/\/+$/, '') || '/';
-      @if ($isTailAdminActive)
-        this.showTailAdmin = true;
-      @else
-        const savedTailAdmin = localStorage.getItem('tailadmin_components_open');
-        if (savedTailAdmin !== null) {
-          this.showTailAdmin = savedTailAdmin === 'true';
-        }
-      @endif
 
       @foreach ($menuGroups as $gIdx => $g)
         @foreach ($g['items'] as $iIdx => $item)
@@ -253,10 +233,6 @@ $isTailAdminActive = true;
           @endif
         @endforeach
       @endforeach
-    },
-    toggleTailAdmin() {
-      this.showTailAdmin = !this.showTailAdmin;
-      localStorage.setItem('tailadmin_components_open', this.showTailAdmin);
     },
     toggleSub(g, i) {
       const k = g + '-' + i;
@@ -309,24 +285,10 @@ $isTailAdminActive = true;
   <nav class="mt-6 flex-1 space-y-6 overflow-y-auto no-scrollbar pr-1 min-h-0">
     @php $navItemCount = 0; @endphp
     @foreach ($menuGroups as $groupIndex => $menuGroup)
-    @php
-    $isTailAdmin = ($menuGroup['title'] === 'TailAdmin Components');
-    @endphp
-
     <div>
-      @if ($isTailAdmin)
-      <div @click="toggleTailAdmin()"
-        class="flex items-center justify-between px-3 text-xs font-semibold uppercase tracking-wider text-ink/70 hover:text-ink cursor-pointer transition select-none">
-        <span>{{ __($menuGroup['title']) }}</span>
-        <x-icon name="chevron" class="size-3.5 shrink-0 transition-transform duration-200"
-          ::class="showTailAdmin && 'rotate-180'" />
-      </div>
-      @else
       <p class="px-3 text-xs font-semibold uppercase tracking-wider text-ink/70">{{ __($menuGroup['title']) }}</p>
-      @endif
 
-      <div @if($isTailAdmin) x-show="showTailAdmin" x-cloak x-transition @endif>
-        <ul class="mt-2.5 space-y-1">
+      <ul class="mt-2.5 space-y-1">
           @foreach ($menuGroup['items'] as $itemIndex => $item)
           @php
           if (!empty($item['can']) && !auth()->user()?->can($item['can'])) {
@@ -445,7 +407,6 @@ $isTailAdminActive = true;
           @endif
           @endif
         </ul>
-      </div>
     </div>
     @endforeach
   </nav>

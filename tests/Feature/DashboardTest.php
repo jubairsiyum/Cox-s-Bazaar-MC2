@@ -28,13 +28,41 @@ it('renders the dashboard for authenticated users', function () {
         ->assertSee('Recent Distribution Invoices');
 });
 
-it('renders tailadmin showcase routes for authenticated users', function () {
-    $user = User::factory()->create();
+it('does not expose removed tailadmin sample routes or sidebar menu items', function () {
+    actingAsSuperAdmin();
 
-    $this->actingAs($user)->get(route('ecommerce'))->assertOk();
-    $this->actingAs($user)->get(route('calendar'))->assertOk();
-    $this->actingAs($user)->get(route('alerts'))->assertOk();
-    $this->actingAs($user)->get(route('buttons'))->assertOk();
+    $this->get('/ecommerce')->assertNotFound();
+    $this->get('/calendar')->assertNotFound();
+    $this->get('/alerts')->assertNotFound();
+    $this->get('/buttons')->assertNotFound();
+    $this->get('/form-elements')->assertNotFound();
+    $this->get('/basic-tables')->assertNotFound();
+
+    $this->get(route('dashboard'))
+        ->assertOk()
+        ->assertDontSee('TailAdmin Components')
+        ->assertDontSee('Ecommerce Demo');
+});
+
+it('serves compatible CSP headers on auth pages in production', function () {
+    app()->detectEnvironment(fn () => 'production');
+
+    try {
+        $response = $this->get(route('login'))
+            ->assertOk()
+            ->assertHeader('Content-Security-Policy');
+
+        $csp = (string) $response->headers->get('Content-Security-Policy');
+        expect($csp)
+            ->toContain("'unsafe-eval'")
+            ->toContain("style-src 'self' 'unsafe-inline'");
+
+        preg_match("/'nonce-([^']+)'/", $csp, $matches);
+        expect($matches[1] ?? '')->not->toBe('');
+        $response->assertSee('nonce="'.$matches[1].'"', false);
+    } finally {
+        app()->detectEnvironment(fn () => 'testing');
+    }
 });
 
 it('attaches security headers to authenticated ERP responses', function () {
