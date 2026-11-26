@@ -143,65 +143,6 @@ class MenuHelper
     }
 
     /**
-     * Get TailAdmin showcase / component items.
-     */
-    public static function getShowcaseItems(): array
-    {
-        return [
-            [
-                'icon' => 'ecommerce',
-                'name' => 'Ecommerce Demo',
-                'path' => '/ecommerce',
-                'new' => true,
-            ],
-            [
-                'icon' => 'calendar',
-                'name' => 'Calendar',
-                'path' => '/calendar',
-            ],
-            [
-                'icon' => 'charts',
-                'name' => 'Charts',
-                'subItems' => [
-                    ['name' => 'Line Chart', 'path' => '/line-chart'],
-                    ['name' => 'Bar Chart', 'path' => '/bar-chart'],
-                ],
-            ],
-            [
-                'icon' => 'forms',
-                'name' => 'Form Elements',
-                'path' => '/form-elements',
-            ],
-            [
-                'icon' => 'tables',
-                'name' => 'Basic Tables',
-                'path' => '/basic-tables',
-            ],
-            [
-                'icon' => 'ui-elements',
-                'name' => 'UI Elements',
-                'subItems' => [
-                    ['name' => 'Alerts', 'path' => '/alerts'],
-                    ['name' => 'Avatars', 'path' => '/avatars'],
-                    ['name' => 'Badges', 'path' => '/badge'],
-                    ['name' => 'Buttons', 'path' => '/buttons'],
-                    ['name' => 'Images', 'path' => '/images'],
-                    ['name' => 'Videos', 'path' => '/videos'],
-                ],
-            ],
-            [
-                'icon' => 'pages',
-                'name' => 'Sample Pages',
-                'subItems' => [
-                    ['name' => 'User Profile', 'path' => '/profile'],
-                    ['name' => 'Blank Page', 'path' => '/blank'],
-                    ['name' => '404 Error', 'path' => '/error-404'],
-                ],
-            ],
-        ];
-    }
-
-    /**
      * Get the minimal sidebar for supplier portal logins: one item per profile section, then notifications.
      */
     public static function getSupplierPortalGroups(?string $notificationBadge = null): array
@@ -243,14 +184,6 @@ class MenuHelper
                 'items' => self::getMainNavItems(),
             ],
         ];
-
-        // TailAdmin showcase / component demos are developer utilities, only visible to Super Admin
-        if (auth()->user()?->isSuperAdmin()) {
-            $groups[] = [
-                'title' => 'TailAdmin Components',
-                'items' => self::getShowcaseItems(),
-            ];
-        }
 
         return $groups;
     }

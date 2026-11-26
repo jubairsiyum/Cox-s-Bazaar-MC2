@@ -57,6 +57,9 @@ $icons = [
 <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />',
 'menu' => '
 <path d="M4 6h16M4 12h16M4 18h16" />',
+'panel-left' => '
+<rect x="3" y="3" width="18" height="18" rx="3" />
+<path d="M9 3v18" />',
 'dots' => '
 <circle cx="5" cy="12" r="1" />
 <circle cx="12" cy="12" r="1" />

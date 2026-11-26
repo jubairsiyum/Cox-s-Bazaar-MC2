@@ -15,6 +15,7 @@
         var t = localStorage.getItem('theme');
         if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) root.classList.add('dark');
         if (localStorage.getItem('dir') === 'rtl') root.setAttribute('dir', 'rtl');
+        root.setAttribute('data-sidebar', localStorage.getItem('sidebarExpanded') === 'false' ? 'collapsed' : 'expanded');
       } catch (e) {}
       root.setAttribute('data-theme', theme);
       if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {

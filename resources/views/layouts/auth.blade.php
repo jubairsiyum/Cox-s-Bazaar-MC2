@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="ltr" class="h-full bg-canvas">
 <head>
-    <script>
+    <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
       (function () {
         var root = document.documentElement, allowed = ['swift', 'ocean', 'aurora', 'ember', 'emerald', 'graphite'], theme = 'swift';
         try {

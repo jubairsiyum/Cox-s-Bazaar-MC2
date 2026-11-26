@@ -15,15 +15,17 @@
     <li>
         <a href="{{ $profileUrl }}#{{ $anchor }}"
            data-profile-section="{{ $anchor }}"
+           :title="!isRailVisible() ? '{{ $section['label'] }}' : ''"
            @click="typeof sidebar !== 'undefined' ? (sidebar = false) : $store.sidebar.setMobileOpen(false)"
-           class="flex items-center justify-between gap-3 rounded-full px-3 py-2.5 text-sm font-medium text-muted transition-colors duration-200 hover:bg-soft/60 hover:text-ink">
-            <span class="flex items-center gap-3 truncate">
+           :class="isRailVisible() ? 'w-full justify-between gap-3 rounded-full px-3 py-2.5' : 'w-full lg:size-11 lg:mx-auto lg:justify-center lg:px-0 lg:rounded-2xl'"
+           class="flex items-center text-sm font-medium text-muted transition-all duration-200 hover:bg-soft/60 hover:text-ink">
+            <span class="flex items-center min-w-0" :class="isRailVisible() ? 'gap-3 truncate' : 'lg:justify-center'">
                 <span class="size-5 shrink-0 flex items-center justify-center">
                     <svg viewBox="{{ $section['viewBox'] }}" class="size-4 fill-current" aria-hidden="true" focusable="false">
                         <path d="{{ $section['path'] }}"/>
                     </svg>
                 </span>
-                <span class="truncate">{{ $section['label'] }}</span>
+                <span x-show="isRailVisible()" class="erp-sidebar-label truncate whitespace-nowrap">{{ $section['label'] }}</span>
             </span>
         </a>
     </li>

@@ -11,6 +11,7 @@
           var t = localStorage.getItem('theme');
           if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) root.classList.add('dark');
           if (localStorage.getItem('dir') === 'rtl') root.setAttribute('dir', 'rtl');
+          root.setAttribute('data-sidebar', localStorage.getItem('sidebarExpanded') === 'false' ? 'collapsed' : 'expanded');
         } catch (e) {}
         root.setAttribute('data-theme', theme);
         if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -31,8 +32,6 @@
     <link rel="icon" href="/favicon.ico" sizes="any">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 
-    @include('layouts.head-meta')
-
     <!-- Scripts & Styles -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
@@ -44,72 +43,6 @@
     </style>
 
     <!-- Sidebar Store -->
-    <script>
-        document.addEventListener('alpine:init', () => {
-            Alpine.store('sidebar', {
-                isExpanded: false,
-                isMobileOpen: false,
-                isHovered: false,
-
-                init() {
-                    const savedState = localStorage.getItem('sidebarExpanded');
-                    if (window.innerWidth >= 1280) {
-                        this.isExpanded = savedState === null ? true : savedState === 'true';
-                    } else {
-                        this.isExpanded = false;
-                    }
-                    this.isMobileOpen = false;
-
-                    window.addEventListener('resize', () => {
-                        this.handleResize();
-                    });
-                },
-
-                handleResize() {
-                    if (window.innerWidth < 1280) {
-                        if (this.isMobileOpen) {
-                             this.isMobileOpen = false;
-                        }
-                    } else {
-                        this.isMobileOpen = false;
-                        const savedState = localStorage.getItem('sidebarExpanded');
-                        this.isExpanded = savedState === null ? true : savedState === 'true';
-                    }
-                },
-
-                toggleExpanded() {
-                    this.isExpanded = !this.isExpanded;
-                    this.isMobileOpen = false;
-                    if (window.innerWidth >= 1280) {
-                        localStorage.setItem('sidebarExpanded', this.isExpanded);
-                    }
-                },
-
-                setExpanded(val) {
-                    this.isExpanded = !!val;
-                    this.isMobileOpen = false;
-                    if (window.innerWidth >= 1280) {
-                        localStorage.setItem('sidebarExpanded', this.isExpanded);
-                    }
-                },
-
-                toggleMobileOpen() {
-                    this.isMobileOpen = !this.isMobileOpen;
-                },
-
-                setMobileOpen(val) {
-                    this.isMobileOpen = val;
-                },
-
-                setHovered(val) {
-                    if (window.innerWidth >= 1280 && !this.isExpanded) {
-                        this.isHovered = val;
-                    }
-                }
-            });
-        });
-    </script>
-
     <!-- Prevent flash of unstyled theme -->
     <script>
         (function() {
@@ -186,11 +119,11 @@
                 x-transition:leave-start="opacity-100 translate-x-0"
                 x-transition:leave-end="opacity-0 translate-x-6"
                 class="pointer-events-auto flex items-start gap-3 rounded-xl border bg-surface p-4 shadow-xl"
-                :class="{ 'border-success-200 -500/30': toast.type === 'success', 'border-error-200 ': toast.type === 'error', 'border-warning-200 -500/30': toast.type === 'warning', }"
+                :class="{ 'border-success/30': toast.type === 'success', 'border-danger/30': toast.type === 'error', 'border-warning/30': toast.type === 'warning' }"
             >
                 <span
                     class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full"
-                    :class="{ 'bg-success-50 text-success-600 -500/15 -400': toast.type === 'success', 'bg-error-50 text-error-600 ': toast.type === 'error', 'bg-warning-50 text-warning-600 -500/15 -400': toast.type === 'warning', }"
+                    :class="{ 'bg-success/15 text-success': toast.type === 'success', 'bg-danger/15 text-danger': toast.type === 'error', 'bg-warning/15 text-warning': toast.type === 'warning' }"
                 >
                     <svg x-show="toast.type === 'success'" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>

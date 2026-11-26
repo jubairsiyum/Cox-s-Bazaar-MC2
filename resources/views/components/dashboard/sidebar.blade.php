@@ -172,31 +172,20 @@ $currentPath = request()->path();
 $isDashboard = request()->routeIs('dashboard') || request()->is('dashboard') || $currentPath === 'dashboard' || $currentPath === '';
 
 $allMenuPaths = [];
-$isTailAdminActive = false;
 foreach ($menuGroups as $group) {
-$isGroupTailAdmin = ($group['title'] === 'TailAdmin Components');
 foreach ($group['items'] as $item) {
 if (!empty($item['path'])) {
 $allMenuPaths[] = $item['path'];
-if ($isGroupTailAdmin && MenuHelper::isActive($item['path'])) {
-$isTailAdminActive = true;
-}
 }
 if (!empty($item['subItems'])) {
 foreach ($item['subItems'] as $sub) {
 if (!empty($sub['path'])) {
 $allMenuPaths[] = $sub['path'];
-if ($isGroupTailAdmin && MenuHelper::isActive($sub['path'])) {
-$isTailAdminActive = true;
-}
 }
 if (!empty($sub['subItems'])) {
 foreach ($sub['subItems'] as $childSub) {
 if (!empty($childSub['path'])) {
 $allMenuPaths[] = $childSub['path'];
-if ($isGroupTailAdmin && MenuHelper::isActive($childSub['path'])) {
-$isTailAdminActive = true;
-}
 }
 }
 }
@@ -206,32 +195,39 @@ $isTailAdminActive = true;
 }
 @endphp
 
-{{-- Mobile backdrop --}}
-<div x-show="typeof sidebar !== 'undefined' ? sidebar : $store.sidebar.isMobileOpen"
-  x-cloak
-  x-transition.opacity
-  @click="typeof sidebar !== 'undefined' ? (sidebar = false) : $store.sidebar.setMobileOpen(false)"
-  class="fixed inset-0 z-30 bg-overlay lg:hidden"></div>
+<div
+  class="erp-sidebar-slot contents lg:block lg:sticky lg:top-5 lg:z-40 lg:h-[calc(100vh-2.5rem)] lg:max-h-[calc(100vh-2.5rem)] lg:shrink-0 lg:self-start lg:transition-[width] lg:duration-300 lg:ease-[cubic-bezier(0.22,1,0.36,1)]"
+  :class="$store.sidebar.isExpanded ? 'lg:w-64' : 'lg:w-20'">
 
-<aside
-  class="{{ $isDashboard ? 'enter mv-left ' : '' }}fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 -translate-x-full flex-col rounded-r-3xl bg-surface p-5 shadow-card transition-transform duration-200 lg:sticky lg:top-5 lg:z-30 lg:h-[calc(100vh-2.5rem)] lg:max-h-[calc(100vh-2.5rem)] lg:w-64 lg:translate-x-0 lg:rounded-3xl self-start overflow-hidden"
-  @if($isDashboard) style="--i:1" @endif
-  :class="{ 'translate-x-0': typeof sidebar !== 'undefined' ? sidebar : $store.sidebar.isMobileOpen }"
-  x-data="{
-    openSubmenus: {},
-    openChildSubmenus: {},
-    showTailAdmin: {{ $isTailAdminActive ? 'true' : 'false' }},
-    allPaths: {{ \Illuminate\Support\Js::from(array_values(array_unique(array_filter($allMenuPaths)))) }},
+  {{-- Mobile backdrop --}}
+  <div x-show="typeof sidebar !== 'undefined' ? sidebar : $store.sidebar.isMobileOpen"
+    x-cloak
+    x-transition.opacity
+    @click="typeof sidebar !== 'undefined' ? (sidebar = false) : $store.sidebar.setMobileOpen(false)"
+    class="fixed inset-0 z-30 bg-overlay lg:hidden"></div>
+
+  <aside
+    @mouseenter="$store.sidebar.setHovered(true)"
+    @mouseleave="$store.sidebar.setHovered(false)"
+    class="{{ $isDashboard ? 'enter mv-left ' : '' }}erp-sidebar-panel fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 -translate-x-full flex-col rounded-r-3xl bg-surface p-5 shadow-card transition-[transform,width,padding,box-shadow,border-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:absolute lg:inset-y-0 lg:left-0 rtl:lg:left-auto rtl:lg:right-0 lg:h-full lg:translate-x-0 lg:rounded-3xl overflow-hidden"
+    @if($isDashboard) style="--i:1" @endif
+    :class="[
+      (typeof sidebar !== 'undefined' ? sidebar : $store.sidebar.isMobileOpen) ? 'translate-x-0' : '',
+      ($store.sidebar.isExpanded || $store.sidebar.isHovered) ? 'lg:w-64 lg:p-5' : 'lg:w-20 lg:px-3 lg:py-5',
+      (!$store.sidebar.isExpanded && $store.sidebar.isHovered) ? 'lg:shadow-2xl lg:ring-1 lg:ring-line/80' : ''
+    ]"
+    x-data="{
+      openSubmenus: {},
+      openChildSubmenus: {},
+      allPaths: {{ \Illuminate\Support\Js::from(array_values(array_unique(array_filter($allMenuPaths)))) }},
+      isRailVisible() {
+        return $store.sidebar.isExpanded
+          || $store.sidebar.isHovered
+          || $store.sidebar.isMobileOpen
+          || (typeof sidebar !== 'undefined' && sidebar);
+      },
     init() {
       const current = window.location.pathname.replace(/\/+$/, '') || '/';
-      @if ($isTailAdminActive)
-        this.showTailAdmin = true;
-      @else
-        const savedTailAdmin = localStorage.getItem('tailadmin_components_open');
-        if (savedTailAdmin !== null) {
-          this.showTailAdmin = savedTailAdmin === 'true';
-        }
-      @endif
 
       @foreach ($menuGroups as $gIdx => $g)
         @foreach ($g['items'] as $iIdx => $item)
@@ -253,10 +249,6 @@ $isTailAdminActive = true;
           @endif
         @endforeach
       @endforeach
-    },
-    toggleTailAdmin() {
-      this.showTailAdmin = !this.showTailAdmin;
-      localStorage.setItem('tailadmin_components_open', this.showTailAdmin);
     },
     toggleSub(g, i) {
       const k = g + '-' + i;
@@ -294,39 +286,30 @@ $isTailAdminActive = true;
   }">
 
   {{-- Brand Logo --}}
-  <div class="shrink-0">
-    <a href="{{ route($isSupplierPortal ? 'suppliers.my-profile' : 'dashboard') }}" class="flex items-center gap-3 px-2 pt-1">
-      <img src="{{ asset('cmc2-logo.jpeg') }}" alt="{{ config('app.name') }}" class="h-9 w-9 shrink-0 rounded-xl object-contain bg-surface p-0.5 shadow-sm">
-      <div class="min-w-0">
-        <!-- <span class="block text-base font-extrabold tracking-tight text-ink truncate">{{ config('app.name', 'Swift Track') }}</span> -->
-        <span class="block text-base font-extrabold tracking-tight text-ink truncate">Cox's Bazar MC2</span>
-        <span class="block text-[11px] font-medium text-muted">Distribution ERP</span>
+  <div class="shrink-0 min-h-[2.75rem]">
+    <a href="{{ route($isSupplierPortal ? 'suppliers.my-profile' : 'dashboard') }}"
+      class="flex items-center min-w-0 pt-1"
+      :class="isRailVisible() ? 'gap-3 px-2' : 'lg:justify-center px-0'">
+      <img src="{{ asset('cmc2-logo.jpeg') }}" alt="{{ config('app.name') }}"
+        class="h-9 w-9 shrink-0 rounded-xl object-contain bg-surface p-0.5 shadow-sm ring-1 ring-line/50">
+      <div x-show="isRailVisible()" class="erp-sidebar-label min-w-0">
+        <span class="block text-base font-extrabold tracking-tight text-ink truncate whitespace-nowrap">Cox's Bazar MC2</span>
+        <span class="block text-[11px] font-medium text-muted truncate whitespace-nowrap">Distribution ERP</span>
       </div>
     </a>
   </div>
 
   {{-- Navigation with Existing Menu Groups --}}
-  <nav class="mt-6 flex-1 space-y-6 overflow-y-auto no-scrollbar pr-1 min-h-0">
+  <nav class="mt-6 flex-1 space-y-6 overflow-y-auto overflow-x-hidden no-scrollbar pr-0.5 min-h-0">
     @php $navItemCount = 0; @endphp
     @foreach ($menuGroups as $groupIndex => $menuGroup)
-    @php
-    $isTailAdmin = ($menuGroup['title'] === 'TailAdmin Components');
-    @endphp
-
     <div>
-      @if ($isTailAdmin)
-      <div @click="toggleTailAdmin()"
-        class="flex items-center justify-between px-3 text-xs font-semibold uppercase tracking-wider text-ink/70 hover:text-ink cursor-pointer transition select-none">
-        <span>{{ __($menuGroup['title']) }}</span>
-        <x-icon name="chevron" class="size-3.5 shrink-0 transition-transform duration-200"
-          ::class="showTailAdmin && 'rotate-180'" />
+      <div class="min-h-4 flex items-center" :class="isRailVisible() ? 'px-3' : 'lg:justify-center lg:px-0'">
+        <p x-show="isRailVisible()" class="erp-sidebar-label text-xs font-semibold uppercase tracking-wider text-ink/70 whitespace-nowrap">{{ __($menuGroup['title']) }}</p>
+        <span x-show="!isRailVisible()" x-cloak aria-hidden="true" class="hidden lg:block h-px w-6 rounded-full bg-line/80"></span>
       </div>
-      @else
-      <p class="px-3 text-xs font-semibold uppercase tracking-wider text-ink/70">{{ __($menuGroup['title']) }}</p>
-      @endif
 
-      <div @if($isTailAdmin) x-show="showTailAdmin" x-cloak x-transition @endif>
-        <ul class="mt-2.5 space-y-1">
+      <ul class="mt-2.5 space-y-1">
           @foreach ($menuGroup['items'] as $itemIndex => $item)
           @php
           if (!empty($item['can']) && !auth()->user()?->can($item['can'])) {
@@ -346,20 +329,24 @@ $isTailAdminActive = true;
             {{-- Menu Item with Submenu --}}
             <button type="button"
               @click="toggleSub({{ $groupIndex }}, {{ $itemIndex }})"
-              class="flex w-full items-center justify-between gap-3 rounded-full px-3 py-2.5 text-sm font-medium transition-colors duration-200 cursor-pointer"
-              :class="isSubOpen({{ $groupIndex }}, {{ $itemIndex }}) ? 'bg-soft text-brand-500 font-semibold' : 'text-muted hover:bg-soft/60 hover:text-ink'">
-              <span class="flex items-center gap-3 truncate">
+              :title="!isRailVisible() ? {{ \Illuminate\Support\Js::from(__($item['name'])) }} : ''"
+              :class="[
+                isSubOpen({{ $groupIndex }}, {{ $itemIndex }}) ? 'bg-soft text-brand-500 font-semibold' : 'text-muted hover:bg-soft/60 hover:text-ink',
+                isRailVisible() ? 'w-full justify-between gap-3 rounded-full px-3 py-2.5' : 'w-full lg:size-11 lg:mx-auto lg:justify-center lg:px-0 lg:rounded-2xl'
+              ]"
+              class="flex items-center text-sm font-medium transition-all duration-200 cursor-pointer">
+              <span class="flex items-center min-w-0" :class="isRailVisible() ? 'gap-3 truncate' : 'lg:justify-center'">
                 <span class="size-5 shrink-0 flex items-center justify-center">
                   {!! MenuHelper::getIconSvg($item['icon']) !!}
                 </span>
-                <span class="truncate">{{ __($item['name']) }}</span>
+                <span x-show="isRailVisible()" class="erp-sidebar-label truncate whitespace-nowrap">{{ __($item['name']) }}</span>
               </span>
-              <x-icon name="chevron" class="size-3.5 shrink-0 transition-transform duration-200"
+              <x-icon x-show="isRailVisible()" name="chevron" class="erp-sidebar-label size-3.5 shrink-0 transition-transform duration-200"
                 ::class="isSubOpen({{ $groupIndex }}, {{ $itemIndex }}) && 'rotate-180 text-brand-500'" />
             </button>
 
             {{-- Submenu level 1 --}}
-            <div x-show="isSubOpen({{ $groupIndex }}, {{ $itemIndex }})" x-cloak x-transition>
+            <div x-show="isRailVisible() && isSubOpen({{ $groupIndex }}, {{ $itemIndex }})" x-cloak x-transition>
               <ul class="mt-1 space-y-1 pl-7">
                 @foreach ($item['subItems'] as $subIndex => $subItem)
                 @php
@@ -422,18 +409,23 @@ $isTailAdminActive = true;
             @else
             {{-- Single Nav Item --}}
             <a href="{{ $item['path'] }}"
-              class="flex items-center justify-between gap-3 rounded-full px-3 py-2.5 text-sm font-medium transition-colors duration-200"
-              :class="isActive('{{ $item['path'] }}') ? 'bg-soft text-brand-500 font-semibold' : 'text-muted hover:bg-soft/60 hover:text-ink'">
-              <span class="flex items-center gap-3 truncate">
+              :title="!isRailVisible() ? {{ \Illuminate\Support\Js::from(__($item['name'])) }} : ''"
+              :class="[
+                isActive('{{ $item['path'] }}') ? 'bg-soft text-brand-500 font-semibold' : 'text-muted hover:bg-soft/60 hover:text-ink',
+                isRailVisible() ? 'w-full justify-between gap-3 rounded-full px-3 py-2.5' : 'w-full lg:size-11 lg:mx-auto lg:justify-center lg:px-0 lg:rounded-2xl'
+              ]"
+              class="relative flex items-center text-sm font-medium transition-all duration-200">
+              <span class="flex items-center min-w-0" :class="isRailVisible() ? 'gap-3 truncate' : 'lg:justify-center'">
                 <span class="size-5 shrink-0 flex items-center justify-center">
                   {!! MenuHelper::getIconSvg($item['icon']) !!}
                 </span>
-                <span class="truncate">{{ __($item['name']) }}</span>
+                <span x-show="isRailVisible()" class="erp-sidebar-label truncate whitespace-nowrap">{{ __($item['name']) }}</span>
               </span>
               @if (!empty($item['badge']))
-              <span class="rounded-full bg-danger/15 px-1.5 py-0.5 text-[10px] font-bold text-danger tabular-nums leading-none">{{ $item['badge'] }}</span>
+              <span x-show="isRailVisible()" class="erp-sidebar-label rounded-full bg-danger/15 px-1.5 py-0.5 text-[10px] font-bold text-danger tabular-nums leading-none">{{ $item['badge'] }}</span>
+              <span x-show="!isRailVisible()" x-cloak aria-hidden="true" class="hidden lg:block absolute top-2 right-2 size-2 rounded-full bg-danger ring-2 ring-surface"></span>
               @elseif (!empty($item['new']))
-              <span class="rounded-full bg-brand-500/10 px-2 py-0.5 text-[10px] font-bold text-brand-500 uppercase">New</span>
+              <span x-show="isRailVisible()" class="erp-sidebar-label rounded-full bg-brand-500/10 px-2 py-0.5 text-[10px] font-bold text-brand-500 uppercase">New</span>
               @endif
             </a>
             @endif
@@ -445,7 +437,6 @@ $isTailAdminActive = true;
           @endif
           @endif
         </ul>
-      </div>
     </div>
     @endforeach
   </nav>
@@ -458,21 +449,31 @@ $isTailAdminActive = true;
     @endphp
     @if ($sidebarSettingsUrl && $canManageSettings)
     <a href="{{ $sidebarSettingsUrl }}"
-      class="flex items-center gap-3 rounded-full px-3 py-2 text-sm font-medium text-muted transition hover:bg-soft/60 hover:text-ink">
-      <x-icon name="settings" class="size-4.5" /> Settings
+      :title="!isRailVisible() ? 'Settings' : ''"
+      :class="isRailVisible() ? 'w-full gap-3 rounded-full px-3 py-2' : 'w-full lg:size-10 lg:mx-auto lg:justify-center lg:px-0 lg:rounded-2xl'"
+      class="flex items-center text-sm font-medium text-muted transition-all duration-200 hover:bg-soft/60 hover:text-ink">
+      <x-icon name="settings" class="size-4.5 shrink-0" />
+      <span x-show="isRailVisible()" class="erp-sidebar-label truncate whitespace-nowrap">Settings</span>
     </a>
     <a href="{{ $sidebarSettingsUrl }}?tab=theme"
-      class="flex items-center gap-3 rounded-full px-3 py-2 text-sm font-medium text-muted transition hover:bg-soft/60 hover:text-ink">
-      <x-icon name="palette" class="size-4.5 text-brand-500" /> Themes
+      :title="!isRailVisible() ? 'Themes' : ''"
+      :class="isRailVisible() ? 'w-full gap-3 rounded-full px-3 py-2' : 'w-full lg:size-10 lg:mx-auto lg:justify-center lg:px-0 lg:rounded-2xl'"
+      class="flex items-center text-sm font-medium text-muted transition-all duration-200 hover:bg-soft/60 hover:text-ink">
+      <x-icon name="palette" class="size-4.5 shrink-0 text-brand-500" />
+      <span x-show="isRailVisible()" class="erp-sidebar-label truncate whitespace-nowrap">Themes</span>
     </a>
     @endif
 
     <form method="POST" action="{{ Route::has('logout') ? route('logout') : '#' }}">
       @csrf
       <button type="submit"
-        class="flex w-full items-center gap-3 rounded-full px-3 py-2 text-sm font-medium text-muted transition hover:bg-danger/10 hover:text-danger cursor-pointer">
-        <x-icon name="logout" class="size-4.5" /> Log Out
+        :title="!isRailVisible() ? 'Log Out' : ''"
+        :class="isRailVisible() ? 'w-full gap-3 rounded-full px-3 py-2' : 'w-full lg:size-10 lg:mx-auto lg:justify-center lg:px-0 lg:rounded-2xl'"
+        class="flex items-center text-sm font-medium text-muted transition-all duration-200 hover:bg-danger/10 hover:text-danger cursor-pointer">
+        <x-icon name="logout" class="size-4.5 shrink-0" />
+        <span x-show="isRailVisible()" class="erp-sidebar-label truncate whitespace-nowrap">Log Out</span>
       </button>
     </form>
   </div>
-</aside>
+  </aside>
+</div>

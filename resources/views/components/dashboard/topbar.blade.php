@@ -10,9 +10,19 @@
 <header {{ $attributes->merge(['class' => ($isDashboard ? 'enter mv-down ' : '') . 'flex items-center gap-3']) }} @if($isDashboard) style="--i:2" @endif>
   {{-- Mobile sidebar button --}}
   <button @click="typeof sidebar !== 'undefined' ? (sidebar = true) : $store.sidebar.toggleMobileOpen()"
-          class="grid size-11 shrink-0 place-items-center rounded-full bg-surface text-muted shadow-card transition-[transform,background-color] duration-200 hover:text-ink active:scale-[0.97] lg:hidden"
-          aria-label="Menu">
+          class="grid size-11 shrink-0 place-items-center rounded-full bg-surface text-muted shadow-card transition-[transform,background-color] duration-200 hover:text-ink active:scale-[0.97] lg:hidden cursor-pointer"
+          aria-label="Open menu">
     <x-icon name="menu" class="size-5" />
+  </button>
+
+  {{-- Desktop sidebar collapse/expand button --}}
+  <button type="button"
+          @click="$store.sidebar.toggleExpanded()"
+          :aria-expanded="$store.sidebar.isExpanded"
+          :title="$store.sidebar.isExpanded ? 'Collapse sidebar' : 'Expand sidebar'"
+          aria-label="Toggle sidebar"
+          class="hidden lg:grid size-11 shrink-0 place-items-center rounded-full bg-surface text-muted shadow-card transition-[transform,color,background-color] duration-200 hover:text-ink active:scale-[0.97] cursor-pointer">
+    <x-icon name="panel-left" class="size-5 transition-colors duration-200" ::class="!$store.sidebar.isExpanded && 'text-brand-500'" />
   </button>
 
   {{-- Search pill --}}

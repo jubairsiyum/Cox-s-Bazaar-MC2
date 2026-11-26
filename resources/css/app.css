@@ -264,35 +264,19 @@ layer(base);
     }
 }
 
-.sidebar:hover {
-    width: 290px;
-}
-.sidebar:hover .logo {
-    display: block;
-}
-.sidebar:hover .logo-icon {
-    display: none;
-}
-.sidebar:hover .sidebar-header {
-    justify-content: space-between;
-}
-.sidebar:hover .menu-group-title {
-    display: block;
-}
-.sidebar:hover .menu-group-icon {
-    display: none;
-}
-
-.sidebar:hover .menu-item-text {
-    display: inline;
-}
-
-.sidebar:hover .menu-item-arrow {
-    display: block;
-}
-
-.sidebar:hover .menu-dropdown {
-    display: flex;
+@layer base {
+    @media (min-width: 1024px) {
+        html[data-sidebar="collapsed"] .erp-sidebar-slot {
+            width: 5rem;
+        }
+        html[data-sidebar="collapsed"] .erp-sidebar-panel:not(:hover) {
+            width: 5rem;
+            padding-inline: 0.75rem;
+        }
+        html[data-sidebar="collapsed"] .erp-sidebar-panel:not(:hover) .erp-sidebar-label {
+            display: none;
+        }
+    }
 }
 
 .tableCheckbox:checked ~ span span {
