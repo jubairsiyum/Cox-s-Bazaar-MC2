@@ -206,7 +206,7 @@ it('filters the collections by search, status, payment status and branch', funct
     $paid = distributorInvoice($unit, ['location_id' => $branchLocation->id, 'paid_amount' => 1000]);
     $voided = distributorInvoice($unit, ['location_id' => $branchLocation->id, 'status' => 'voided', 'voided_at' => now()]);
 
-    $this->get(route('collections.index', ['branch_id' => $branch->id]))
+    $this->get(route('collections.index', ['location_id' => $branchLocation->id]))
         ->assertOk()
         ->assertSee($pos->invoice_no)
         ->assertSee($paid->invoice_no)

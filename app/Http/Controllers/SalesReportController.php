@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\Branch;
 use App\Models\Customer;
 use App\Models\Location;
 use App\Models\SalesInvoice;
@@ -57,7 +56,6 @@ class SalesReportController extends Controller
             'statusBreakdown' => $statusBreakdown,
             'customers' => Customer::query()->active()->orderBy('name')->get(['id', 'name']),
             'locations' => SalesScope::scopeQuery(Location::query(), $request->user(), 'id')->active()->orderBy('name')->get(['id', 'name']),
-            'branches' => SalesScope::isRestricted($request->user()) ? collect() : Branch::query()->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -77,8 +75,9 @@ class SalesReportController extends Controller
 
         $query = SalesScope::scopeQuery($query, $request->user());
 
-        return $query
-            ->when($request->filled('location_id') && ! SalesScope::isRestricted($request->user()), fn ($q) => $q->where('location_id', (int) $request->input('location_id')))
-            ->when($request->filled('branch_id') && ! SalesScope::isRestricted($request->user()), fn ($q) => $q->where('branch_id', (int) $request->input('branch_id')));
+        return $query->when(
+            $request->filled('location_id') && ! SalesScope::isRestricted($request->user()),
+            fn (Builder $q) => $q->where('location_id', (int) $request->input('location_id'))
+        );
     }
 }

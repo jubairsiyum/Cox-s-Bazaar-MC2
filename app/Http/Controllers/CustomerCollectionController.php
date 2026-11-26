@@ -6,7 +6,6 @@ namespace App\Http\Controllers;
 
 use App\Enums\SalesInvoiceStatus;
 use App\Http\Requests\CustomerCollection\StoreCustomerCollectionRequest;
-use App\Models\Branch;
 use App\Models\Customer;
 use App\Models\CustomerCollection;
 use App\Models\Location;
@@ -61,8 +60,7 @@ class CustomerCollectionController extends Controller
             'direction' => $direction,
             'totals' => $this->totals($request),
             'customers' => Customer::query()->active()->orderBy('name')->get(['id', 'name']),
-            'locations' => Location::query()->active()->orderBy('name')->get(['id', 'name']),
-            'branches' => Branch::query()->orderBy('name')->get(['id', 'name']),
+            'locations' => SalesScope::scopeQuery(Location::query(), $request->user(), 'id')->active()->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -241,9 +239,10 @@ class CustomerCollectionController extends Controller
 
         $query = SalesScope::scopeQuery($query, $request->user());
 
-        return $query
-            ->when($request->filled('location_id') && ! SalesScope::isRestricted($request->user()), fn ($q) => $q->where('location_id', (int) $request->input('location_id')))
-            ->when($request->filled('branch_id') && ! SalesScope::isRestricted($request->user()), fn ($q) => $q->where('branch_id', (int) $request->input('branch_id')));
+        return $query->when(
+            $request->filled('location_id') && ! SalesScope::isRestricted($request->user()),
+            fn (Builder $q) => $q->where('location_id', (int) $request->input('location_id'))
+        );
     }
 
     /**

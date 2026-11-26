@@ -12,7 +12,6 @@ use App\Exceptions\InsufficientStockException;
 use App\Http\Requests\SalesOrder\ConfirmSalesOrderPaymentRequest;
 use App\Http\Requests\SalesOrder\StoreSalesOrderRequest;
 use App\Http\Requests\SalesOrder\UpdateSalesOrderRequest;
-use App\Models\Branch;
 use App\Models\Customer;
 use App\Models\Location;
 use App\Models\Product;
@@ -70,8 +69,7 @@ class SalesOrderController extends Controller
             'direction' => $direction,
             'totals' => $this->totals($request),
             'customers' => Customer::query()->active()->orderBy('name')->get(['id', 'name']),
-            'locations' => Location::query()->active()->orderBy('name')->get(['id', 'name']),
-            'branches' => Branch::query()->orderBy('name')->get(['id', 'name']),
+            'locations' => SalesScope::scopeQuery(Location::query(), $request->user(), 'id')->active()->orderBy('name')->get(['id', 'name']),
             'statusOptions' => SalesOrderStatus::options(),
         ]);
     }
@@ -336,12 +334,24 @@ class SalesOrderController extends Controller
         $this->authorize('viewAny', SalesOrder::class);
 
         $locationId = $request->filled('location_id') ? (int) $request->input('location_id') : null;
+        $term = $request->string('search')->toString();
+        $unitIds = array_values(array_filter(array_map('intval', (array) $request->input('unit_ids', []))));
+
+        // The picker offers only products stocked at the selected business
+        // location. Until any location-specific movement is posted, stock is
+        // still the global opening stock, so nothing is split by location yet.
+        $location = $locationId !== null ? Location::query()->find($locationId) : null;
 
         $units = Unit::query()
             ->with('product')
-            ->search($request->string('search')->toString())
+            ->search($term)
+            ->when($unitIds !== [], fn (Builder $query) => $query->whereIn('units.id', $unitIds))
+            ->when(
+                $location !== null && self::hasAnyLocationMovements(),
+                fn (Builder $query) => $query->whereIn('units.id', self::stockedUnitIdsQuery($location))
+            )
             ->orderBy(Product::query()->select('name')->whereColumn('products.id', 'units.product_id'))
-            ->limit(20)
+            ->limit(max(count($unitIds), $term === '' ? 30 : 20))
             ->get();
 
         $quantities = StockService::scopedQuantitiesFor($units, $request->user());
@@ -359,6 +369,35 @@ class SalesOrderController extends Controller
                 'barcode' => $unit->product?->barcode,
             ])->values()->all(),
         ]);
+    }
+
+    /**
+     * Whether the system tracks stock per location at all. Until the first
+     * location-specific movement is posted, quantities are read from the
+     * unit's global opening stock (see {@see resolveLocationStock()}), so the
+     * picker must not hide products that have no per-location ledger yet.
+     */
+    private static function hasAnyLocationMovements(): bool
+    {
+        return StockMovement::query()->whereNotNull('location_id')->exists();
+    }
+
+    /**
+     * Unit ids holding stock rows at the location, read the same way
+     * resolveLocationStock() reads them: a warehouse also holds the unassigned
+     * opening movements.
+     */
+    private static function stockedUnitIdsQuery(Location $location): Builder
+    {
+        return StockMovement::query()
+            ->select('unit_id')
+            ->where(function (Builder $query) use ($location): void {
+                $query->where('location_id', $location->id)
+                    ->when(
+                        $location->type === LocationType::Warehouse,
+                        fn (Builder $inner) => $inner->orWhereNull('location_id')
+                    );
+            });
     }
 
     /**
@@ -466,9 +505,10 @@ class SalesOrderController extends Controller
 
         $query = SalesScope::scopeQuery($query, $request->user());
 
-        return $query
-            ->when($request->filled('location_id') && ! SalesScope::isRestricted($request->user()), fn ($q) => $q->where('location_id', (int) $request->input('location_id')))
-            ->when($request->filled('branch_id') && ! SalesScope::isRestricted($request->user()), fn ($q) => $q->where('branch_id', (int) $request->input('branch_id')));
+        return $query->when(
+            $request->filled('location_id') && ! SalesScope::isRestricted($request->user()),
+            fn (Builder $q) => $q->where('location_id', (int) $request->input('location_id'))
+        );
     }
 
     /**

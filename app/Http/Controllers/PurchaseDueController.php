@@ -9,7 +9,6 @@ use App\Enums\PurchaseStatus;
 use App\Helpers\Money;
 use App\Http\Requests\PurchaseDue\StorePurchaseDueRequest;
 use App\Http\Requests\PurchaseDue\UpdatePurchaseDueRequest;
-use App\Models\Branch;
 use App\Models\Location;
 use App\Models\PaymentMethod;
 use App\Models\PurchaseOrder;
@@ -74,7 +73,7 @@ class PurchaseDueController extends Controller
         return view('purchase-dues.index', [
             'orders' => $orders,
             'requestsByOrder' => $requestsByOrder,
-            'branches' => Branch::query()->orderBy('name')->get(['id', 'name']),
+            'locations' => LocationScope::scopeQuery(Location::query(), $request->user(), 'id')->active()->orderBy('name')->get(['id', 'name']),
             'requestStatusFilters' => self::REQUEST_STATUS_FILTERS,
             'methodOptions' => PaymentMethod::options(),
             'canFilterBranch' => ! LocationScope::isRestricted($request->user()),
@@ -448,12 +447,7 @@ class PurchaseDueController extends Controller
                         });
                 });
             })
-            ->when($request->filled('branch_id') && ! LocationScope::isRestricted($request->user()), function (Builder $q) use ($request): void {
-                $q->whereIn(
-                    'location_id',
-                    Location::query()->where('branch_id', (int) $request->input('branch_id'))->pluck('id')
-                );
-            });
+            ->when($request->filled('location_id') && ! LocationScope::isRestricted($request->user()), fn (Builder $q) => $q->where('location_id', (int) $request->input('location_id')));
 
         return SupplierScope::scopeQuery(LocationScope::scopeQuery($query, $request->user()), $request->user())
             ->orderByDesc('order_date')

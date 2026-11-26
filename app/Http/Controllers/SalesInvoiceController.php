@@ -10,7 +10,6 @@ use App\Exceptions\InsufficientStockException;
 use App\Exports\SalesInvoiceExport;
 use App\Http\Requests\SalesInvoice\StoreSalesInvoiceRequest;
 use App\Http\Requests\SalesInvoice\UpdateSalesInvoiceRequest;
-use App\Models\Branch;
 use App\Models\Customer;
 use App\Models\Location;
 use App\Models\SalesInvoice;
@@ -69,7 +68,6 @@ class SalesInvoiceController extends Controller
             'totals' => $this->totals($request),
             'customers' => Customer::query()->active()->orderBy('name')->get(['id', 'name']),
             'locations' => SalesScope::scopeQuery(Location::query(), $request->user(), 'id')->active()->orderBy('name')->get(['id', 'name']),
-            'branches' => SalesScope::isRestricted($request->user()) ? collect() : Branch::query()->orderBy('name')->get(['id', 'name']),
             'statusOptions' => SalesInvoiceStatus::options(),
         ]);
     }
@@ -90,7 +88,7 @@ class SalesInvoiceController extends Controller
 
         return view('collections.index', [
             'invoices' => $invoices,
-            'branches' => Branch::query()->orderBy('name')->get(['id', 'name']),
+            'locations' => SalesScope::scopeQuery(Location::query(), $request->user(), 'id')->active()->orderBy('name')->get(['id', 'name']),
             'statusOptions' => SalesInvoiceStatus::options(),
             'canFilterBranch' => ! SalesScope::isRestricted($request->user()),
         ]);
@@ -369,7 +367,6 @@ class SalesInvoiceController extends Controller
             'date_from' => $request->string('date_from')->toString(),
             'date_to' => $request->string('date_to')->toString(),
             'location_id' => $request->input('location_id'),
-            'branch_id' => $request->input('branch_id'),
         ], fn ($value) => $value !== null && $value !== '');
 
         $filename = 'sales_invoices_'.now()->format('Y-m-d_His').'.'.($format === 'csv' ? 'csv' : 'xlsx');
@@ -400,9 +397,10 @@ class SalesInvoiceController extends Controller
 
         $query = SalesScope::scopeQuery($query, $request->user());
 
-        return $query
-            ->when($request->filled('location_id') && ! SalesScope::isRestricted($request->user()), fn ($q) => $q->where('location_id', (int) $request->input('location_id')))
-            ->when($request->filled('branch_id') && ! SalesScope::isRestricted($request->user()), fn ($q) => $q->where('branch_id', (int) $request->input('branch_id')));
+        return $query->when(
+            $request->filled('location_id') && ! SalesScope::isRestricted($request->user()),
+            fn (Builder $q) => $q->where('location_id', (int) $request->input('location_id'))
+        );
     }
 
     /**
@@ -418,20 +416,10 @@ class SalesInvoiceController extends Controller
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')->toString()))
             ->when($request->filled('payment_status'), fn ($q) => $q->where('payment_status', $request->string('payment_status')->toString()));
 
-        return SalesScope::scopeQuery($query, $request->user())
-            ->when($request->filled('branch_id') && ! SalesScope::isRestricted($request->user()), function (Builder $q) use ($request): void {
-                // POS/walk-in invoices carry no branch of their own: their
-                // location's branch counts as the branch for filtering.
-                $branchId = (int) $request->input('branch_id');
-
-                $q->where(function (Builder $inner) use ($branchId): void {
-                    $inner->where('branch_id', $branchId)
-                        ->orWhereIn(
-                            'location_id',
-                            Location::query()->where('branch_id', $branchId)->pluck('id')
-                        );
-                });
-            });
+        return SalesScope::scopeQuery($query, $request->user())->when(
+            $request->filled('location_id') && ! SalesScope::isRestricted($request->user()),
+            fn (Builder $q) => $q->where('location_id', (int) $request->input('location_id'))
+        );
     }
 
     /**

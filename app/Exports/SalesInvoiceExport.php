@@ -41,7 +41,7 @@ class SalesInvoiceExport implements FromCollection, WithHeadings, WithMapping
     protected array $activeColumns;
 
     /**
-     * @param  array{customer_id?: int|string, status?: string, payment_status?: string, date_from?: string, date_to?: string, location_id?: int|string, branch_id?: int|string}  $filters  Register filters, mirroring the invoice index.
+     * @param  array{customer_id?: int|string, status?: string, payment_status?: string, date_from?: string, date_to?: string, location_id?: int|string}  $filters  Register filters, mirroring the invoice index.
      */
     public function __construct(
         protected ?string $search = null,
@@ -118,8 +118,9 @@ class SalesInvoiceExport implements FromCollection, WithHeadings, WithMapping
             $query = SalesScope::scopeQuery($query, $this->user);
         }
 
-        return $query
-            ->when($this->filters['location_id'] ?? null, fn ($q) => $q->where('location_id', (int) $this->filters['location_id']))
-            ->when($this->filters['branch_id'] ?? null, fn ($q) => $q->where('branch_id', (int) $this->filters['branch_id']));
+        return $query->when(
+            $this->filters['location_id'] ?? null,
+            fn (Builder $q) => $q->where('location_id', (int) $this->filters['location_id'])
+        );
     }
 }

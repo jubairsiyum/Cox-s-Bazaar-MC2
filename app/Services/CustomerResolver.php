@@ -76,15 +76,17 @@ class CustomerResolver
 
     /**
      * Resolve the submitted customer fields to a stored customer profile.
+     *
+     * @param  string  $source  Human-readable origin used in audit messages.
      */
-    public static function resolveOrCreate(?int $customerId, ?string $name, ?string $phone, ?string $email = null, ?int $createdBy = null): Customer
+    public static function resolveOrCreate(?int $customerId, ?string $name, ?string $phone, ?string $email = null, ?int $createdBy = null, string $source = 'a sales order'): Customer
     {
         $phone = DuplicateCheckService::normalize('mobile', $phone);
         $email = DuplicateCheckService::normalize('email', $email);
 
         if ($customerId !== null) {
             $customer = Customer::query()->findOrFail($customerId);
-            self::syncContact($customer, $phone, $email);
+            self::syncContact($customer, $phone, $email, $source);
 
             return $customer;
         }
@@ -95,7 +97,7 @@ class CustomerResolver
         $matched = self::matchByName($name);
 
         if ($matched instanceof Customer) {
-            self::syncContact($matched, $phone, $email);
+            self::syncContact($matched, $phone, $email, $source);
 
             return $matched;
         }
@@ -108,7 +110,7 @@ class CustomerResolver
             $reusable->fill($attributes);
             $reusable->restore();
 
-            AuditService::created($reusable, "Customer '{$reusable->name}' ({$reusable->customer_id}) restored from a sales order.");
+            AuditService::created($reusable, "Customer '{$reusable->name}' ({$reusable->customer_id}) restored from {$source}.");
 
             return $reusable;
         }
@@ -120,7 +122,7 @@ class CustomerResolver
             'created_by' => $createdBy,
         ]);
 
-        AuditService::created($customer, "Customer '{$customer->name}' ({$customer->customer_id}) created from a sales order.");
+        AuditService::created($customer, "Customer '{$customer->name}' ({$customer->customer_id}) created from {$source}.");
 
         return $customer;
     }
@@ -128,7 +130,7 @@ class CustomerResolver
     /**
      * Persist an edited mobile number or email back to the customer's profile.
      */
-    private static function syncContact(Customer $customer, ?string $phone, ?string $email): void
+    private static function syncContact(Customer $customer, ?string $phone, ?string $email, string $source = 'a sales order'): void
     {
         $labels = ['mobile' => 'mobile number', 'email' => 'email'];
         $changes = [];
@@ -151,6 +153,6 @@ class CustomerResolver
 
         $updated = implode(' and ', array_map(fn (string $column): string => $labels[$column], array_keys($changes)));
 
-        AuditService::updated($customer, $original, "Customer '{$customer->name}' ({$customer->customer_id}) {$updated} updated from a sales order.");
+        AuditService::updated($customer, $original, "Customer '{$customer->name}' ({$customer->customer_id}) {$updated} updated from {$source}.");
     }
 }

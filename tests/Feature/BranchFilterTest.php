@@ -47,15 +47,14 @@ it('filters stock transfers by the branch of either location', function () {
     actingAsSuperAdmin();
 
     $branch = branchFilterBranch();
-    $fromInBranch = Location::factory()->create(['branch_id' => $branch->id]);
-    $toInBranch = Location::factory()->create(['branch_id' => $branch->id]);
+    $inBranch = Location::factory()->create(['branch_id' => $branch->id]);
     $outside = Location::factory()->create();
 
-    $leaving = StockTransfer::factory()->create(['from_location_id' => $fromInBranch->id, 'to_location_id' => $outside->id]);
-    $arriving = StockTransfer::factory()->create(['from_location_id' => $outside->id, 'to_location_id' => $toInBranch->id]);
+    $leaving = StockTransfer::factory()->create(['from_location_id' => $inBranch->id, 'to_location_id' => $outside->id]);
+    $arriving = StockTransfer::factory()->create(['from_location_id' => $outside->id, 'to_location_id' => $inBranch->id]);
     $unrelated = StockTransfer::factory()->create(['from_location_id' => $outside->id, 'to_location_id' => Location::factory()->create()->id]);
 
-    $this->get(route('stock-transfers.index', ['branch' => $branch->id]))
+    $this->get(route('stock-transfers.index', ['branch' => $inBranch->id]))
         ->assertOk()
         ->assertSee($leaving->reference_no)
         ->assertSee($arriving->reference_no)
@@ -72,7 +71,7 @@ it('filters stock adjustments by the branch of their location', function () {
     $mine = StockAdjustment::factory()->create(['location_id' => $inBranch->id]);
     $theirs = StockAdjustment::factory()->create(['location_id' => $outside->id]);
 
-    $this->get(route('stock-adjustments.index', ['branch' => $branch->id]))
+    $this->get(route('stock-adjustments.index', ['branch' => $inBranch->id]))
         ->assertOk()
         ->assertSee($mine->reference_no)
         ->assertDontSee($theirs->reference_no);
@@ -89,12 +88,12 @@ it('scopes the inventory ledger and movement modal to the selected branch', func
     StockMovement::factory()->create(['unit_id' => $unit->id, 'location_id' => $inBranch->id, 'note' => 'Branch movement marker']);
     StockMovement::factory()->create(['unit_id' => $unit->id, 'location_id' => $outside->id, 'note' => 'Outside movement marker']);
 
-    $this->get(route('stocks.index', ['branch' => $branch->id]))
+    $this->get(route('stocks.index', ['branch' => $inBranch->id]))
         ->assertOk()
         ->assertSee('Branch movement marker')
         ->assertDontSee('Outside movement marker');
 
-    $this->getJson(route('stocks.movements', [$unit, 'branch' => $branch->id]))
+    $this->getJson(route('stocks.movements', [$unit, 'branch' => $inBranch->id]))
         ->assertOk()
         ->assertJsonCount(1, 'items')
         ->assertJsonPath('items.0.note', 'Branch movement marker');
@@ -110,7 +109,7 @@ it('composes the branch filter with the existing filters', function () {
     $mine = StockTransfer::factory()->create(['from_location_id' => $inBranch->id, 'to_location_id' => $outside->id]);
     $theirs = StockTransfer::factory()->create(['from_location_id' => $outside->id, 'to_location_id' => Location::factory()->create()->id]);
 
-    $this->get(route('stock-transfers.index', ['branch' => $branch->id, 'search' => $mine->reference_no]))
+    $this->get(route('stock-transfers.index', ['branch' => $inBranch->id, 'search' => $mine->reference_no]))
         ->assertOk()
         ->assertSee($mine->reference_no)
         ->assertDontSee($theirs->reference_no);
@@ -119,7 +118,7 @@ it('composes the branch filter with the existing filters', function () {
 it('filters each list to nothing for a branch without locations', function () {
     actingAsSuperAdmin();
 
-    $emptyBranch = branchFilterBranch('Empty Outlet');
+    $emptyBranch = Location::factory()->create(['name' => 'Empty Outlet']);
 
     $transfer = StockTransfer::factory()->create();
     $adjustment = StockAdjustment::factory()->create(['location_id' => Location::factory()->create()->id]);
@@ -139,6 +138,30 @@ it('filters each list to nothing for a branch without locations', function () {
     $this->get(route('stocks.index', ['branch' => $emptyBranch->id]))
         ->assertOk()
         ->assertSee('No stock movements recorded for this scope yet.');
+});
+
+it('offers outlet locations in every branch filter', function () {
+    actingAsSuperAdmin();
+
+    Location::factory()->create(['name' => 'Bandarban Outlet']);
+    Branch::query()->create(['name' => 'Legacy Branch', 'code' => 'LGB', 'status' => 'active']);
+
+    foreach ([
+        route('reports.sales'),
+        route('sales-invoices.index'),
+        route('sales-orders.index'),
+        route('sales-returns.index'),
+        route('collections.index'),
+        route('purchase-dues.index'),
+        route('stocks.index'),
+        route('stock-adjustments.index'),
+        route('stock-transfers.index'),
+    ] as $url) {
+        $this->get($url)
+            ->assertOk()
+            ->assertSee('>Bandarban Outlet</option>', false)
+            ->assertDontSee('>Legacy Branch</option>', false);
+    }
 });
 
 it('offers the branch filter to unrestricted users only', function () {

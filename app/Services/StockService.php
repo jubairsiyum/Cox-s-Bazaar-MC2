@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\LocationType;
 use App\Enums\StockMovementType;
 use App\Exceptions\InsufficientStockException;
 use App\Models\Location;
@@ -11,6 +12,7 @@ use App\Models\Setting;
 use App\Models\StockMovement;
 use App\Models\Unit;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\Auth;
@@ -235,6 +237,49 @@ class StockService
     }
 
     /**
+     * Quantities usable for selling at a location. A warehouse also holds the
+     * unassigned central pool, where products created by a Super Admin start.
+     *
+     * @return array<int, int> unit_id => saleable quantity
+     */
+    public static function saleableQuantitiesAt(int $locationId): array
+    {
+        $query = StockMovement::query();
+        self::scopeToLocationWithCentral($query, $locationId);
+
+        return $query
+            ->groupBy('unit_id')
+            ->selectRaw('unit_id, COALESCE(SUM(quantity), 0) as total')
+            ->pluck('total', 'unit_id')
+            ->map(fn ($total): int => (int) $total)
+            ->all();
+    }
+
+    /**
+     * Limit a movement query to a location, including the unassigned central
+     * pool when that location is a warehouse.
+     */
+    private static function scopeToLocationWithCentral(Builder $query, int $locationId): void
+    {
+        $query->where(function (Builder $inner) use ($locationId): void {
+            $inner->where('location_id', $locationId);
+
+            if (self::isWarehouse($locationId)) {
+                $inner->orWhereNull('location_id');
+            }
+        });
+    }
+
+    private static function isWarehouse(?int $locationId): bool
+    {
+        if ($locationId === null) {
+            return false;
+        }
+
+        return Location::query()->toBase()->where('id', $locationId)->value('type') === LocationType::Warehouse->value;
+    }
+
+    /**
      * Batch variant of quantityAt(): the stock of every unit with ledger
      * activity at one location, in a single query (no N+1). Units without
      * any movement at the location are absent from the result.
@@ -346,6 +391,14 @@ class StockService
 
         $location = $locationId ?? self::actorLocationId();
         $availableHere = self::availableAt($unit, $location);
+
+        // A warehouse also holds the unassigned central pool, where products
+        // added by a Super Admin start their life. Sales from the main
+        // warehouse must be able to consume that stock.
+        if (self::isWarehouse($location)) {
+            $availableHere += self::availableAt($unit, null);
+        }
+
         $availableOverall = (int) $unit->quantity;
 
         if ($availableHere + $delta >= 0 && $availableOverall + $delta >= 0) {

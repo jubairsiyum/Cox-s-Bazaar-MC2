@@ -9,7 +9,6 @@ use App\Enums\StockAdjustmentType;
 use App\Exports\StockAdjustmentExport;
 use App\Http\Requests\StockAdjustment\StoreStockAdjustmentRequest;
 use App\Http\Requests\StockAdjustment\UpdateStockAdjustmentRequest;
-use App\Models\Branch;
 use App\Models\Location;
 use App\Models\Product;
 use App\Models\StockAdjustment;
@@ -18,6 +17,7 @@ use App\Services\AuditService;
 use App\Services\LocationScope;
 use App\Services\StockAdjustmentService;
 use App\Services\StockService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -75,10 +75,7 @@ class StockAdjustmentController extends Controller
             ->when($request->string('status')->toString() === 'applied', fn ($q) => $q->whereIn('approval_status', [ApprovalStatus::Approved->value, ApprovalStatus::Pending->value]))
             ->when($request->string('status')->toString() === 'rejected', fn ($q) => $q->where('approval_status', ApprovalStatus::Rejected->value))
             ->when($request->filled('location_id') && ! LocationScope::isRestricted($request->user()), fn ($q) => $q->where('location_id', $request->integer('location_id')))
-            ->when($request->filled('branch') && ! LocationScope::isRestricted($request->user()), fn ($q) => $q->whereIn(
-                'location_id',
-                Location::query()->where('branch_id', $request->integer('branch'))->pluck('id')
-            ));
+            ->when($request->filled('branch') && ! LocationScope::isRestricted($request->user()), fn (Builder $q) => $q->where('location_id', $request->integer('branch')));
 
         // Outlet Managers see the adjustments of their location/branch only.
         LocationScope::scopeQuery($query, $request->user(), 'location_id');
@@ -93,9 +90,8 @@ class StockAdjustmentController extends Controller
             'perPage' => $perPage,
             'sort' => $sort,
             'direction' => $direction,
-            'locations' => Location::query()->active()->orderBy('name')->get(),
+            'locations' => LocationScope::scopeQuery(Location::query()->active(), $request->user(), 'id')->orderBy('name')->get(),
             'statuses' => self::STATUS_FILTERS,
-            'branches' => Branch::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
         ]);
     }
 

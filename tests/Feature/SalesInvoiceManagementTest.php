@@ -323,7 +323,7 @@ it('shows super admins every branch in the overview', function () {
     $a = salesDraftInvoice(Unit::factory()->create(['quantity' => 10]), 1, 100.0, ['sales_order_id' => SalesOrder::factory()->create()->id]);
     $b = salesDraftInvoice(Unit::factory()->create(['quantity' => 10]), 1, 100.0, ['sales_order_id' => SalesOrder::factory()->create()->id]);
 
-    $this->get(route('sales-invoices.index', ['branch_id' => 999]))
+    $this->get(route('sales-invoices.index', ['location_id' => 999]))
         ->assertOk()
         ->assertDontSee($a->invoice_no);
 
@@ -331,6 +331,36 @@ it('shows super admins every branch in the overview', function () {
         ->assertOk()
         ->assertSee($a->invoice_no)
         ->assertSee($b->invoice_no);
+});
+
+it('lists the outlet locations in the branch filter of the register', function () {
+    actingAsSuperAdmin();
+
+    Location::factory()->create(['name' => 'Bandarban Outlet']);
+    Location::factory()->inactive()->create(['name' => 'Closed Outlet']);
+
+    $this->get(route('sales-invoices.index'))
+        ->assertOk()
+        ->assertSee('name="location_id"', false)
+        ->assertDontSee('name="branch_id"', false)
+        ->assertSee('>Bandarban Outlet</option>', false)
+        ->assertDontSee('>Closed Outlet</option>', false);
+});
+
+it('filters the sales invoice register by location', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $outlet = Location::factory()->create();
+    $elsewhere = Location::factory()->create();
+
+    $mine = salesDraftInvoice($unit, 1, 100.0, ['sales_order_id' => SalesOrder::factory()->create()->id, 'location_id' => $outlet->id]);
+    $theirs = salesDraftInvoice($unit, 1, 100.0, ['sales_order_id' => SalesOrder::factory()->create()->id, 'location_id' => $elsewhere->id]);
+
+    $this->get(route('sales-invoices.index', ['location_id' => $outlet->id]))
+        ->assertOk()
+        ->assertSee($mine->invoice_no)
+        ->assertDontSee($theirs->invoice_no);
 });
 
 it('exports the filtered sales invoice register to excel and csv', function () {
@@ -353,6 +383,26 @@ it('exports the filtered sales invoice register to excel and csv', function () {
     $this->get(route('sales-invoices.export', ['format' => 'xlsx']))
         ->assertOk()
         ->assertHeader('content-disposition');
+});
+
+it('exports only the invoices of the selected branch location', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $outlet = Location::factory()->create();
+    $elsewhere = Location::factory()->create();
+    $mine = salesDraftInvoice($unit, 1, 100.0, ['location_id' => $outlet->id]);
+    $theirs = salesDraftInvoice($unit, 1, 100.0, ['location_id' => $elsewhere->id]);
+
+    $csv = $this->get(route('sales-invoices.export', ['format' => 'csv', 'location_id' => $outlet->id]));
+
+    $csv->assertOk();
+
+    $content = file_get_contents($csv->baseResponse->getFile()->getPathname());
+
+    expect($content)
+        ->toContain($mine->invoice_no)
+        ->not->toContain($theirs->invoice_no);
 });
 
 it('scopes the sales invoice export to the assigned location for outlet managers', function () {

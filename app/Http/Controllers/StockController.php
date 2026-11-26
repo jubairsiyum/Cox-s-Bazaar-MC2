@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\Branch;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Location;
@@ -128,9 +127,6 @@ class StockController extends Controller
             'categories' => Category::orderBy('name')->get(),
             'locations' => BranchScope::scopeQuery(Location::query()->active(), $user, 'id')->orderBy('name')->get(),
             'locationFilter' => $locationFilter,
-            'branches' => BranchScope::isUnrestricted($user)
-                ? Branch::query()->where('status', 'active')->orderBy('name')->get(['id', 'name'])
-                : collect(),
             'scopedMovements' => $this->scopedMovements($locationFilter, $branchLocationIds, $base),
         ]);
     }
@@ -197,11 +193,9 @@ class StockController extends Controller
             return null;
         }
 
-        return Location::query()
-            ->where('branch_id', $request->integer('branch'))
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
+        // Locations are merged into branches: the Branch filter lists outlet
+        // locations and the selected value is a location id.
+        return [$request->integer('branch')];
     }
 
     /**

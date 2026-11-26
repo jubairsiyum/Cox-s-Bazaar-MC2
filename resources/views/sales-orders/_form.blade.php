@@ -243,6 +243,7 @@
                             <input type="text"
                                    x-ref="searchInput"
                                    x-model="searchQuery"
+                                   @focus="searchUnits()"
                                    @input.debounce.250ms="searchUnits()"
                                    @keydown.enter.prevent="searchUnits()"
                                    @keydown.escape="results = []"
@@ -749,17 +750,11 @@ function orderForm(state) {
 
         onLocationChange(event) {
             this.syncStockForCurrentRows();
-            if (this.searchQuery.trim().length >= 2) {
-                this.searchUnits();
-            }
+            this.searchUnits();
         },
 
         async searchUnits() {
             const query = this.searchQuery.trim();
-            if (query.length < 2) {
-                this.results = [];
-                return;
-            }
 
             this.isSearching = true;
             try {
@@ -787,15 +782,17 @@ function orderForm(state) {
             if (!this.locationId || this.rows.length === 0) return;
 
             try {
-                for (let row of this.rows) {
-                    const url = @js(route('sales-orders.search-units')) + '?search=' + encodeURIComponent(row.product_name) + '&location_id=' + encodeURIComponent(this.locationId);
-                    const res = await fetch(url, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
-                    const data = await res.json();
-                    const match = (data.units || []).find(u => u.id === row.unit_id);
-                    if (match) {
-                        row.stock = parseFloat(match.quantity) || 0;
-                    }
-                }
+                const params = new URLSearchParams({ location_id: this.locationId });
+                this.rows.forEach(row => params.append('unit_ids[]', row.unit_id));
+
+                const res = await fetch(@js(route('sales-orders.search-units')) + '?' + params.toString(), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+                const data = await res.json();
+                const stockByUnit = new Map((data.units || []).map(unit => [Number(unit.id), parseFloat(unit.quantity) || 0]));
+
+                // A product that is not stocked at the newly selected location has none there.
+                this.rows.forEach(row => {
+                    row.stock = stockByUnit.get(Number(row.unit_id)) ?? 0;
+                });
             } catch (e) {
                 // Ignore sync errors gracefully
             }

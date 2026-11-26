@@ -7,6 +7,7 @@ use App\Models\Location;
 use App\Models\Product;
 use App\Models\SalesInvoice;
 use App\Models\SalesOrder;
+use App\Models\StockMovement;
 use App\Models\Unit;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -413,11 +414,134 @@ it('searches units by product code and model for the order item picker', functio
         ->assertJsonPath('units.0.id', (int) $unit->id);
 });
 
+it('lists products in the picker when no search term is given', function () {
+    actingAsSuperAdmin();
+
+    Unit::factory()->count(3)->create(['quantity' => 10]);
+    Unit::factory()->create(['quantity' => 0]);
+
+    $this->get(route('sales-orders.search-units'))
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonCount(4, 'units');
+});
+
+it('restricts the order item picker to products stocked at the selected branch', function () {
+    actingAsSuperAdmin();
+
+    $branchA = Location::factory()->brandShop()->create(['name' => 'Branch A']);
+    $branchB = Location::factory()->brandShop()->create(['name' => 'Branch B']);
+
+    $stockedHere = Unit::factory()->create([
+        'quantity' => 50,
+        'product_id' => Product::factory()->create(['name' => 'Zephyr Headphones', 'storage' => null, 'color' => null])->id,
+    ]);
+    $stockedElsewhere = Unit::factory()->create([
+        'quantity' => 50,
+        'product_id' => Product::factory()->create(['name' => 'Volt Power Bank', 'storage' => null, 'color' => null])->id,
+    ]);
+
+    stockAtLocation($stockedHere, 5, $branchA->id);
+    stockAtLocation($stockedElsewhere, 7, $branchB->id);
+
+    $this->get(route('sales-orders.search-units', ['search' => 'Zephyr', 'location_id' => $branchA->id]))
+        ->assertOk()
+        ->assertJsonCount(1, 'units')
+        ->assertJsonPath('units.0.id', (int) $stockedHere->id)
+        ->assertJsonPath('units.0.quantity', 5);
+
+    // A product only present at another branch is not offered at all.
+    $this->get(route('sales-orders.search-units', ['search' => 'Volt', 'location_id' => $branchA->id]))
+        ->assertOk()
+        ->assertJsonCount(0, 'units');
+
+    // A branch that holds no stock at all offers nothing.
+    $emptyBranch = Location::factory()->brandShop()->create(['name' => 'Branch C']);
+
+    $this->get(route('sales-orders.search-units', ['location_id' => $emptyBranch->id]))
+        ->assertOk()
+        ->assertJsonCount(0, 'units');
+});
+
+it('filters the sales order register by the outlet location', function () {
+    actingAsSuperAdmin();
+
+    $branchA = Location::factory()->create(['name' => 'Branch A']);
+    $branchB = Location::factory()->create(['name' => 'Branch B']);
+    $unit = Unit::factory()->create(['quantity' => 50]);
+
+    $orderAtA = salesOrderWithItem($unit, 1, 100.0, ['location_id' => $branchA->id]);
+    $orderAtB = salesOrderWithItem($unit, 1, 100.0, ['location_id' => $branchB->id]);
+
+    $this->get(route('sales-orders.index', ['location_id' => $branchA->id]))
+        ->assertOk()
+        ->assertSee($orderAtA->order_no)
+        ->assertDontSee($orderAtB->order_no);
+});
+
+it('lists the outlet locations in the sales order branch filter', function () {
+    actingAsSuperAdmin();
+
+    Location::factory()->create(['name' => 'Bandarban Outlet']);
+
+    $this->get(route('sales-orders.index'))
+        ->assertOk()
+        ->assertSee('name="location_id"', false)
+        ->assertDontSee('name="branch_id"', false)
+        ->assertSee('>Bandarban Outlet</option>', false);
+});
+
+it('offers unassigned opening stock in the warehouse picker', function () {
+    actingAsSuperAdmin();
+
+    $warehouse = Location::factory()->warehouse()->create(['name' => 'Main Warehouse']);
+    $outlet = Location::factory()->brandShop()->create(['name' => 'Outlet']);
+
+    // Opening stock is posted to the central pool (no location), which a
+    // warehouse holds; the outlet-only unit has no unassigned stock at all.
+    $openingOnly = Unit::factory()->create([
+        'quantity' => 4,
+        'product_id' => Product::factory()->create(['name' => 'Opening Stock Item', 'storage' => null, 'color' => null])->id,
+    ]);
+    $outletOnly = Unit::factory()->create([
+        'quantity' => 0,
+        'product_id' => Product::factory()->create(['name' => 'Outlet Only Item', 'storage' => null, 'color' => null])->id,
+    ]);
+
+    StockMovement::factory()->create(['unit_id' => $outletOnly->id, 'location_id' => $outlet->id, 'quantity' => 3]);
+
+    $this->get(route('sales-orders.search-units', ['location_id' => $warehouse->id]))
+        ->assertOk()
+        ->assertJsonCount(1, 'units')
+        ->assertJsonPath('units.0.id', (int) $openingOnly->id)
+        ->assertJsonPath('units.0.quantity', 4);
+});
+
+it('returns the stock of the requested units at the selected location', function () {
+    actingAsSuperAdmin();
+
+    $branch = Location::factory()->brandShop()->create(['name' => 'Branch X']);
+    $other = Location::factory()->brandShop()->create(['name' => 'Branch Y']);
+    $stocked = Unit::factory()->create(['quantity' => 9]);
+    $elsewhere = Unit::factory()->create(['quantity' => 9]);
+
+    stockAtLocation($stocked, 6, $branch->id);
+    stockAtLocation($elsewhere, 9, $other->id);
+
+    $this->get(route('sales-orders.search-units', [
+        'location_id' => $branch->id,
+        'unit_ids' => [$stocked->id, $elsewhere->id],
+    ]))
+        ->assertOk()
+        ->assertJsonCount(1, 'units')
+        ->assertJsonPath('units.0.id', (int) $stocked->id)
+        ->assertJsonPath('units.0.quantity', 6);
+});
+
 it('renders the product search field on the create and edit forms', function () {
     actingAsSuperAdmin();
 
     $unit = Unit::factory()->create(['quantity' => 50]);
-
     $this->get(route('sales-orders.create'))
         ->assertOk()
         ->assertSee('Search product or scan barcode')

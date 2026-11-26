@@ -43,7 +43,7 @@
         ? (int) request('branch')
         : null;
     $branchFilterName = $branchFilter !== null
-        ? ($branches->firstWhere('id', $branchFilter)?->name ?? 'the selected branch')
+        ? ($locations->firstWhere('id', $branchFilter)?->name ?? 'the selected branch')
         : null;
 @endphp
 
@@ -260,8 +260,8 @@
                     <select name="branch" onchange="this.form.submit()"
                             class="rounded-xl border border-line bg-surface py-2 px-2.5 text-xs font-semibold text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 cursor-pointer">
                         <option value="">All Branches</option>
-                        @foreach($branches as $branch)
-                            <option value="{{ $branch->id }}" @selected($branchFilter === $branch->id)>{{ $branch->name }}</option>
+                        @foreach($locations as $location)
+                            <option value="{{ $location->id }}" @selected($branchFilter === $location->id)>{{ $location->name }}</option>
                         @endforeach
                     </select>
                     <select name="location_id" onchange="this.form.submit()"

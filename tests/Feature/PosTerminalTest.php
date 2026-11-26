@@ -2,14 +2,17 @@
 
 declare(strict_types=1);
 
+use App\Models\Brand;
 use App\Models\Customer;
 use App\Models\Location;
 use App\Models\Product;
 use App\Models\SalesInvoice;
 use App\Models\Unit;
 use App\Models\User;
+use App\Services\StockService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\SettingsSeeder;
+use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
@@ -45,8 +48,42 @@ it('renders the POS terminal for POS users with the walk-in option', function ()
     $this->get(route('pos.index'))
         ->assertOk()
         ->assertSee('POS Terminal')
-        ->assertSee('Walk-in Customer')
+        ->assertSee('Walk-in')
         ->assertSee('Complete Sale');
+});
+
+it('keeps the cart, customer and tendered amount when the server rejects a sale', function () {
+    actingAsSuperAdmin();
+
+    $product = Product::factory()->create(['name' => 'Restored Cart Item', 'storage' => null, 'color' => null]);
+    $unit = Unit::factory()->for($product)->create(['quantity' => 50]);
+    $location = Location::factory()->create(['name' => 'Restored Outlet']);
+    stockAtLocation($unit, 5, $location->id);
+
+    // A new customer without a mobile number is rejected after validation.
+    $this->from(route('pos.index'))
+        ->post(route('pos.store'), [
+            'location_id' => $location->id,
+            'customer_id' => null,
+            'customer_name' => 'Karim Uddin',
+            'mobile_no' => null,
+            'cart_discount' => 25,
+            'paid_amount' => 750,
+            'items' => [
+                ['unit_id' => $unit->id, 'quantity' => 2, 'unit_price' => 500, 'discount' => 10],
+            ],
+        ])
+        ->assertRedirect(route('pos.index'));
+
+    $this->get(route('pos.index'))
+        ->assertOk()
+        ->assertSee('Restored Cart Item')
+        ->assertSee('\u0022product_name\u0022:\u0022Restored Cart Item\u0022', false)
+        ->assertSee('\u0022quantity\u0022:2', false)
+        ->assertSee('\u0022unit_price\u0022:500', false)
+        ->assertSee("customerName: 'Karim Uddin'", false)
+        ->assertSee('paidAmount: 750', false)
+        ->assertSee('discountValue: 25', false);
 });
 
 it('records a quick sale: creates AND posts the invoice with the stock-out', function () {
@@ -200,14 +237,25 @@ it('never floors the grand total below zero when the discount exceeds the subtot
 
     $unit = Unit::factory()->create(['quantity' => 50]);
 
-    $this->post(route('pos.store'), posSalePayload($unit, 0, ['cart_discount' => 5000]));
+    $this->post(route('pos.store'), posSalePayload($unit, 100, ['cart_discount' => 5000]));
 
     expect((float) SalesInvoice::first()->grand_total)->toBe(0.0);
 });
 
+it('requires a tendered amount greater than zero', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+
+    $this->post(route('pos.store'), posSalePayload($unit, 0))
+        ->assertSessionHasErrors('paid_amount');
+
+    expect(SalesInvoice::count())->toBe(0);
+});
+
 it('shows only the branch products to a branch user in the POS search', function () {
-    $branchA = Location::factory()->create(['name' => 'Branch A']);
-    $branchB = Location::factory()->create(['name' => 'Branch B']);
+    $branchA = Location::factory()->brandShop()->create(['name' => 'Branch A']);
+    $branchB = Location::factory()->brandShop()->create(['name' => 'Branch B']);
 
     $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $branchA->id]);
     $manager->assignRole('Outlet Manager');
@@ -237,10 +285,217 @@ it('shows branch availability to the super admin in the POS search', function ()
     $this->get(route('pos.search-units'))
         ->assertOk()
         ->assertJsonPath('units.0.quantity', 5)
+        ->assertJsonPath('units.0.in_stock', true)
         ->assertJsonPath('units.0.branches.0.name', 'Branch A')
         ->assertJsonPath('units.0.branches.0.quantity', 3)
         ->assertJsonPath('units.0.branches.1.name', 'Branch B')
         ->assertJsonPath('units.0.branches.1.quantity', 2);
+});
+
+it('includes the brand name and logo in the POS search results', function () {
+    actingAsSuperAdmin();
+
+    $brand = Brand::factory()->create(['name' => 'Apple', 'logo' => 'brand-logos/apple.jpg']);
+    $product = Product::factory()->for($brand)->create(['name' => 'iPhone 15', 'storage' => null, 'color' => null]);
+    $unit = Unit::factory()->for($product)->create(['quantity' => 12]);
+
+    $this->get(route('pos.search-units', ['search' => 'iPhone']))
+        ->assertOk()
+        ->assertJsonPath('units.0.id', $unit->id)
+        ->assertJsonPath('units.0.brand_name', 'Apple')
+        ->assertJsonPath('units.0.brand_logo', Storage::disk('public')->url('brand-logos/apple.jpg'));
+});
+
+it('includes the product photo in the POS search results', function () {
+    actingAsSuperAdmin();
+
+    $product = Product::factory()->create(['name' => 'iPhone 15', 'storage' => null, 'color' => null, 'photo' => 'products/iphone-15.jpg']);
+    $unit = Unit::factory()->for($product)->create(['quantity' => 12]);
+
+    $this->get(route('pos.search-units', ['search' => 'iPhone']))
+        ->assertOk()
+        ->assertJsonPath('units.0.photo', Storage::disk('public')->url('products/iphone-15.jpg'));
+});
+
+it('defaults the super admin POS to the main warehouse and lists all products there', function () {
+    actingAsSuperAdmin();
+
+    $warehouse = Location::factory()->warehouse()->create(['name' => 'Main Warehouse']);
+    Location::factory()->create(['name' => 'Bandarban']);
+    $product = Product::factory()->create(['name' => 'S23 Ultra', 'storage' => null, 'color' => null]);
+    $unit = Unit::factory()->for($product)->create(['quantity' => 8]);
+
+    $this->get(route('pos.index'))
+        ->assertOk()
+        ->assertSee('locationId: '.$warehouse->id, false);
+
+    $this->get(route('pos.search-units', ['search' => 'S23 Ultra', 'location_id' => $warehouse->id]))
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('units.0.display_name', 'S23 Ultra');
+});
+
+it('lets the super admin select and sell a product whose opening stock sits in the central pool', function () {
+    actingAsSuperAdmin();
+
+    $warehouse = Location::factory()->warehouse()->create(['name' => 'Main Warehouse']);
+    $unit = Unit::factory()->create(['quantity' => 8]);
+
+    $this->get(route('pos.search-units', ['search' => $unit->product->name, 'location_id' => $warehouse->id]))
+        ->assertOk()
+        ->assertJsonPath('units.0.id', (int) $unit->id)
+        ->assertJsonPath('units.0.quantity', 8)
+        ->assertJsonPath('units.0.in_stock', true);
+
+    $this->post(route('pos.store'), [
+        'location_id' => $warehouse->id,
+        'paid_amount' => 800,
+        'items' => [
+            ['unit_id' => $unit->id, 'quantity' => 1, 'unit_price' => 800, 'discount' => 0],
+        ],
+    ])->assertRedirect(route('pos.index'));
+
+    expect(SalesInvoice::count())->toBe(1)
+        ->and($unit->fresh()->quantity)->toBe(7);
+});
+
+it('judges super admin availability against the selected branch location', function () {
+    actingAsSuperAdmin();
+
+    $branchA = Location::factory()->create(['name' => 'Branch A']);
+    $branchB = Location::factory()->create(['name' => 'Branch B']);
+    $unit = Unit::factory()->create(['quantity' => 3]);
+    stockAtLocation($unit, 3, $branchA->id);
+
+    // Stocked at the selected branch: selectable.
+    $this->get(route('pos.search-units', ['location_id' => $branchA->id]))
+        ->assertOk()
+        ->assertJsonPath('units.0.quantity', 3)
+        ->assertJsonPath('units.0.in_stock', true)
+        ->assertJsonPath('units.0.sell_location', 'Branch A');
+
+    // Not stocked at the selected branch: shown as insufficient stock.
+    $this->get(route('pos.search-units', ['location_id' => $branchB->id]))
+        ->assertOk()
+        ->assertJsonPath('units.0.quantity', 0)
+        ->assertJsonPath('units.0.in_stock', false);
+});
+
+it('creates and links a new customer from the POS sale', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $payload = posSalePayload($unit, 1000);
+    $payload['customer_id'] = null;
+    $payload['customer_name'] = 'Karim Uddin';
+    $payload['mobile_no'] = '01712345678';
+
+    $this->post(route('pos.store'), $payload)
+        ->assertRedirect(route('pos.index'));
+
+    $customer = Customer::query()->where('name', 'Karim Uddin')->firstOrFail();
+
+    expect($customer->mobile)->toBe('01712345678')
+        ->and(SalesInvoice::first()->customer_id)->toBe($customer->id);
+});
+
+it('links an existing customer by typed name on the POS sale', function () {
+    actingAsSuperAdmin();
+
+    $existing = Customer::factory()->create(['name' => 'Rahim Store', 'mobile' => '01811122233']);
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $payload = posSalePayload($unit, 1000);
+    $payload['customer_id'] = null;
+    $payload['customer_name'] = 'Rahim Store';
+    $payload['mobile_no'] = '01811122233';
+
+    $this->post(route('pos.store'), $payload)
+        ->assertRedirect(route('pos.index'));
+
+    expect(Customer::count())->toBe(1)
+        ->and(SalesInvoice::first()->customer_id)->toBe($existing->id);
+});
+
+it('requires a mobile number when adding a new customer on the POS sale', function () {
+    actingAsSuperAdmin();
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $payload = posSalePayload($unit, 1000);
+    $payload['customer_id'] = null;
+    $payload['customer_name'] = 'Karim Uddin';
+    $payload['mobile_no'] = null;
+
+    $this->post(route('pos.store'), $payload)
+        ->assertSessionHasErrors('mobile_no');
+
+    expect(SalesInvoice::count())->toBe(0)
+        ->and(Customer::count())->toBe(0);
+});
+
+it('rejects a new customer whose mobile no already belongs to another customer', function () {
+    actingAsSuperAdmin();
+
+    Customer::factory()->create(['name' => 'Rahim Store', 'mobile' => '01811122233']);
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $payload = posSalePayload($unit, 1000);
+    $payload['customer_id'] = null;
+    $payload['customer_name'] = 'Karim Uddin';
+    $payload['mobile_no'] = '01811122233';
+
+    $this->post(route('pos.store'), $payload)
+        ->assertSessionHasErrors('mobile_no');
+
+    expect(SalesInvoice::count())->toBe(0)
+        ->and(Customer::count())->toBe(1);
+});
+
+it('does not require a mobile number when the typed name resolves to an existing customer', function () {
+    actingAsSuperAdmin();
+
+    $existing = Customer::factory()->create(['name' => 'Rahim Store', 'mobile' => '01811122233']);
+
+    $unit = Unit::factory()->create(['quantity' => 50]);
+    $payload = posSalePayload($unit, 1000);
+    $payload['customer_id'] = null;
+    $payload['customer_name'] = 'Rahim Store';
+    $payload['mobile_no'] = null;
+
+    $this->post(route('pos.store'), $payload)
+        ->assertRedirect(route('pos.index'));
+
+    expect(Customer::count())->toBe(1)
+        ->and(SalesInvoice::first()->customer_id)->toBe($existing->id)
+        ->and($existing->fresh()->mobile)->toBe('01811122233');
+});
+
+it('returns sold-out branch products as disabled with their branch location', function () {
+    $branch = Location::factory()->create(['name' => 'Branch A']);
+
+    $manager = User::factory()->create(['email_verified_at' => now(), 'branch_id' => $branch->id]);
+    $manager->assignRole('Outlet Manager');
+
+    $inStock = Unit::factory()->for(Product::factory()->create(['name' => 'Aurora In-Stock Phone']))->create(['quantity' => 5]);
+    $soldOut = Unit::factory()->for(Product::factory()->create(['name' => 'Zephyr Sold-Out Phone']))->create(['quantity' => 5]);
+    stockAtLocation($inStock, 5, $branch->id);
+    stockAtLocation($soldOut, 5, $branch->id);
+    StockService::sell($soldOut, 5, null, 'Test sale.', $branch->id);
+
+    $this->actingAs($manager)
+        ->get(route('pos.search-units'))
+        ->assertOk()
+        ->assertJsonCount(2, 'units')
+        ->assertJsonPath('units.0.id', $inStock->id)
+        ->assertJsonPath('units.0.quantity', 5)
+        ->assertJsonPath('units.0.in_stock', true)
+        ->assertJsonPath('units.0.branches.0.name', 'Branch A')
+        ->assertJsonPath('units.0.branches.0.quantity', 5)
+        ->assertJsonPath('units.1.id', $soldOut->id)
+        ->assertJsonPath('units.1.quantity', 0)
+        ->assertJsonPath('units.1.in_stock', false)
+        ->assertJsonPath('units.1.branches.0.name', 'Branch A')
+        ->assertJsonPath('units.1.branches.0.quantity', 0);
 });
 
 it('blocks a restricted branch user from spoofing location_id to sell from another branch', function () {
@@ -298,7 +553,7 @@ it('enforces catalog unit price and discount bounds for branch staff on POS sale
         ->post(route('pos.store'), [
             'location_id' => $branch->id,
             'cart_discount' => 20000,
-            'paid_amount' => 0,
+            'paid_amount' => 15000,
             'items' => [
                 ['unit_id' => $unit->id, 'quantity' => 1, 'unit_price' => 15000, 'discount' => 0],
             ],

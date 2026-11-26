@@ -83,10 +83,10 @@
             @if(auth()->user()?->hasRole('Super Admin'))
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">Branch</label>
-                    <select name="branch_id" class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20">
+                    <select name="location_id" class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20">
                         <option value="">All</option>
-                        @foreach($branches as $branch)
-                            <option value="{{ $branch->id }}" @selected(request('branch_id') == $branch->id)>{{ $branch->name }}</option>
+                        @foreach($locations as $location)
+                            <option value="{{ $location->id }}" @selected(request('location_id') == $location->id)>{{ $location->name }}</option>
                         @endforeach
                     </select>
                 </div>

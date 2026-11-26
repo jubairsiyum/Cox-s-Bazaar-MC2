@@ -62,13 +62,13 @@ it('filters the report by date range and payment status', function () {
         ->assertDontSee($due->invoice_no);
 });
 
-it('filters the report by branch', function () {
+it('filters the report by outlet location', function () {
     actingAsSuperAdmin();
 
     $mine = reportInvoice(1000, 500, ['branch_id' => null]);
     $other = reportInvoice(700, 700, ['branch_id' => null]);
 
-    $this->get(route('reports.sales', ['branch_id' => 999]))
+    $this->get(route('reports.sales', ['location_id' => 999]))
         ->assertOk()
         ->assertDontSee($mine->invoice_no);
 

@@ -93,7 +93,7 @@ it('filters the purchase dues list by payment request status and branch', functi
         ->assertSee($plain->reference_no)
         ->assertDontSee($requested->reference_no);
 
-    $this->get(route('purchase-dues.index', ['branch_id' => $branch->id]))
+    $this->get(route('purchase-dues.index', ['location_id' => $branchLocation->id]))
         ->assertOk()
         ->assertSee($requested->reference_no)
         ->assertDontSee($plain->reference_no);

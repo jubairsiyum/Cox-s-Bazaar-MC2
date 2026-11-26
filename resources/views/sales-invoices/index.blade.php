@@ -6,7 +6,7 @@
 @section('content')
 @php
     $exportParams = array_filter(
-        request()->only(['search', 'customer_id', 'status', 'payment_status', 'date_from', 'date_to', 'branch_id', 'location_id']),
+        request()->only(['search', 'customer_id', 'status', 'payment_status', 'date_from', 'date_to', 'location_id']),
         fn ($value) => $value !== null && $value !== '',
     );
 @endphp
@@ -122,15 +122,6 @@
             @if(auth()->user()?->hasRole('Super Admin'))
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">Branch</label>
-                    <select name="branch_id" class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20">
-                        <option value="">All</option>
-                        @foreach($branches as $branch)
-                            <option value="{{ $branch->id }}" @selected(request('branch_id') == $branch->id)>{{ $branch->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">Location</label>
                     <select name="location_id" class="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink shadow-2xs focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20">
                         <option value="">All</option>
                         @foreach($locations as $location)
@@ -170,7 +161,7 @@
                         <th class="py-3.5 px-5">Invoice No</th>
                         <th class="py-3.5 px-5">Date</th>
                         <th class="py-3.5 px-5">Customer</th>
-                        <th class="py-3.5 px-5">Location</th>
+                        <th class="py-3.5 px-5">Branch</th>
                         <th class="py-3.5 px-5">Status</th>
                         <th class="py-3.5 px-5">Payment</th>
                         <th class="py-3.5 px-5 text-right">Total</th>

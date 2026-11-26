@@ -11,7 +11,6 @@ use App\Exports\StockTransferExport;
 use App\Helpers\Money;
 use App\Http\Requests\StockTransfer\StoreStockTransferRequest;
 use App\Http\Requests\StockTransfer\UpdateStockTransferRequest;
-use App\Models\Branch;
 use App\Models\Location;
 use App\Models\Product;
 use App\Models\StockTransfer;
@@ -70,14 +69,12 @@ class StockTransferController extends Controller
             $query->where(fn ($q) => $q->whereIn('from_location_id', $ids)->orWhereIn('to_location_id', $ids));
         }
 
-        // Overview branch filter: matches transfers where either side of the
-        // move belongs to the selected branch.
+        // Locations are merged into branches: the selected value is an outlet
+        // location, matched on either side of the transfer.
         $query->when($request->filled('branch'), function ($q) use ($request) {
-            $branchLocationIds = Location::query()
-                ->where('branch_id', $request->integer('branch'))
-                ->pluck('id');
+            $locationId = $request->integer('branch');
 
-            $q->where(fn ($q) => $q->whereIn('from_location_id', $branchLocationIds)->orWhereIn('to_location_id', $branchLocationIds));
+            $q->where(fn ($inner) => $inner->where('from_location_id', $locationId)->orWhere('to_location_id', $locationId));
         });
 
         $transfers = $query
@@ -90,7 +87,7 @@ class StockTransferController extends Controller
             'perPage' => $perPage,
             'sort' => $sort,
             'direction' => $direction,
-            'branches' => Branch::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
+            'locations' => LocationScope::scopeQuery(Location::query()->active(), $request->user(), 'id')->orderBy('name')->get(),
         ]);
     }
 

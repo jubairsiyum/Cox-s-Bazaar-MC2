@@ -42,7 +42,7 @@ it('refuses a sale that would drive overall stock below zero', function () {
 it('refuses a POS sale of stock the branch does not hold and keeps the quantity', function () {
     actingAsSuperAdmin();
 
-    $location = Location::factory()->create();
+    $location = Location::factory()->brandShop()->create();
     $unit = Unit::factory()->create(['quantity' => 0]);
     StockService::restock($unit, 1, null, null, $location->id);
 
@@ -63,7 +63,7 @@ it('refuses a POS sale of stock the branch does not hold and keeps the quantity'
 });
 
 it('refuses a purchase return that would drive branch stock below zero', function () {
-    $location = Location::factory()->create();
+    $location = Location::factory()->brandShop()->create();
     $unit = Unit::factory()->create(['quantity' => 0]);
     StockService::restock($unit, 2, null, null, $location->id);
 
@@ -74,7 +74,7 @@ it('refuses a purchase return that would drive branch stock below zero', functio
 });
 
 it('refuses a stock adjustment that would take a branch below zero', function () {
-    $location = Location::factory()->create();
+    $location = Location::factory()->brandShop()->create();
     $unit = Unit::factory()->create(['quantity' => 0]);
     StockService::restock($unit, 5, null, null, null);
 
