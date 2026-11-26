@@ -192,6 +192,87 @@ Alpine.store('theme', {
   },
 });
 
+// Collapsible desktop sidebar + mobile drawer store
+const syncSidebarAttr = (expanded) => {
+  document.documentElement.setAttribute('data-sidebar', expanded ? 'expanded' : 'collapsed');
+};
+
+const readSidebarExpanded = () => {
+  const saved = read('sidebarExpanded');
+  return saved === null ? true : saved === 'true';
+};
+
+Alpine.store('sidebar', {
+  isExpanded: window.innerWidth >= 1024 ? readSidebarExpanded() : false,
+  isMobileOpen: false,
+  isHovered: false,
+  _hoverTimer: null,
+
+  init() {
+    this.syncFromViewport();
+    window.addEventListener('resize', () => this.syncFromViewport());
+  },
+
+  syncFromViewport() {
+    if (window.innerWidth >= 1024) {
+      this.isMobileOpen = false;
+      this.isExpanded = readSidebarExpanded();
+      syncSidebarAttr(this.isExpanded);
+    } else {
+      this.isHovered = false;
+      this.isExpanded = false;
+      syncSidebarAttr(false);
+    }
+  },
+
+  toggleExpanded() {
+    if (window.innerWidth < 1024) {
+      this.toggleMobileOpen();
+      return;
+    }
+    clearTimeout(this._hoverTimer);
+    this.isExpanded = !this.isExpanded;
+    this.isHovered = false;
+    this.isMobileOpen = false;
+    write('sidebarExpanded', this.isExpanded ? 'true' : 'false');
+    syncSidebarAttr(this.isExpanded);
+  },
+
+  setExpanded(val) {
+    clearTimeout(this._hoverTimer);
+    this.isExpanded = !!val;
+    this.isHovered = false;
+    this.isMobileOpen = false;
+    if (window.innerWidth >= 1024) {
+      write('sidebarExpanded', this.isExpanded ? 'true' : 'false');
+      syncSidebarAttr(this.isExpanded);
+    }
+  },
+
+  toggleMobileOpen() {
+    this.isMobileOpen = !this.isMobileOpen;
+  },
+
+  setMobileOpen(val) {
+    this.isMobileOpen = !!val;
+  },
+
+  setHovered(val) {
+    if (window.innerWidth < 1024 || this.isExpanded) {
+      this.isHovered = false;
+      return;
+    }
+    clearTimeout(this._hoverTimer);
+    if (val) {
+      this.isHovered = true;
+    } else {
+      this._hoverTimer = setTimeout(() => {
+        this.isHovered = false;
+      }, 60);
+    }
+  },
+});
+
 registerMotion(Alpine);
 startMotion();
 

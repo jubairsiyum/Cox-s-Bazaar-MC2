@@ -40,6 +40,8 @@ it('does not expose removed tailadmin sample routes or sidebar menu items', func
 
     $this->get(route('dashboard'))
         ->assertOk()
+        ->assertSee('erp-sidebar-slot')
+        ->assertSee('Toggle sidebar')
         ->assertDontSee('TailAdmin Components')
         ->assertDontSee('Ecommerce Demo');
 });
