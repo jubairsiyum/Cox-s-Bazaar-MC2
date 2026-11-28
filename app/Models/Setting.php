@@ -15,6 +15,12 @@ class Setting extends Model
 
     private const CACHE_NULL_SENTINEL = '__setting_null__';
 
+    /** @var array<string, mixed> */
+    private static array $memo = [];
+
+    /** @var array<string, array<string, mixed>> */
+    private static array $groupMemo = [];
+
     protected $fillable = ['key', 'value', 'group', 'label', 'updated_by'];
 
     protected $casts = ['updated_at' => 'datetime'];
@@ -37,11 +43,16 @@ class Setting extends Model
      */
     public static function get(string $key, mixed $default = null): mixed
     {
-        $cached = Cache::remember(
-            self::cacheKey($key),
-            self::CACHE_TTL_SECONDS,
-            static fn (): mixed => static::query()->where('key', $key)->value('value') ?? self::CACHE_NULL_SENTINEL
-        );
+        if (array_key_exists($key, self::$memo)) {
+            $cached = self::$memo[$key];
+        } else {
+            $cached = Cache::remember(
+                self::cacheKey($key),
+                self::CACHE_TTL_SECONDS,
+                static fn (): mixed => static::query()->where('key', $key)->value('value') ?? self::CACHE_NULL_SENTINEL
+            );
+            self::$memo[$key] = $cached;
+        }
 
         return $cached === self::CACHE_NULL_SENTINEL ? $default : $cached;
     }
@@ -66,7 +77,11 @@ class Setting extends Model
      */
     public static function group(string $group): array
     {
-        return Cache::remember(
+        if (array_key_exists($group, self::$groupMemo)) {
+            return self::$groupMemo[$group];
+        }
+
+        return self::$groupMemo[$group] = Cache::remember(
             self::groupCacheKey($group),
             self::CACHE_TTL_SECONDS,
             static fn (): array => static::query()
@@ -81,10 +96,14 @@ class Setting extends Model
      */
     public static function forgetCache(string $key, ?string $group = null): void
     {
+        unset(self::$memo[$key]);
         Cache::forget(self::cacheKey($key));
 
         if ($group !== null && $group !== '') {
+            unset(self::$groupMemo[$group]);
             Cache::forget(self::groupCacheKey($group));
+        } else {
+            self::$groupMemo = [];
         }
 
         if (! str_starts_with($key, 'numbering_counter_') && class_exists(DashboardMetricsService::class)) {

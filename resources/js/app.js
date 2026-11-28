@@ -1,8 +1,6 @@
 import { createPopper } from "@popperjs/core";
 import Alpine from "alpinejs";
 import persist from "@alpinejs/persist";
-import flatpickr from "flatpickr";
-import "flatpickr/dist/flatpickr.min.css";
 import "./bootstrap";
 import initCharts from "./components/chart";
 import registerUi from "./ui";
@@ -15,7 +13,14 @@ Alpine.plugin(persist);
 
 window.Alpine = Alpine;
 window.createPopper = createPopper;
-window.flatpickr = flatpickr;
+window.loadFlatpickr = async () => {
+    const [{ default: flatpickr }] = await Promise.all([
+        import("flatpickr"),
+        import("flatpickr/dist/flatpickr.min.css"),
+    ]);
+    window.flatpickr = flatpickr;
+    return flatpickr;
+};
 
 // ── Global helpers available in Alpine expressions ──────────
 window.formatBDT = (amount) => {

@@ -291,8 +291,24 @@ $status = $targetAmount <= 0 ? 'not_set' : ($achievedSales>= $targetAmount ? 'ac
                         </div>
                     </div>
 
-                    {{-- ApexCharts Smooth Gradient Area Chart (Line Chart 5) --}}
-                    <div class="w-full">
+                    {{-- ApexCharts Smooth Gradient Area Chart (Line Chart 5) with reserved-height skeleton --}}
+                    <div class="relative w-full min-h-[195px]" data-chart-wrapper aria-busy="true">
+                        <div data-chart-skeleton class="h-[195px] w-full rounded-2xl bg-soft/60 p-4 flex flex-col justify-between animate-pulse">
+                            <div class="h-3 w-28 rounded-full bg-line/80"></div>
+                            <div class="h-24 w-full rounded-xl bg-line/50"></div>
+                            <div class="flex justify-between gap-2">
+                                <div class="h-2.5 w-10 rounded-full bg-line/70"></div>
+                                <div class="h-2.5 w-10 rounded-full bg-line/70"></div>
+                                <div class="h-2.5 w-10 rounded-full bg-line/70"></div>
+                                <div class="h-2.5 w-10 rounded-full bg-line/70"></div>
+                            </div>
+                        </div>
+                        <div data-chart-error role="alert" class="hidden h-[195px] w-full flex-col items-center justify-center gap-2 rounded-2xl border border-line bg-soft/30 p-4 text-center">
+                            <p class="text-xs font-semibold text-ink">Unable to load trajectory chart</p>
+                            <button type="button" data-chart-retry class="rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-brand-500 hover:bg-soft cursor-pointer">
+                                Retry
+                            </button>
+                        </div>
                         <div data-dashboard-chart="daily-sales-trajectory" data-config='@json($trajectoryConfig)'></div>
                     </div>
                 </div>

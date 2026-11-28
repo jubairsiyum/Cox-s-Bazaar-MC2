@@ -89,6 +89,33 @@ class NotificationService
     }
 
     /**
+     * Return the scoped unread notification count, memoized on the active HTTP request
+     * so shared shell components (sidebar + topbar bell) do not execute duplicate COUNT(*) queries.
+     */
+    public static function unreadCountFor(?User $user): int
+    {
+        if ($user === null) {
+            return 0;
+        }
+
+        $attrKey = '_unread_notifications_count_'.$user->id;
+        if (app()->bound('request')) {
+            $req = request();
+            if ($req->attributes->has($attrKey)) {
+                return (int) $req->attributes->get($attrKey);
+            }
+        }
+
+        $count = (int) self::scopeFor($user->unreadNotifications(), $user)->count();
+
+        if (app()->bound('request')) {
+            request()->attributes->set($attrKey, $count);
+        }
+
+        return $count;
+    }
+
+    /**
      * Store notification links as site-relative paths (path + query + fragment)
      * instead of absolute URLs. An absolute URL hard-codes the host the request
      * was generated on (e.g. "localhost" vs "127.0.0.1"), so clicking it can

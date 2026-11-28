@@ -70,8 +70,8 @@ class SalesReportController extends Controller
             ->when($request->filled('customer_id'), fn ($q) => $q->where('customer_id', (int) $request->input('customer_id')))
             ->when($request->filled('payment_status'), fn ($q) => $q->where('payment_status', $request->string('payment_status')->toString()))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')->toString()))
-            ->when($request->filled('date_from'), fn ($q) => $q->whereDate('invoice_date', '>=', $request->string('date_from')->toString()))
-            ->when($request->filled('date_to'), fn ($q) => $q->whereDate('invoice_date', '<=', $request->string('date_to')->toString()));
+            ->when($request->filled('date_from'), fn ($q) => $q->where('invoice_date', '>=', $request->string('date_from')->toString().' 00:00:00'))
+            ->when($request->filled('date_to'), fn ($q) => $q->where('invoice_date', '<=', $request->string('date_to')->toString().' 23:59:59'));
 
         $query = SalesScope::scopeQuery($query, $request->user());
 

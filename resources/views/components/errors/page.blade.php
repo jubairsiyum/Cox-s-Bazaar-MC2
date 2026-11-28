@@ -41,7 +41,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     @if ($assetsReady)
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @vite(['resources/css/app.css', 'resources/css/error-scene.css', 'resources/js/app.js'])
     @else
         {{-- Assets not built (fresh deploy / build failure): still readable, no color literals needed. --}}
         <style>

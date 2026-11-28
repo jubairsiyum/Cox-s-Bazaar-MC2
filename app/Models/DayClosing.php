@@ -75,7 +75,7 @@ class DayClosing extends Model
 
         return static::query()
             ->where('location_id', $locationId)
-            ->whereDate('closing_date', $dateString)
+            ->whereBetween('closing_date', [$dateString, $dateString.' 23:59:59'])
             ->where('status', 'closed')
             ->exists();
     }

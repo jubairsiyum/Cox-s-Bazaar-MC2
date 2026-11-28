@@ -85,10 +85,11 @@
 
         <p class="mt-1 text-xs sm:text-sm text-muted">
           @if ($activeScopeLocation)
-            Showing live metrics for <strong class="text-ink">{{ $activeScopeLocation->name }}</strong> on {{ now()->format('l, d M Y') }}.
+            Showing live metrics for <strong class="text-ink">{{ $activeScopeLocation->name }}</strong> on {{ now()->format('l, d M Y') }}
           @else
-            Consolidated network overview across all distribution outlets and warehouses on {{ now()->format('l, d M Y') }}.
+            Consolidated network overview across all distribution outlets and warehouses on {{ now()->format('l, d M Y') }}
           @endif
+          <span class="text-muted/80"> · As of {{ $asOfFormatted ?? now()->format('d M, h:i A') }}</span>
         </p>
       </div>
 

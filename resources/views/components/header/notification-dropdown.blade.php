@@ -3,7 +3,7 @@
     $notifications = $user === null
         ? collect()
         : \App\Services\NotificationService::scopeFor($user->notifications(), $user)->latest()->limit(12)->get();
-    $unreadCount = $user === null ? 0 : \App\Services\NotificationService::scopeFor($user->unreadNotifications(), $user)->count();
+    $unreadCount = \App\Services\NotificationService::unreadCountFor($user);
 
     /**
      * Visual style per notification type (GenericDatabaseNotification):

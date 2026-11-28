@@ -39,6 +39,11 @@ export function mountChart(el, build) {
         }
         chart = new ApexCharts(el, opts);
         chart.render();
+        const wrapper = el.closest('[data-chart-wrapper]');
+        const skeleton = wrapper?.querySelector('[data-chart-skeleton]');
+        if (skeleton) skeleton.classList.add('hidden');
+        if (wrapper) wrapper.removeAttribute('aria-busy');
+        el.dataset.chartLoaded = '1';
     };
 
     const host = el.closest('.rv');

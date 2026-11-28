@@ -191,6 +191,8 @@ class DashboardMetricsService
             'dynamicBrandShares' => $raw['dynamicBrandShares'],
             'branchTargetPerformance' => $raw['branchTargetPerformanceData'],
             'networkTargetOverview' => $networkOverview,
+            'asOf' => $raw['asOf'] ?? now()->toIso8601String(),
+            'asOfFormatted' => $raw['asOfFormatted'] ?? now()->format('d M, h:i A'),
         ];
     }
 
@@ -353,6 +355,8 @@ class DashboardMetricsService
             'dynamicBrandShares' => $dynamicBrandShares,
             'branchTargetPerformanceData' => $branchTargetPerformanceData,
             'networkTargetOverviewData' => $networkTargetOverviewData,
+            'asOf' => now()->toIso8601String(),
+            'asOfFormatted' => now()->format('d M, h:i A'),
         ];
     }
 
@@ -1007,6 +1011,8 @@ class DashboardMetricsService
             'dynamicBrandShares' => [],
             'branchTargetPerformanceData' => null,
             'networkTargetOverviewData' => null,
+            'asOf' => now()->toIso8601String(),
+            'asOfFormatted' => now()->format('d M, h:i A'),
         ];
     }
 }

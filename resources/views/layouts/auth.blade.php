@@ -28,7 +28,7 @@
     <link rel="icon" href="/favicon.ico" sizes="any">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css', 'resources/css/auth.css', 'resources/js/app.js'])
 
     <!-- Cloak Style -->
     <style>

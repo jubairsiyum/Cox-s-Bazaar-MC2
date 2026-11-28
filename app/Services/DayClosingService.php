@@ -65,17 +65,17 @@ class DayClosingService
         // 1. Opening Balance: Previous day's counted cash or 0.00
         $previousClosing = DayClosing::query()
             ->where('location_id', $locationId)
-            ->whereDate('closing_date', '<', $dateString)
+            ->where('closing_date', '<', $dateString)
             ->where('status', 'closed')
             ->orderByDesc('closing_date')
             ->first();
 
         $openingBalance = $previousClosing ? (string) $previousClosing->counted_cash : '0.00';
 
-        // 2. Cash Sales on this date
+        // 2. Cash Sales on this date (sargable date range)
         $cashSales = (string) SalesInvoice::query()
             ->where('location_id', $locationId)
-            ->whereDate('invoice_date', $dateString)
+            ->whereBetween('invoice_date', [$dateString, $dateString.' 23:59:59'])
             ->where('status', '!=', SalesInvoiceStatus::Voided)
             ->sum('paid_amount');
 
@@ -87,7 +87,7 @@ class DayClosingService
         // 4. Completed Cash Remittances from this branch to HQ on this date
         $cashRemittances = (string) AccountTransfer::query()
             ->where('location_id', $locationId)
-            ->whereDate('transfer_date', $dateString)
+            ->whereBetween('transfer_date', [$dateString, $dateString.' 23:59:59'])
             ->where('status', AccountEntryStatus::Completed)
             ->sum('amount');
 
@@ -228,7 +228,7 @@ class DayClosingService
         // 1. Check if today's business day has been closed
         $todayClosing = DayClosing::query()
             ->where('location_id', $locationId)
-            ->whereDate('closing_date', $today)
+            ->whereBetween('closing_date', [$today, $today.' 23:59:59'])
             ->where('status', 'closed')
             ->first();
 
@@ -246,7 +246,7 @@ class DayClosingService
                     $q->where('location_id', $locationId)
                         ->orWhereHas('fromAccount', fn ($fq) => $fq->where('location_id', $locationId));
                 })
-                ->whereDate('transfer_date', '>=', $closingDate)
+                ->where('transfer_date', '>=', $closingDate)
                 ->whereHas('toAccount', function ($tq) use ($locationId) {
                     $tq->whereNull('location_id')
                         ->orWhere('location_id', '!=', $locationId)
@@ -299,7 +299,7 @@ class DayClosingService
         // Live cash sales, collections, and expenses for today
         $todayCashSales = (float) SalesInvoice::query()
             ->where('location_id', $locationId)
-            ->whereDate('invoice_date', $today)
+            ->whereBetween('invoice_date', [$today, $today.' 23:59:59'])
             ->where('status', '!=', SalesInvoiceStatus::Voided)
             ->sum('paid_amount');
 
@@ -307,7 +307,7 @@ class DayClosingService
         if (class_exists(CustomerCollection::class)) {
             $todayCollections = (float) CustomerCollection::query()
                 ->where('location_id', $locationId)
-                ->whereDate('collection_date', $today)
+                ->whereBetween('collection_date', [$today, $today.' 23:59:59'])
                 ->sum('amount');
         }
 
@@ -318,7 +318,7 @@ class DayClosingService
         // Check if there was unremitted cash from the most recent past closing
         $pastClosing = DayClosing::query()
             ->where('location_id', $locationId)
-            ->whereDate('closing_date', '<', $today)
+            ->where('closing_date', '<', $today)
             ->where('status', 'closed')
             ->orderByDesc('closing_date')
             ->first();
@@ -355,7 +355,7 @@ class DayClosingService
                 $q->where('location_id', $locationId)
                     ->orWhereHas('fromAccount', fn ($fq) => $fq->where('location_id', $locationId));
             })
-            ->whereDate('transfer_date', $today)
+            ->whereBetween('transfer_date', [$today, $today.' 23:59:59'])
             ->whereHas('toAccount', function ($tq) use ($locationId) {
                 $tq->whereNull('location_id')
                     ->orWhere('location_id', '!=', $locationId)
@@ -423,31 +423,164 @@ class DayClosingService
             ->where('type', '!=', LocationType::Warehouse)
             ->get(['id', 'name']);
 
+        $branchIds = $branchLocations->pluck('id')->map(static fn ($id): int => (int) $id)->all();
+        $today = now()->toDateString();
+        $todayEnd = $today.' 23:59:59';
+
         $totalClosings = 0.0;
         $totalSent = 0.0;
         $totalReceivable = 0.0;
-        $today = now()->toDateString();
         $closedCount = 0;
 
-        foreach ($branchLocations as $loc) {
-            $summary = self::getPayableToHqSummary($loc->id);
-            $totalClosings += $summary['cash_close_amount'];
-            $totalSent += $summary['transferred_to_hq'];
-            $totalReceivable += $summary['left_amount'];
+        if ($branchIds !== []) {
+            $todayClosings = DayClosing::query()
+                ->whereIn('location_id', $branchIds)
+                ->whereBetween('closing_date', [$today, $todayEnd])
+                ->where('status', 'closed')
+                ->get()
+                ->keyBy('location_id');
 
-            if (self::isDayClosed($loc->id, $today)) {
-                $closedCount++;
+            $closedCount = $todayClosings->count();
+            $openBranchIds = array_values(array_diff(
+                $branchIds,
+                $todayClosings->keys()->map(static fn ($id): int => (int) $id)->all()
+            ));
+
+            // Single bulk query for today's completed transfers (also supplies todaySentToHq)
+            $completedTransfersToday = AccountTransfer::query()
+                ->with(['fromAccount:id,location_id', 'toAccount.location:id,type'])
+                ->whereBetween('transfer_date', [$today, $todayEnd])
+                ->where('status', AccountEntryStatus::Completed)
+                ->get(['id', 'location_id', 'from_account_id', 'to_account_id', 'amount']);
+
+            $todaySentToHq = 0.0;
+            $completedByBranchToday = [];
+
+            foreach ($completedTransfersToday as $transfer) {
+                $amt = (float) $transfer->amount;
+                $toLocId = $transfer->toAccount?->location_id;
+                $toType = $transfer->toAccount?->location?->type;
+                $isToHqOrWarehouse = $toLocId === null
+                    || $toType === LocationType::Warehouse
+                    || ($toType?->value ?? $toType) === LocationType::Warehouse->value;
+
+                if ($isToHqOrWarehouse) {
+                    $todaySentToHq += $amt;
+                }
+
+                $srcLocId = $transfer->location_id ?? $transfer->fromAccount?->location_id;
+                if ($srcLocId !== null && in_array((int) $srcLocId, $branchIds, true)) {
+                    if ($isToHqOrWarehouse || (int) $toLocId !== (int) $srcLocId) {
+                        $completedByBranchToday[(int) $srcLocId] = ($completedByBranchToday[(int) $srcLocId] ?? 0.0) + $amt;
+                    }
+                }
             }
-        }
 
-        $todaySentToHq = (float) AccountTransfer::query()
-            ->whereDate('transfer_date', $today)
-            ->where('status', AccountEntryStatus::Completed)
-            ->whereHas('toAccount', function ($tq) {
-                $tq->whereNull('location_id')
-                    ->orWhereHas('location', fn ($l) => $l->where('type', LocationType::Warehouse));
-            })
-            ->sum('amount');
+            foreach ($todayClosings as $locId => $closing) {
+                $countedCash = (float) $closing->counted_cash;
+                $systemCash = (float) $closing->system_cash;
+                $baseCash = $countedCash > 0 ? $countedCash : $systemCash;
+                $remittedBeforeClose = (float) $closing->cash_remittances;
+                $totalCashClose = round($baseCash + $remittedBeforeClose, 2);
+
+                $completed = (float) ($completedByBranchToday[(int) $locId] ?? 0.0);
+                $transferredToHq = round(max($completed, $remittedBeforeClose), 2);
+                $leftAmount = max(0.0, round($totalCashClose - $transferredToHq, 2));
+
+                $totalClosings += $totalCashClose;
+                $totalSent += $transferredToHq;
+                $totalReceivable += $leftAmount;
+            }
+
+            if ($openBranchIds !== []) {
+                $salesByLoc = SalesInvoice::query()
+                    ->whereIn('location_id', $openBranchIds)
+                    ->whereBetween('invoice_date', [$today, $todayEnd])
+                    ->where('status', '!=', SalesInvoiceStatus::Voided)
+                    ->groupBy('location_id')
+                    ->selectRaw('location_id, COALESCE(SUM(paid_amount), 0) as total')
+                    ->pluck('total', 'location_id');
+
+                $collectionsByLoc = class_exists(CustomerCollection::class)
+                    ? CustomerCollection::query()
+                        ->whereIn('location_id', $openBranchIds)
+                        ->whereBetween('collection_date', [$today, $todayEnd])
+                        ->groupBy('location_id')
+                        ->selectRaw('location_id, COALESCE(SUM(amount), 0) as total')
+                        ->pluck('total', 'location_id')
+                    : collect();
+
+                $expensesByLoc = AccountTransaction::query()
+                    ->whereIn('location_id', $openBranchIds)
+                    ->where('type', AccountTransactionType::Expense)
+                    ->where('status', AccountEntryStatus::Completed)
+                    ->whereBetween('transaction_date', [$today, $todayEnd])
+                    ->whereHas('account', fn ($q) => $q->where('type', AccountType::Cash))
+                    ->groupBy('location_id')
+                    ->selectRaw('location_id, COALESCE(SUM(amount), 0) as total')
+                    ->pluck('total', 'location_id');
+
+                $pastClosings = DayClosing::query()
+                    ->whereIn('location_id', $openBranchIds)
+                    ->where('closing_date', '<', $today)
+                    ->where('status', 'closed')
+                    ->orderByDesc('closing_date')
+                    ->get()
+                    ->unique('location_id')
+                    ->keyBy('location_id');
+
+                $yesterday = now()->subDay()->toDateString();
+
+                foreach ($openBranchIds as $locId) {
+                    $todayNetInflows = max(
+                        0.0,
+                        round(
+                            (float) ($salesByLoc[$locId] ?? 0)
+                            + (float) ($collectionsByLoc[$locId] ?? 0)
+                            - (float) ($expensesByLoc[$locId] ?? 0),
+                            2
+                        )
+                    );
+
+                    $pastUnremitted = 0.0;
+                    $pastClosing = $pastClosings->get($locId);
+                    if ($pastClosing !== null) {
+                        $pastCounted = (float) $pastClosing->counted_cash;
+                        $pastSystem = (float) $pastClosing->system_cash;
+                        $pastBase = $pastCounted > 0 ? $pastCounted : $pastSystem;
+                        $pastRemittedAtClose = (float) $pastClosing->cash_remittances;
+                        $pastTotal = round($pastBase + $pastRemittedAtClose, 2);
+
+                        $pastTransfers = (float) AccountTransfer::query()
+                            ->where(function ($q) use ($locId) {
+                                $q->where('location_id', $locId)
+                                    ->orWhereHas('fromAccount', fn ($fq) => $fq->where('location_id', $locId));
+                            })
+                            ->whereBetween('transfer_date', [$pastClosing->closing_date->toDateString(), $yesterday.' 23:59:59'])
+                            ->where('status', AccountEntryStatus::Completed)
+                            ->whereHas('toAccount', function ($tq) use ($locId) {
+                                $tq->whereNull('location_id')
+                                    ->orWhere('location_id', '!=', $locId)
+                                    ->orWhereHas('location', fn ($l) => $l->where('type', LocationType::Warehouse));
+                            })
+                            ->sum('amount');
+
+                        $pastRemitted = max($pastRemittedAtClose, $pastTransfers);
+                        $pastUnremitted = max(0.0, round($pastTotal - $pastRemitted, 2));
+                    }
+
+                    $transferredToHq = round((float) ($completedByBranchToday[$locId] ?? 0.0), 2);
+                    $totalCashDue = max(round($todayNetInflows + $pastUnremitted, 2), $transferredToHq);
+                    $leftAmount = max(0.0, round($totalCashDue - $transferredToHq, 2));
+
+                    $totalClosings += $totalCashDue;
+                    $totalSent += $transferredToHq;
+                    $totalReceivable += $leftAmount;
+                }
+            }
+        } else {
+            $todaySentToHq = 0.0;
+        }
 
         $effectiveSentToHq = round(max($todaySentToHq, $totalSent), 2);
         $isAllClear = $totalClosings <= 0 || $totalReceivable <= 0.001;
@@ -610,7 +743,7 @@ class DayClosingService
             ->where('location_id', $locationId)
             ->where('type', AccountTransactionType::Expense)
             ->where('status', AccountEntryStatus::Completed)
-            ->whereDate('transaction_date', $dateString)
+            ->whereBetween('transaction_date', [$dateString, $dateString.' 23:59:59'])
             ->whereHas('account', fn ($query) => $query->where('type', AccountType::Cash))
             ->sum('amount');
 

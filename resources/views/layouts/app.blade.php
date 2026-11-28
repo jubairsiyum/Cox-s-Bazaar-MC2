@@ -9,9 +9,16 @@
           var c = localStorage.getItem('color-theme');
           if (c && allowed.indexOf(c) > -1) theme = c;
           var t = localStorage.getItem('theme');
-          if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) root.classList.add('dark');
+          var isDark = t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches);
+          if (isDark) {
+            root.classList.add('dark');
+            root.setAttribute('data-color-scheme', 'dark');
+          } else {
+            root.classList.remove('dark');
+            root.setAttribute('data-color-scheme', 'light');
+          }
           if (localStorage.getItem('dir') === 'rtl') root.setAttribute('dir', 'rtl');
-          root.setAttribute('data-sidebar', localStorage.getItem('sidebarExpanded') === 'false' ? 'collapsed' : 'expanded');
+          root.setAttribute('data-sidebar', window.innerWidth >= 1024 && localStorage.getItem('sidebarExpanded') === 'false' ? 'collapsed' : 'expanded');
         } catch (e) {}
         root.setAttribute('data-theme', theme);
         if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -32,6 +39,11 @@
     <link rel="icon" href="/favicon.ico" sizes="any">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 
+    {{-- Non-blocking font preconnect + swap --}}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Hind+Siliguri:wght@400;500;600;700&display=swap">
+
     <!-- Scripts & Styles -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
@@ -42,22 +54,6 @@
         }
     </style>
 
-    <!-- Sidebar Store -->
-    <!-- Prevent flash of unstyled theme -->
-    <script>
-        (function() {
-            const savedTheme = localStorage.getItem('theme');
-            const isDark = savedTheme === 'dark';
-            if (isDark) {
-                document.documentElement.classList.add('dark');
-                document.documentElement.setAttribute('data-color-scheme', 'dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-                document.documentElement.setAttribute('data-color-scheme', 'light');
-            }
-        })();
-    </script>
-
     @stack('head')
 </head>
 
@@ -67,6 +63,53 @@
 @endphp
 
 <body class="min-h-screen bg-canvas font-sans text-ink antialiased p-3 sm:p-4 lg:p-5 selection:bg-brand-500/20 selection:text-brand-600">
+    {{-- Instant navigation top progress indicator (accessible, bfcache-safe) --}}
+    <div id="nav-progress" aria-hidden="true"></div>
+    <script>
+      (function () {
+        var bar = document.getElementById('nav-progress');
+        var timer = null;
+        function resetNav() {
+          clearTimeout(timer);
+          if (bar) bar.classList.remove('is-active', 'is-finishing');
+          var main = document.querySelector('main');
+          if (main) main.removeAttribute('aria-busy');
+        }
+        function startNav() {
+          if (!bar) return;
+          clearTimeout(timer);
+          bar.classList.remove('is-finishing');
+          void bar.offsetWidth;
+          bar.classList.add('is-active');
+          var main = document.querySelector('main');
+          if (main) main.setAttribute('aria-busy', 'true');
+        }
+        document.addEventListener('click', function (e) {
+          if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+          var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+          if (!a) return;
+          var target = a.getAttribute('target');
+          if ((target && target !== '_self') || a.hasAttribute('download')) return;
+          var href = a.getAttribute('href') || '';
+          if (!href || href.charAt(0) === '#' || /^(mailto:|tel:|javascript:)/i.test(href)) return;
+          try {
+            var url = new URL(a.href, window.location.href);
+            if (url.origin !== window.location.origin) return;
+            if (url.pathname === window.location.pathname && url.search === window.location.search && url.hash) return;
+          } catch (err) {
+            return;
+          }
+          startNav();
+          timer = setTimeout(resetNav, 12000);
+        }, true);
+        window.addEventListener('pagehide', function () {
+          if (bar && bar.classList.contains('is-active')) {
+            bar.classList.add('is-finishing');
+          }
+        });
+        window.addEventListener('pageshow', resetNav);
+      })();
+    </script>
 
     <div class="{{ $isDashboard ? 'enter mv-shell ' : '' }}flex min-h-[calc(100vh-2.5rem)] w-full gap-5 items-start" x-data="{ sidebar: false }">
         <x-dashboard.sidebar />

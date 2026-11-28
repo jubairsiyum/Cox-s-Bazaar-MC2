@@ -456,9 +456,28 @@
           @endif
         </div>
 
-        {{-- ApexCharts Area Chart --}}
+        {{-- ApexCharts Area Chart with reserved-height skeleton --}}
         <div class="mt-3 custom-scrollbar max-w-full overflow-x-auto flex-1">
-          <div class="min-w-[400px] sm:min-w-full">
+          <div class="relative min-w-[400px] sm:min-w-full min-h-[275px]" data-chart-wrapper aria-busy="true">
+            <div data-chart-skeleton class="h-[275px] w-full rounded-2xl bg-soft/60 p-4 flex flex-col justify-between animate-pulse">
+              <div class="flex justify-between">
+                <div class="h-3 w-32 rounded-full bg-line/80"></div>
+                <div class="h-3 w-16 rounded-full bg-line/70"></div>
+              </div>
+              <div class="h-44 w-full rounded-xl bg-line/50"></div>
+              <div class="flex justify-between gap-2">
+                <div class="h-2.5 w-10 rounded-full bg-line/70"></div>
+                <div class="h-2.5 w-10 rounded-full bg-line/70"></div>
+                <div class="h-2.5 w-10 rounded-full bg-line/70"></div>
+                <div class="h-2.5 w-10 rounded-full bg-line/70"></div>
+              </div>
+            </div>
+            <div data-chart-error role="alert" class="hidden h-[275px] w-full flex-col items-center justify-center gap-2 rounded-2xl border border-line bg-soft/30 p-4 text-center">
+              <p class="text-xs font-semibold text-ink">Unable to load brand share chart</p>
+              <button type="button" data-chart-retry class="rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-brand-500 hover:bg-soft cursor-pointer">
+                Retry
+              </button>
+            </div>
             <div x-ref="chart" data-dashboard-chart="brand-sales-share" data-config='@json($chartConfig)'></div>
           </div>
         </div>

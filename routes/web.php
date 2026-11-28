@@ -88,6 +88,9 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('verified')->group(function () {
         Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('dashboard/metrics', [DashboardController::class, 'metrics'])
+            ->middleware('throttle:60,1')
+            ->name('dashboard.metrics');
 
         Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');
         Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
